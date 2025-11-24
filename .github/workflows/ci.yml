@@ -19,7 +19,7 @@ jobs:
         working-directory: ./client/Conductor.Client.Web
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: '0'
 
@@ -103,7 +103,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: 17
           distribution: 'zulu'
@@ -150,7 +150,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin /k:"conductor" /o:"personal-james" /d:sonar.token="$SONAR_TOKEN"
+          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin /k:"conductor" /o:"personal-james" /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
           "${{ runner.temp }}/scanner/dotnet-sonarscanner" end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
@@ -176,7 +176,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: '0'
 

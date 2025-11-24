@@ -23,7 +23,7 @@ public static class Endpoints
         var endpoints = app.MapGroup("/applications")
             .WithTags("Application");
 
-        endpoints.MapPublicGroup()
+        endpoints.MapPrivateGroup()
             .MapEndpoint<CreateApplicationEndpoint>()
             .MapEndpoint<GetAllApplicationsEndpoint>()
             .MapEndpoint<GetApplicationEndpoint>();
@@ -34,7 +34,7 @@ public static class Endpoints
         var endpoints = app.MapGroup("/environments")
             .WithTags("Environment");
 
-        endpoints.MapPublicGroup()
+        endpoints.MapPrivateGroup()
             .MapEndpoint<CreateEnvironmentEndpoint>()
             .MapEndpoint<GetAllEnvironmentsEndpoint>()
             .MapEndpoint<GetEnvironmentEndpoint>();
@@ -45,7 +45,7 @@ public static class Endpoints
         var endpoints = app.MapGroup("/deployments")
             .WithTags("Deployment");
 
-        endpoints.MapPublicGroup()
+        endpoints.MapPrivateGroup()
             .MapEndpoint<CreateDeploymentEndpoint>();
     }
 
@@ -54,7 +54,7 @@ public static class Endpoints
         var endpoints = app.MapGroup("/resource-templates")
             .WithTags("Resource Template");
 
-        endpoints.MapPublicGroup()
+        endpoints.MapPrivateGroup()
             .MapEndpoint<CreateResourceTemplateEndpoint>()
             .MapEndpoint<CreateResourceTemplateWithVersionEndpoint>()
             .MapEndpoint<GetResourceTemplateEndpoint>()
@@ -75,6 +75,12 @@ public static class Endpoints
     {
         return app.MapGroup(prefix ?? string.Empty)
             .AllowAnonymous();
+    }
+    
+    private static RouteGroupBuilder MapPrivateGroup(this IEndpointRouteBuilder app, string? prefix = null)
+    {
+        return app.MapGroup(prefix ?? string.Empty)
+            .RequireAuthorization();
     }
 
     private static IEndpointRouteBuilder MapEndpoint<TEndpoint>(this IEndpointRouteBuilder app)
