@@ -54,6 +54,13 @@ jobs:
       - name: Check code formatting
         run: pnpm run format:check
 
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: ./client/Conductor.Client.Web
+
       - name: Build project
         run: pnpm run build
 
@@ -74,6 +81,13 @@ jobs:
       
       - uses: actions-rust-lang/setup-rust-toolchain@v1
    
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: ./client/Conductor.Client.Cli
+
       - name: Build 
         run: cargo build --release
 
@@ -151,11 +165,12 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
-            /k:"conductor" \
+            /k:"personal-james_conductor-engine" \
             /o:"personal-james" \
+            /n:"Conductor Engine" \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.qualitygate.wait=false \
-            /d:sonar.exclusions="**/bin/**,**/obj/**,engine/src/Conductor.Engine.Persistence/Migrations/**"
+            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**"
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
