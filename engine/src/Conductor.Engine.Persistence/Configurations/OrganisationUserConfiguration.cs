@@ -20,7 +20,7 @@ internal sealed class OrganisationUserConfiguration : IEntityTypeConfiguration<O
                 id => id.Value,
                 value => new OrganisationUserId(value)
             );
-        
+
         builder.Property(x => x.OrganisationId)
             .HasConversion(
                 id => id.Value,

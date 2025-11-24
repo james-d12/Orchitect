@@ -13,7 +13,7 @@ internal sealed class DeploymentConfiguration : IEntityTypeConfiguration<Deploym
     public void Configure(EntityTypeBuilder<Deployment> builder)
     {
         builder.ToTable("Deployments");
-        
+
         builder.HasKey(d => d.Id);
 
         builder.HasIndex(d => new { d.ApplicationId, d.EnvironmentId, d.CommitId, d.Status })

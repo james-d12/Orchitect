@@ -11,7 +11,7 @@ internal sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organ
     public void Configure(EntityTypeBuilder<Organisation> builder)
     {
         builder.ToTable("Organisations");
-        
+
         builder.HasKey(a => a.Id);
         builder.HasIndex(a => a.Name).IsUnique();
 

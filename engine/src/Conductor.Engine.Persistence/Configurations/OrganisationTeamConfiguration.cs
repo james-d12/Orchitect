@@ -9,7 +9,7 @@ internal sealed class OrganisationTeamConfiguration : IEntityTypeConfiguration<O
     public void Configure(EntityTypeBuilder<OrganisationTeam> builder)
     {
         builder.ToTable("OrganisationTeams");
-        
+
         builder.HasKey(s => s.Id);
         builder.HasIndex(s => new { s.Name, s.OrganisationId })
             .IsUnique();

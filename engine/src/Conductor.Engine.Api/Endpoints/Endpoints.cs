@@ -76,7 +76,7 @@ public static class Endpoints
         return app.MapGroup(prefix ?? string.Empty)
             .AllowAnonymous();
     }
-    
+
     private static RouteGroupBuilder MapPrivateGroup(this IEndpointRouteBuilder app, string? prefix = null)
     {
         return app.MapGroup(prefix ?? string.Empty)
