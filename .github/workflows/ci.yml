@@ -155,7 +155,7 @@ jobs:
             /o:"personal-james" \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.qualitygate.wait=false \
-            /d:sonar.exclusions="**/bin/**,**/obj/**,engine/src/Conductor.Engine.Persistence/Migrations/**"
+            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**"
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
