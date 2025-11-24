@@ -11,7 +11,15 @@ internal sealed class OrganisationUserConfiguration : IEntityTypeConfiguration<O
     {
         builder.ToTable("OrganisationUsers");
 
-        builder.HasKey(x => x.IdentityUserId);
+        builder.HasKey(s => s.Id);
+        builder.HasIndex(s => new { s.IdentityUserId, s.OrganisationId })
+            .IsUnique();
+
+        builder.Property(x => x.Id)
+            .HasConversion(
+                id => id.Value,
+                value => new OrganisationUserId(value)
+            );
 
         builder.Property(x => x.OrganisationId)
             .HasConversion(

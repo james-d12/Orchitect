@@ -10,6 +10,8 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
 {
     public void Configure(EntityTypeBuilder<Application> builder)
     {
+        builder.ToTable("Applications");
+
         builder.HasKey(a => a.Id);
 
         builder.Property(b => b.Name).IsRequired();

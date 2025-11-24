@@ -10,7 +10,10 @@ internal sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organ
 {
     public void Configure(EntityTypeBuilder<Organisation> builder)
     {
+        builder.ToTable("Organisations");
+
         builder.HasKey(a => a.Id);
+        builder.HasIndex(a => a.Name).IsUnique();
 
         builder.Property(b => b.Name).IsRequired();
         builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("now()");
@@ -21,12 +24,6 @@ internal sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organ
                 id => id.Value,
                 value => new OrganisationId(value)
             );
-
-        builder
-            .HasMany<OrganisationUser>()
-            .WithOne()
-            .HasForeignKey(u => u.OrganisationId)
-            .IsRequired();
 
         builder.HasMany<Application>()
             .WithOne()
@@ -39,5 +36,22 @@ internal sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organ
             .HasForeignKey(e => e.OrganisationId)
             .IsRequired()
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany<OrganisationTeam>()
+            .WithOne()
+            .HasForeignKey(ot => ot.OrganisationId)
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany<OrganisationService>()
+            .WithOne()
+            .HasForeignKey(o => o.OrganisationId)
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany<OrganisationUser>()
+            .WithOne()
+            .HasForeignKey(u => u.OrganisationId)
+            .IsRequired();
     }
 }

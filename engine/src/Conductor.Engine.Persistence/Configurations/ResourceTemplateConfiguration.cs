@@ -8,6 +8,8 @@ internal sealed class ResourceTemplateConfiguration : IEntityTypeConfiguration<R
 {
     public void Configure(EntityTypeBuilder<ResourceTemplate> builder)
     {
+        builder.ToTable("ResourceTemplates");
+
         builder.HasKey(r => r.Id);
 
         builder.HasIndex(r => r.Name).IsUnique();
