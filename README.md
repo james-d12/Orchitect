@@ -6,7 +6,13 @@ It is currently a multi language monorepo, consisting of 3 main components:
 
 - Engine: This is the heart of Conductor, it has all of the business logic, api, and persistence code.
 - CLI: This is a rust CLI tool that allows you to interact with Conductor's API through an easy to use CLI.
-- Web: Thisd is a Typescript based Web Portal that allows you to interact with Conductor's API.
+- Web: This is a Typescript based Web Portal that allows you to interact with Conductor's API.
+
+[![Engine Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=personal-james_conductor-engine&metric=alert_status&token=c14734eb1fea1906d0a1b4d7796d59f34dd9f661)](https://sonarcloud.io/summary/new_code?id=personal-james_conductor-engine)
+
+[![CLI Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=personal-james_conductor-cli&metric=alert_status&token=667e1a2c2d857e82f8ca39f191475b2b0f2b15b6)](https://sonarcloud.io/summary/new_code?id=personal-james_conductor-cli)
+ 
+[![Web Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=personal-james_conductor-web&metric=alert_status&token=38430168f73055fa515f93060746e7806b1195b1)](https://sonarcloud.io/summary/new_code?id=personal-james_conductor-web)
 
 # Getting Started
 
