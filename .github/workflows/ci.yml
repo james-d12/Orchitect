@@ -160,10 +160,10 @@ jobs:
           "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
             /k:"conductor" \
             /o:"personal-james" \
+            /n:"Conductor Engine" \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.qualitygate.wait=false \
-            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**" \
-            /d:sonar.projectName="Conductor Engine"
+            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**"
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
