@@ -80,10 +80,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           projectBaseDir: ./client/Conductor.Client.Cli
-          args: >
-            -Dsonar.projectKey=personal-james_conductor-cli
-            -Dsonar.organization=personal-james
-            -Dsonar.exclusions=**/target/**
 
       - name: Build 
         run: cargo build --release
@@ -166,7 +162,8 @@ jobs:
             /o:"personal-james" \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.qualitygate.wait=false \
-            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**"
+            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**" \
+            /d:sonar.projectName="Conductor Engine"
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
