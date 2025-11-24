@@ -43,7 +43,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("OrganisationId");
 
-                    b.ToTable("Applications");
+                    b.ToTable("Applications", (string)null);
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Deployment.Deployment", b =>
@@ -82,7 +82,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("ApplicationId", "EnvironmentId", "CommitId", "Status")
                         .IsUnique();
 
-                    b.ToTable("Deployments");
+                    b.ToTable("Deployments", (string)null);
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Environment.Environment", b =>
@@ -118,7 +118,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("OrganisationId");
 
-                    b.ToTable("Environments");
+                    b.ToTable("Environments", (string)null);
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.Organisation", b =>
@@ -142,20 +142,94 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Organisation");
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Organisations", (string)null);
                 });
 
-            modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationUser", b =>
+            modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationService", b =>
                 {
-                    b.Property<string>("IdentityUserId")
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("OrganisationId")
                         .HasColumnType("TEXT");
 
-                    b.HasKey("IdentityUserId");
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
 
                     b.HasIndex("OrganisationId");
+
+                    b.HasIndex("Name", "OrganisationId")
+                        .IsUnique();
+
+                    b.ToTable("OrganisationServices", (string)null);
+                });
+
+            modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationTeam", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("Name", "OrganisationId")
+                        .IsUnique();
+
+                    b.ToTable("OrganisationTeams", (string)null);
+                });
+
+            modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IdentityUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("IdentityUserId", "OrganisationId")
+                        .IsUnique();
 
                     b.ToTable("OrganisationUsers", (string)null);
                 });
@@ -192,7 +266,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("ApplicationId", "EnvironmentId", "ResourceTemplateId");
 
-                    b.ToTable("Resource");
+                    b.ToTable("Resources", (string)null);
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.ResourceTemplate.ResourceTemplate", b =>
@@ -231,7 +305,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("ResourceTemplates");
+                    b.ToTable("ResourceTemplates", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -257,7 +331,7 @@ namespace Conductor.Engine.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("RoleNameIndex");
 
-                    b.ToTable("AspNetRoles", (string)null);
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -280,7 +354,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("AspNetRoleClaims", (string)null);
+                    b.ToTable("RoleClaims", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUser", b =>
@@ -344,7 +418,7 @@ namespace Conductor.Engine.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
-                    b.ToTable("AspNetUsers", (string)null);
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
@@ -367,7 +441,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AspNetUserClaims", (string)null);
+                    b.ToTable("UserClaims", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
@@ -389,7 +463,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AspNetUserLogins", (string)null);
+                    b.ToTable("UserLogins", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
@@ -404,7 +478,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("AspNetUserRoles", (string)null);
+                    b.ToTable("UserRoles", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
@@ -423,7 +497,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
-                    b.ToTable("AspNetUserTokens", (string)null);
+                    b.ToTable("UserTokens", (string)null);
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Application.Application", b =>
@@ -479,6 +553,24 @@ namespace Conductor.Engine.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Environment.Environment", b =>
+                {
+                    b.HasOne("Conductor.Engine.Domain.Organisation.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationService", b =>
+                {
+                    b.HasOne("Conductor.Engine.Domain.Organisation.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationTeam", b =>
                 {
                     b.HasOne("Conductor.Engine.Domain.Organisation.Organisation", null)
                         .WithMany()

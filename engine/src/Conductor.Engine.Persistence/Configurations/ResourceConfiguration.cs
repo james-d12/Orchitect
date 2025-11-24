@@ -11,6 +11,8 @@ internal sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
 {
     public void Configure(EntityTypeBuilder<Resource> builder)
     {
+        builder.ToTable("Resources");
+        
         builder.HasKey(r => r.Id);
 
         builder.HasIndex(r => new { r.ApplicationId, r.EnvironmentId, r.ResourceTemplateId });

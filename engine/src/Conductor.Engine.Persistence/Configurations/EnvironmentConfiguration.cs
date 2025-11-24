@@ -10,6 +10,8 @@ internal sealed class EnvironmentConfiguration : IEntityTypeConfiguration<Enviro
 {
     public void Configure(EntityTypeBuilder<Environment> builder)
     {
+        builder.ToTable("Environments");
+        
         builder.HasKey(r => r.Id);
         builder.HasIndex(r => r.Name).IsUnique();
 
