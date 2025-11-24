@@ -74,6 +74,11 @@ jobs:
       
       - uses: actions-rust-lang/setup-rust-toolchain@v1
    
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
       - name: Build 
         run: cargo build --release
 
