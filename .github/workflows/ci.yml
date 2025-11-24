@@ -150,9 +150,17 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin /k:"conductor" /o:"personal-james" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.qualitygate.wait=false
+          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
+            /k:"conductor" \
+            /o:"personal-james" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.qualitygate.wait=false \
+            /d:sonar.exclusions="**/bin/**,**/obj/**,engine/src/Conductor.Engine.Persistence/Migrations/**"
+
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
-          "${{ runner.temp }}/scanner/dotnet-sonarscanner" end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+          "${{ runner.temp }}/scanner/dotnet-sonarscanner" end \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
       - name: Check No Pending Model Changes
         run: dotnet ef migrations has-pending-model-changes
