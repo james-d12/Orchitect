@@ -6,6 +6,7 @@ using Conductor.Engine.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -25,7 +26,6 @@ builder.Services.AddOptions<JwtOptions>()
 builder.Services
     .AddOpenApi()
     .AddEndpointsApiExplorer()
-    .AddSwaggerGen()
     .AddPersistenceServices()
     .AddInfrastructureServices();
 
@@ -43,10 +43,41 @@ builder.Services
         options.TokenValidationParameters.ValidIssuer = builder.Configuration["JwtOptions:Issuer"];
         options.TokenValidationParameters.ValidAudience = builder.Configuration["JwtOptions:Audience"];
         options.TokenValidationParameters.IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["JwtOptions:SigningKey"]!));
+            Encoding.UTF8.GetBytes(builder.Configuration["JwtOptions:Secret"]!));
+        options.TokenValidationParameters.ClockSkew = TimeSpan.Zero;
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = JwtBearerDefaults.AuthenticationScheme,
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter 'Bearer {token}'"
+    });
+
+    options.AddSecurityRequirement(doc =>
+    {
+        var schemeReference = new OpenApiSecuritySchemeReference("schema")
+        {
+            Reference = new OpenApiReferenceWithDescription()
+            {
+                Type = ReferenceType.SecurityScheme,
+                Id = JwtBearerDefaults.AuthenticationScheme
+            }
+        };
+
+        var requirement = new OpenApiSecurityRequirement();
+        requirement.Add(schemeReference, []);
+
+        return requirement;
+    });
+});
 
 await builder.Services.ApplyMigrations();
 

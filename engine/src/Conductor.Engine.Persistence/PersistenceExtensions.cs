@@ -1,6 +1,7 @@
 using Conductor.Engine.Domain.Application;
 using Conductor.Engine.Domain.Deployment;
 using Conductor.Engine.Domain.Environment;
+using Conductor.Engine.Domain.Organisation;
 using Conductor.Engine.Domain.ResourceTemplate;
 using Conductor.Engine.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -10,22 +11,26 @@ namespace Conductor.Engine.Persistence;
 
 public static class PersistenceExtensions
 {
-    public static IServiceCollection AddPersistenceServices(this IServiceCollection services)
+    extension(IServiceCollection services)
     {
-        services.AddDbContext<ConductorDbContext>();
-        services.AddScoped<IResourceTemplateRepository, ResourceTemplateRepository>();
-        services.AddScoped<IApplicationRepository, ApplicationRepository>();
-        services.AddScoped<IEnvironmentRepository, EnvironmentRepository>();
-        services.AddScoped<IDeploymentRepository, DeploymentRepository>();
+        public IServiceCollection AddPersistenceServices()
+        {
+            services.AddDbContext<ConductorDbContext>();
+            services.AddScoped<IResourceTemplateRepository, ResourceTemplateRepository>();
+            services.AddScoped<IApplicationRepository, ApplicationRepository>();
+            services.AddScoped<IEnvironmentRepository, EnvironmentRepository>();
+            services.AddScoped<IDeploymentRepository, DeploymentRepository>();
+            services.AddScoped<IOrganisationRepository, OrganisationRepository>();
 
-        return services;
-    }
+            return services;
+        }
 
-    public static async Task ApplyMigrations(this IServiceCollection services)
-    {
-        using IServiceScope scope = services.BuildServiceProvider().CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ConductorDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.MigrateAsync();
+        public async Task ApplyMigrations()
+        {
+            using IServiceScope scope = services.BuildServiceProvider().CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ConductorDbContext>();
+            await dbContext.Database.EnsureDeletedAsync();
+            await dbContext.Database.MigrateAsync();
+        }
     }
 }

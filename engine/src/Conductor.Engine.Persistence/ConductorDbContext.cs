@@ -1,5 +1,6 @@
 using Conductor.Engine.Domain.Application;
 using Conductor.Engine.Domain.Deployment;
+using Conductor.Engine.Domain.Organisation;
 using Conductor.Engine.Domain.ResourceTemplate;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -14,6 +15,7 @@ public sealed class ConductorDbContext : IdentityDbContext
     public required DbSet<Application> Applications { get; init; }
     public required DbSet<Environment> Environments { get; init; }
     public required DbSet<Deployment> Deployments { get; init; }
+    public required DbSet<Organisation> Organisations { get; init; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

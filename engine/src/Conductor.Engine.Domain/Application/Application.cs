@@ -41,7 +41,7 @@ public sealed record Application
         return new Application
         {
             Id = new ApplicationId(),
-            OrganisationId = request.OrganisationId,
+            OrganisationId = new OrganisationId(Guid.Parse(request.OrganisationId)),
             Name = request.Name,
             Repository = new Repository
             {
