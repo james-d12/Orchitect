@@ -81,7 +81,11 @@ public static class Endpoints
                 .WithTags("Organisation");
 
             endpoints1.MapPrivateGroup()
-                .MapEndpoint<CreateOrganisationEndpoint>();
+                .MapEndpoint<CreateOrganisationEndpoint>()
+                .MapEndpoint<GetAllOrganisationsEndpoint>()
+                .MapEndpoint<GetOrganisationEndpoint>()
+                .MapEndpoint<UpdateOrganisationEndpoint>()
+                .MapEndpoint<DeleteOrganisationEndpoint>();
         }
 
         private RouteGroupBuilder MapPublicGroup(string? prefix = null)
