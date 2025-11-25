@@ -1,6 +1,7 @@
 using System.Text;
 using Conductor.Engine.Api.Common;
 using Conductor.Engine.Api.Endpoints;
+using Conductor.Engine.Api.Queue;
 using Conductor.Engine.Infrastructure;
 using Conductor.Engine.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -16,12 +17,14 @@ builder.Host.UseDefaultServiceProvider(options =>
     options.ValidateOnBuild = true;
 });
 
+builder.Services.AddHostedService<QueuedHostedService>();
+builder.Services.AddSingleton<IBackgroundTaskQueueProcessor>(ctx => new BackgroundTaskQueueProcessor(5));
+
 builder.Services.AddLogging();
 builder.Services.AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection("JwtOptions"))
     .ValidateDataAnnotations()
     .ValidateOnStart();
-
 
 builder.Services
     .AddOpenApi()

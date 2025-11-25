@@ -107,9 +107,9 @@ var paymentApi = Application.Create("payment-api", new Repository
 
 var devEnvironment = Environment.Create("dev", "The Development Environment", organisation.Id);
 
-var commit = Commit.Create("7b926d5c23d0e806c62d4c86e25fc73564efb8a1", "test message");
+var commitId = new CommitId("7b926d5c23d0e806c62d4c86e25fc73564efb8a1");
 
-var deployment = Deployment.Create(paymentApi.Id, devEnvironment.Id, commit.Id);
+var deployment = Deployment.Create(paymentApi.Id, devEnvironment.Id, commitId);
 
 var resource = new Resource
 {
