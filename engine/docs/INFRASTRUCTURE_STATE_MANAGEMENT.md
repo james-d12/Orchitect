@@ -8,6 +8,8 @@
 
 This document proposes approaches for storing and managing infrastructure state in Conductor Engine to support flexible resource provisioning scenarios, including shared resources across multiple applications. The primary challenge is enabling both dedicated and shared resource models while maintaining clean separation of concerns and accurate state tracking.
 
+**⚠️ IMPORTANT UPDATE:** The domain already contains a production-ready DAG (Directed Acyclic Graph) implementation in `ResourceDependencyGraph` with topological sorting (Kahn's algorithm) and cycle detection. **Option 5 (Recommended)** leverages this existing implementation instead of building graph algorithms from scratch, reducing complexity and implementation time from 4-6 weeks to 1-2 weeks.
+
 ---
 
 ## Table of Contents
@@ -20,6 +22,7 @@ This document proposes approaches for storing and managing infrastructure state 
    - [Option 2: Explicit Resource References](#option-2-explicit-resource-references)
    - [Option 3: Resource Pools](#option-3-resource-pools)
    - [Option 4: Declarative Resource Graph](#option-4-declarative-resource-graph)
+   - [Option 5: Explicit References + Existing DAG](#option-5-explicit-references--existing-dag-recommended) ⭐ **RECOMMENDED**
 5. [State Storage Strategies](#state-storage-strategies)
 6. [Comparison Matrix](#comparison-matrix)
 7. [Recommendation](#recommendation)
@@ -106,19 +109,48 @@ public sealed record ResourceTemplateVersion
 }
 ```
 
-#### ResourceInstance (Current)
+#### Resource (Current)
 ```csharp
-public sealed record ResourceInstance
+public sealed record Resource
 {
-    public ResourceInstanceId Id { get; init; }
-    public string Name { get; init; }
-    public ResourceTemplateVersionId TemplateVersionId { get; init; }
-    public string? ExistingResourceId { get; init; }
-    public ResourceInstanceState State { get; init; }
-    public IReadOnlyList<ApplicationId> Consumers { get; }  // ✅ Already supports multiple consumers
-    public EnvironmentId EnvironmentId { get; init; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime UpdatedAt { get; init; }
+    public required ResourceId Id { get; init; }
+    public required string Name { get; init; }
+    public required ResourceTemplateId ResourceTemplateId { get; init; }
+    public required ApplicationId ApplicationId { get; init; }  // ❗ Currently 1:1 - needs N:1
+    public required EnvironmentId EnvironmentId { get; init; }
+    public required DateTime CreatedAt { get; init; }
+    public required DateTime UpdatedAt { get; init; }
+}
+```
+
+#### ResourceDependency (Current - DAG Implementation)
+**⚠️ IMPORTANT: This already exists in the domain!**
+
+```csharp
+// Domain/ResourceDependency/ResourceDependency.cs
+public sealed record ResourceDependency
+{
+    public ResourceDependencyId Id { get; init; }
+    public string Identifier { get; init; }  // Resource identifier (name or ID)
+}
+
+// Domain/ResourceDependency/ResourceDependencyGraph.cs
+public interface IResourceDependencyGraph
+{
+    void AddResource(ResourceDependency resourceDependency);
+    bool RemoveResource(ResourceDependencyId nodeId);
+    void AddDependency(ResourceDependencyId from, ResourceDependencyId to);
+    bool RemoveDependency(ResourceDependencyId from, ResourceDependencyId to);
+    bool HasDependencyPath(ResourceDependencyId startId, ResourceDependencyId targetId);
+    IList<ResourceDependency> ResolveOrder();  // ✅ Topological sort (Kahn's algorithm)
+}
+
+public sealed class ResourceDependencyGraph : IResourceDependencyGraph
+{
+    // ✅ Full DAG implementation with:
+    // - Cycle detection via HasDependencyPath()
+    // - Topological sort via ResolveOrder()
+    // - Bidirectional edge tracking (In/Out)
 }
 ```
 
@@ -127,8 +159,9 @@ public sealed record ResourceInstance
 1. **No State Storage**: Where are Terraform outputs stored?
 2. **No Matching Logic**: How to determine if a resource can be shared?
 3. **No Outputs Tracking**: Where are connection strings, endpoints stored?
-4. **No Dependency Management**: How to handle resources that depend on others?
+4. **No Multi-Consumer Support**: Resource → Application is 1:1, needs to be N:1 for sharing
 5. **No Resource Discovery**: How does App B find the existing DB from App A?
+6. **Dependency Graph Not Integrated**: ResourceDependencyGraph exists but isn't linked to Resource model
 
 ---
 
@@ -741,11 +774,14 @@ resources:
 **Domain Model:**
 
 ```csharp
-public sealed record ResourceDependency
+// ⚠️ NOTE: Use existing ResourceDependency from domain, not a new model
+// The existing model is at: Domain/ResourceDependency/ResourceDependency.cs
+
+// Mapping table to link Resource instances to dependency graph
+public sealed record ResourceDependencyMapping
 {
-    public required ResourceInstanceId DependentId { get; init; }      // Resource that depends
-    public required ResourceInstanceId DependencyId { get; init; }     // Resource depended upon
-    public required DependencyType Type { get; init; }
+    public required ResourceId ResourceId { get; init; }
+    public required ResourceDependencyId DependencyNodeId { get; init; }
 }
 
 public enum DependencyType
@@ -755,20 +791,23 @@ public enum DependencyType
     OutputReference     // Uses outputs from dependency
 }
 
-public sealed record ResourceInstance
+public sealed record Resource
 {
     // Existing fields...
-    public ResourceInstanceId Id { get; init; }
+    public ResourceId Id { get; init; }
     public string Name { get; init; }
-    public ResourceTemplateVersionId TemplateVersionId { get; init; }
+    public ResourceTemplateId ResourceTemplateId { get; init; }
     public EnvironmentId EnvironmentId { get; init; }
-    public IReadOnlyList<ApplicationId> Consumers { get; }
+
+    // Enhanced: Multi-consumer support (was single ApplicationId)
+    private readonly List<ApplicationId> _consumers = new();
+    public IReadOnlyList<ApplicationId> Consumers => _consumers.AsReadOnly();
+
     public ResourceStateLocation StateLocation { get; init; }
     public ResourceOutputs Outputs { get; init; }
 
-    // New: Dependency tracking
-    public IReadOnlyList<ResourceDependency> Dependencies { get; }
-    public IReadOnlyList<ResourceDependency> Dependents { get; }
+    // New: Link to dependency graph node (uses existing ResourceDependency domain)
+    public ResourceDependencyId? DependencyNodeId { get; init; }
 
     // New: Graph metadata
     public required SharingMode SharingMode { get; init; }
@@ -789,55 +828,71 @@ public enum SharingMode
 ```csharp
 public class ResourceGraphBuilder
 {
-    public async Task<ResourceGraph> BuildGraphAsync(
+    private readonly IResourceDependencyGraph _dependencyGraph;
+
+    public async Task<Dictionary<string, Resource>> BuildGraphAsync(
         Application application,
         IEnumerable<ResourceRequirement> requirements,
         EnvironmentId environmentId,
         CancellationToken ct)
     {
-        var graph = new ResourceGraph();
-        var resolvedResources = new Dictionary<string, ResourceInstance>();
+        // ✅ Use existing ResourceDependencyGraph from domain
+        var graph = new ResourceDependencyGraph();
+        var resolvedResources = new Dictionary<string, Resource>();
+        var dependencyNodes = new Dictionary<string, ResourceDependency>();
 
-        // 1. Topological sort based on dependencies
-        var sorted = TopologicalSort(requirements);
-
-        // 2. Process each requirement in dependency order
-        foreach (var requirement in sorted)
+        // 1. Add all resources to dependency graph first
+        foreach (var requirement in requirements)
         {
-            // 3. Resolve dependencies first
-            var resolvedDeps = new List<ResourceInstance>();
+            var node = new ResourceDependency(requirement.Name);
+            graph.AddResource(node);
+            dependencyNodes[requirement.Name] = node;
+        }
+
+        // 2. Add dependencies to graph
+        foreach (var requirement in requirements)
+        {
             foreach (var depName in requirement.DependsOn)
             {
-                if (!resolvedResources.TryGetValue(depName, out var dep))
-                {
-                    throw new InvalidOperationException($"Dependency {depName} not resolved");
-                }
-                resolvedDeps.Add(dep);
+                graph.AddDependency(
+                    dependencyNodes[requirement.Name].Id,
+                    dependencyNodes[depName].Id);
             }
+        }
 
-            // 4. Substitute dependency outputs into parameters
+        // 3. Get topological order using EXISTING algorithm
+        var sorted = graph.ResolveOrder();  // ✅ Built-in Kahn's algorithm
+
+        // 4. Process each requirement in dependency order
+        foreach (var depNode in sorted)
+        {
+            var requirementName = depNode.Identifier;
+            var requirement = requirements.First(r => r.Name == requirementName);
+
+            // 5. Substitute dependency outputs into parameters
             var parameters = SubstituteDependencyOutputs(
                 requirement.Parameters,
                 resolvedResources);
 
-            // 5. Find or create resource
+            // 6. Find or create resource
             var resource = await FindOrCreateResourceAsync(
                 requirement,
                 parameters,
                 environmentId,
-                resolvedDeps,
                 ct);
 
+            // 7. Link resource to dependency graph node
+            resource.DependencyNodeId = depNode.Id;
+
             resolvedResources[requirement.Name] = resource;
-            graph.AddResource(resource);
         }
 
-        return graph;
+        return resolvedResources;
     }
 
     private Dictionary<string, string> SubstituteDependencyOutputs(
         Dictionary<string, string> parameters,
-        Dictionary<string, ResourceInstance> resolvedResources)
+        Dictionary<string, Resource> resolvedResources)
     {
         var substituted = new Dictionary<string, string>();
 
@@ -926,16 +981,356 @@ public class ResourceCleanupService
 ✅ **Correct Provisioning Order**: Guarantees dependencies created first
 ✅ **Clean Deletion**: Deletes in reverse order, respects dependencies
 ✅ **Flexible Sharing**: Mix shared and dedicated resources
+✅ **Existing DAG Implementation**: ResourceDependencyGraph already has cycle detection & topological sort
 
 #### Cons
 
-❌ **High Complexity**: Graph algorithms, cycle detection, topological sort
 ❌ **Debugging Difficulty**: Hard to trace provisioning failures
 ❌ **Performance**: Graph operations expensive for large resource sets
 ❌ **Learning Curve**: Developers need to understand dependency syntax
-❌ **Circular Dependencies**: Need cycle detection and error handling
+⚠️ **Integration Work**: Need to link Resource model to existing ResourceDependencyGraph
 
-#### Complexity Score: 9/10
+#### Complexity Score: 6/10 (reduced from 9/10 due to existing graph implementation)
+
+---
+
+### Option 5: Explicit References + Existing DAG (RECOMMENDED)
+
+#### Concept
+
+Combine the simplicity of Option 2 (Explicit Resource References) with basic dependency support using the **existing ResourceDependencyGraph** from the domain. This provides predictable resource sharing while leveraging proven graph algorithms already in the codebase.
+
+#### Architecture
+
+**Application Score File:**
+```yaml
+resources:
+  resource-group:
+    type: azure-resource-group
+    reference:
+      mode: shared
+      name: "prod-rg"
+    params:
+      location: westus2
+
+  cosmos-db:
+    type: azure-cosmosdb
+    reference:
+      mode: shared
+      name: "shared-cosmos"
+    dependsOn:
+      - resource-group
+    params:
+      tier: Standard
+      resourceGroupId: ${resource-group.id}  # Output substitution
+```
+
+**Enhanced Resource Domain Model:**
+
+```csharp
+public sealed record Resource
+{
+    // Existing fields
+    public required ResourceId Id { get; init; }
+    public required string Name { get; init; }
+    public required ResourceTemplateId ResourceTemplateId { get; init; }
+    public required EnvironmentId EnvironmentId { get; init; }
+    public required DateTime CreatedAt { get; init; }
+    public required DateTime UpdatedAt { get; init; }
+
+    // ENHANCED: Multi-consumer support (replaces single ApplicationId)
+    private readonly List<ApplicationId> _consumers = new();
+    public IReadOnlyList<ApplicationId> Consumers => _consumers.AsReadOnly();
+
+    // NEW: State management
+    public required ResourceState State { get; init; }
+    public required ResourceStateLocation StateLocation { get; init; }
+
+    // NEW: Outputs and parameters
+    public required ResourceOutputs Outputs { get; init; }
+    public required Dictionary<string, string> Parameters { get; init; }
+
+    // NEW: Sharing mode
+    public required ResourceReferenceMode ReferenceMode { get; init; }
+
+    // NEW: Link to dependency graph (uses existing ResourceDependency domain)
+    public ResourceDependencyId? DependencyNodeId { get; init; }
+
+    // Methods
+    public void AddConsumer(ApplicationId appId)
+    {
+        if (!_consumers.Contains(appId))
+        {
+            _consumers.Add(appId);
+        }
+    }
+
+    public void RemoveConsumer(ApplicationId appId)
+    {
+        _consumers.Remove(appId);
+    }
+}
+
+public enum ResourceReferenceMode
+{
+    Dedicated,      // Create unique resource for this app
+    Shared,         // Share with other apps using same name
+    ExistingId      // Reference existing resource by ID
+}
+
+public enum ResourceState
+{
+    Provisioning,
+    Active,
+    Updating,
+    Deleting,
+    Failed
+}
+```
+
+**Provisioning Service (Leverages Existing DAG):**
+
+```csharp
+public class ResourceProvisioningService
+{
+    private readonly IResourceRepository _repository;
+    private readonly ITerraformDriver _terraformDriver;
+
+    public async Task<Dictionary<string, Resource>> ProvisionResourcesAsync(
+        Application application,
+        IEnumerable<ResourceRequirement> requirements,
+        EnvironmentId environmentId,
+        CancellationToken ct)
+    {
+        var resolved = new Dictionary<string, Resource>();
+
+        // 1. Build dependency graph using EXISTING ResourceDependencyGraph
+        var graph = new ResourceDependencyGraph();
+        var nodeMap = new Dictionary<string, ResourceDependency>();
+
+        foreach (var req in requirements)
+        {
+            var node = new ResourceDependency(req.Name);
+            graph.AddResource(node);
+            nodeMap[req.Name] = node;
+        }
+
+        // 2. Add dependencies to graph
+        foreach (var req in requirements)
+        {
+            foreach (var depName in req.DependsOn)
+            {
+                if (nodeMap.TryGetValue(depName, out var depNode))
+                {
+                    // ✅ Cycle detection happens here automatically
+                    graph.AddDependency(nodeMap[req.Name].Id, depNode.Id);
+                }
+            }
+        }
+
+        // 3. Get provisioning order using EXISTING topological sort
+        var provisioningOrder = graph.ResolveOrder();  // ✅ Kahn's algorithm built-in
+
+        // 4. Provision in dependency order
+        foreach (var depNode in provisioningOrder)
+        {
+            var requirement = requirements.First(r => r.Name == depNode.Identifier);
+
+            // Substitute dependency outputs
+            var parameters = SubstituteDependencyOutputs(
+                requirement.Parameters,
+                resolved);
+
+            // Find or create resource
+            var resource = await ProvisionOrLinkAsync(
+                application,
+                requirement,
+                parameters,
+                environmentId,
+                ct);
+
+            // Link to dependency graph node
+            resource.DependencyNodeId = depNode.Id;
+
+            resolved[requirement.Name] = resource;
+        }
+
+        return resolved;
+    }
+
+    private async Task<Resource> ProvisionOrLinkAsync(
+        Application application,
+        ResourceRequirement requirement,
+        Dictionary<string, string> parameters,
+        EnvironmentId environmentId,
+        CancellationToken ct)
+    {
+        switch (requirement.Reference.Mode)
+        {
+            case ResourceReferenceMode.Dedicated:
+                // Always create new
+                return await ProvisionNewResourceAsync(
+                    application,
+                    requirement,
+                    parameters,
+                    environmentId,
+                    generateUniqueName: true,
+                    ct);
+
+            case ResourceReferenceMode.Shared:
+                // Find or create by name
+                var existing = await _repository.GetByNameAndEnvironmentAsync(
+                    requirement.Reference.Name!,
+                    environmentId,
+                    ct);
+
+                if (existing is not null)
+                {
+                    existing.AddConsumer(application.Id);
+                    await _repository.UpdateAsync(existing, ct);
+                    return existing;
+                }
+
+                // Create new with specified name
+                return await ProvisionNewResourceAsync(
+                    application,
+                    requirement,
+                    parameters,
+                    environmentId,
+                    customName: requirement.Reference.Name!,
+                    ct);
+
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+    }
+
+    private Dictionary<string, string> SubstituteDependencyOutputs(
+        Dictionary<string, string> parameters,
+        Dictionary<string, Resource> resolvedResources)
+    {
+        var substituted = new Dictionary<string, string>();
+
+        foreach (var (key, value) in parameters)
+        {
+            // Handle ${resource-name.output-key} syntax
+            if (value.StartsWith("${") && value.EndsWith("}"))
+            {
+                var parts = value.Trim('$', '{', '}').Split('.');
+                if (parts.Length == 2)
+                {
+                    var resourceName = parts[0];
+                    var outputKey = parts[1];
+
+                    if (resolvedResources.TryGetValue(resourceName, out var resource))
+                    {
+                        var outputValue = resource.Outputs.GetOutput(outputKey);
+                        substituted[key] = outputValue ?? value;
+                        continue;
+                    }
+                }
+            }
+
+            substituted[key] = value;
+        }
+
+        return substituted;
+    }
+}
+```
+
+**Cleanup Service (Uses DAG for Deletion Order):**
+
+```csharp
+public class ResourceCleanupService
+{
+    private readonly IResourceRepository _repository;
+
+    public async Task CleanupApplicationResourcesAsync(
+        Application application,
+        EnvironmentId environmentId,
+        CancellationToken ct)
+    {
+        // 1. Get all resources consumed by this app
+        var resources = await _repository.GetResourcesByConsumerAsync(
+            application.Id,
+            environmentId,
+            ct);
+
+        // 2. Remove app as consumer
+        foreach (var resource in resources)
+        {
+            resource.RemoveConsumer(application.Id);
+            await _repository.UpdateAsync(resource, ct);
+        }
+
+        // 3. Find resources with no remaining consumers
+        var toDelete = resources.Where(r => r.Consumers.Count == 0).ToList();
+
+        if (toDelete.Count == 0)
+        {
+            return;  // All resources still in use
+        }
+
+        // 4. Build dependency graph for deletion order
+        var graph = new ResourceDependencyGraph();
+        var nodeMap = new Dictionary<ResourceId, ResourceDependency>();
+
+        foreach (var resource in toDelete)
+        {
+            if (resource.DependencyNodeId.HasValue)
+            {
+                var node = new ResourceDependency(resource.Name);
+                graph.AddResource(node);
+                nodeMap[resource.Id] = node;
+            }
+        }
+
+        // Rebuild dependencies
+        var allDeps = await _repository.GetResourceDependenciesAsync(
+            toDelete.Select(r => r.Id),
+            ct);
+
+        foreach (var (resourceId, dependencyId) in allDeps)
+        {
+            if (nodeMap.ContainsKey(resourceId) && nodeMap.ContainsKey(dependencyId))
+            {
+                graph.AddDependency(nodeMap[resourceId].Id, nodeMap[dependencyId].Id);
+            }
+        }
+
+        // 5. Get deletion order (reverse of provisioning order)
+        var deletionOrder = graph.ResolveOrder().Reverse();  // ✅ Delete dependents first
+
+        // 6. Delete resources in order
+        foreach (var depNode in deletionOrder)
+        {
+            var resource = toDelete.First(r => r.Name == depNode.Identifier);
+            await DeleteResourceAsync(resource, ct);
+        }
+    }
+}
+```
+
+#### Pros
+
+✅ **Simple & Predictable**: Explicit naming like Option 2, easy to understand
+✅ **Proven DAG Implementation**: Leverages existing ResourceDependencyGraph with cycle detection
+✅ **Fast Lookups**: Name-based resource discovery
+✅ **Correct Order Guaranteed**: Topological sort for provision & deletion
+✅ **Developer Control**: Explicit sharing decisions
+✅ **Low Integration Effort**: Extends existing Resource model, uses existing graph
+✅ **Production Ready**: Graph algorithms already tested in domain
+
+#### Cons
+
+❌ **Manual Coordination**: Developers must agree on shared resource names
+❌ **Naming Conflicts**: Risk of accidental name collisions
+⚠️ **Database Migration**: Need to add Consumers relationship and new fields
+
+#### Complexity Score: 4/10
+
+**Best For:** Teams that want predictable resource sharing with dependency support, without building complex matching logic.
 
 ---
 
@@ -1020,44 +1415,53 @@ terraform {
 
 ## Comparison Matrix
 
-| Criteria | Option 1: Matching | Option 2: Explicit Refs | Option 3: Pools | Option 4: Graph |
-|----------|-------------------|------------------------|----------------|-----------------|
-| **Complexity** | ⭐⭐⭐⭐⭐⭐⭐ High | ⭐⭐⭐⭐ Low | ⭐⭐⭐⭐⭐⭐ Medium | ⭐⭐⭐⭐⭐⭐⭐⭐⭐ Very High |
-| **Developer Experience** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐ Good | ⭐⭐⭐ Good | ⭐⭐ Challenging |
-| **Predictability** | ⭐⭐ Poor | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐ Good | ⭐⭐⭐ Moderate |
-| **Performance** | ⭐⭐⭐ Moderate | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐ Poor |
-| **Flexibility** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐ Good | ⭐⭐ Poor | ⭐⭐⭐⭐⭐ Excellent |
-| **Shared Resources** | ✅ Automatic | ✅ Manual | ✅ Pool-based | ✅ Declarative |
-| **Dedicated Resources** | ✅ Via policy | ✅ Default | ✅ Via pool config | ✅ Via sharing mode |
-| **Dependencies** | ❌ Limited | ❌ None | ❌ None | ✅ Full support |
-| **Race Conditions** | ⚠️ High risk | ⚠️ Low risk | ⚠️ Low risk | ⚠️ Medium risk |
-| **Debug Ease** | ⭐⭐ Difficult | ⭐⭐⭐⭐⭐ Easy | ⭐⭐⭐⭐ Good | ⭐⭐ Difficult |
-| **Implementation Time** | 3-4 weeks | 1-2 weeks | 2-3 weeks | 4-6 weeks |
-| **Best For** | Auto-discovery | Simple cases | Pre-planned capacity | Complex dependencies |
+| Criteria | Option 1: Matching | Option 2: Explicit Refs | Option 3: Pools | Option 4: Graph | Option 5: Refs + DAG |
+|----------|-------------------|------------------------|----------------|-----------------|---------------------|
+| **Complexity** | ⭐⭐⭐⭐⭐⭐⭐ High | ⭐⭐⭐⭐ Low | ⭐⭐⭐⭐⭐⭐ Medium | ⭐⭐⭐⭐⭐⭐ Medium | ⭐⭐⭐⭐ Low |
+| **Developer Experience** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐ Good | ⭐⭐⭐ Good | ⭐⭐⭐ Good | ⭐⭐⭐⭐ Very Good |
+| **Predictability** | ⭐⭐ Poor | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐ Good | ⭐⭐⭐ Moderate | ⭐⭐⭐⭐⭐ Excellent |
+| **Performance** | ⭐⭐⭐ Moderate | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐ Moderate | ⭐⭐⭐⭐ Very Good |
+| **Flexibility** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐ Good | ⭐⭐ Poor | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐ Very Good |
+| **Shared Resources** | ✅ Automatic | ✅ Manual | ✅ Pool-based | ✅ Declarative | ✅ Manual |
+| **Dedicated Resources** | ✅ Via policy | ✅ Default | ✅ Via pool config | ✅ Via sharing mode | ✅ Default |
+| **Dependencies** | ❌ Limited | ❌ None | ❌ None | ✅ Full support | ✅ Full support |
+| **Existing Code Reuse** | ❌ None | ❌ None | ❌ None | ⚠️ Partial | ✅ Full (DAG) |
+| **Race Conditions** | ⚠️ High risk | ⚠️ Low risk | ⚠️ Low risk | ⚠️ Medium risk | ⚠️ Low risk |
+| **Debug Ease** | ⭐⭐ Difficult | ⭐⭐⭐⭐⭐ Easy | ⭐⭐⭐⭐ Good | ⭐⭐⭐ Moderate | ⭐⭐⭐⭐⭐ Easy |
+| **Implementation Time** | 3-4 weeks | 1-2 weeks | 2-3 weeks | 3-4 weeks | 1-2 weeks |
+| **Best For** | Auto-discovery | Simple cases | Pre-planned capacity | Complex deps (custom) | **Most teams** |
 
 ---
 
 ## Recommendation
 
-### For Most Teams: **Option 2 (Explicit Resource References) + Simplified Dependency Support**
+### For Most Teams: **Option 5 (Explicit References + Existing DAG)** ⭐ RECOMMENDED
 
 **Rationale:**
 
-1. **Predictable & Simple**: Explicit naming makes behavior clear and debugging easy
+1. **Leverages Existing Code**: Uses proven ResourceDependencyGraph already in domain with Kahn's algorithm
 
-2. **Fast Implementation**: Can be built in 1-2 weeks on top of existing domain models
+2. **Predictable & Simple**: Explicit naming makes behavior clear and debugging easy
 
-3. **Developer-Friendly**: Developers have full control, no magic matching
+3. **Fast Implementation**: Can be built in 1-2 weeks by extending existing Resource model
 
-4. **Good Enough for 80% of Use Cases**: Most scenarios are:
+4. **Full Dependency Support**: Get topological sorting and cycle detection for free
+
+5. **Developer-Friendly**: Developers have full control over sharing decisions, no magic matching
+
+6. **Production Ready**: Graph algorithms already tested and in use (see Playground project)
+
+7. **Covers All Use Cases**:
    - Dedicated resources (each app gets own DB)
-   - Simple shared resources (multiple apps share one DB via name)
+   - Shared resources (multiple apps share one DB via name)
+   - Complex dependencies (DB → Resource Group → VPC)
+   - Output substitution (pass connection strings between resources)
 
-5. **Extensible**: Can add basic dependency support later without full graph complexity
+### Alternative: Option 2 + Basic Dependencies (Superseded by Option 5)
 
-### Enhanced Recommendation: Option 2 + Basic Dependencies
+**Note:** This approach was originally proposed but is now superseded by Option 5, which uses the existing ResourceDependencyGraph instead of custom dependency logic.
 
-Add simple dependency support to Option 2:
+~~Add simple dependency support to Option 2:~~
 
 ```yaml
 resources:
@@ -1143,29 +1547,43 @@ public class ResourceProvisioningService
 
 ---
 
-## Implementation Guide
+## Implementation Guide (Option 5)
 
-### Phase 1: Core Infrastructure (Week 1-2)
+### Phase 1: Core Infrastructure (Week 1)
 
-1. **Extend ResourceInstance Domain Model**
+1. **Extend Resource Domain Model**
 ```csharp
-public sealed record ResourceInstance
+public sealed record Resource
 {
     // Existing
-    public ResourceInstanceId Id { get; init; }
-    public string Name { get; init; }
-    public ResourceTemplateVersionId TemplateVersionId { get; init; }
-    public EnvironmentId EnvironmentId { get; init; }
-    public IReadOnlyList<ApplicationId> Consumers { get; }
+    public required ResourceId Id { get; init; }
+    public required string Name { get; init; }
+    public required ResourceTemplateId ResourceTemplateId { get; init; }
+    public required EnvironmentId EnvironmentId { get; init; }
+    public required DateTime CreatedAt { get; init; }
+    public required DateTime UpdatedAt { get; init; }
 
-    // New
-    public required ResourceReferenceMode ReferenceMode { get; init; }
-    public required Dictionary<string, string> ProvisioningParameters { get; init; }
+    // ENHANCED: Multi-consumer support (replaces ApplicationId)
+    private readonly List<ApplicationId> _consumers = new();
+    public IReadOnlyList<ApplicationId> Consumers => _consumers.AsReadOnly();
+
+    // NEW: State management
+    public required ResourceState State { get; init; }
     public required ResourceStateLocation StateLocation { get; init; }
+
+    // NEW: Outputs and parameters
     public required ResourceOutputs Outputs { get; init; }
-    public ResourceInstanceState State { get; private set; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime UpdatedAt { get; private set; }
+    public required Dictionary<string, string> Parameters { get; init; }
+
+    // NEW: Sharing mode
+    public required ResourceReferenceMode ReferenceMode { get; init; }
+
+    // NEW: Link to existing ResourceDependencyGraph
+    public ResourceDependencyId? DependencyNodeId { get; init; }
+
+    // Methods
+    public void AddConsumer(ApplicationId appId) { /* ... */ }
+    public void RemoveConsumer(ApplicationId appId) { /* ... */ }
 }
 ```
 
@@ -1188,50 +1606,56 @@ public sealed record ResourceOutputs
 
 3. **Database Migration**
 ```bash
-./scripts/efm.sh AddResourceInstanceEnhancements
+./scripts/efm.sh AddResourceMultiConsumerSupport
 ```
 
-### Phase 2: Provisioning Logic (Week 2-3)
+### Phase 2: Provisioning Logic with DAG (Week 1-2)
 
 4. **Implement ResourceProvisioningService**
-   - `ProvisionOrLinkAsync()`
-   - `FindResourceByNameAsync()`
-   - `AddConsumerAsync()`
+   - ✅ Use existing `ResourceDependencyGraph` for dependency resolution
+   - `ProvisionResourcesAsync()` - builds graph, gets topological order
+   - `ProvisionOrLinkAsync()` - handles shared vs dedicated resources
+   - `SubstituteDependencyOutputs()` - output substitution between resources
 
 5. **Update Worker to Store Outputs**
    - Extract Terraform outputs after apply
    - Store in ResourceOutputs
    - Update StateLocation
+   - Link Resource to ResourceDependencyGraph node
 
 6. **Create Repository Methods**
    - `GetByNameAndEnvironmentAsync()`
-   - `GetByConsumerAsync()`
+   - `GetResourcesByConsumerAsync()`
+   - `GetResourceDependenciesAsync()`
    - `UpdateOutputsAsync()`
 
-### Phase 3: API Endpoints (Week 3-4)
+### Phase 3: API Endpoints (Week 2)
 
-7. **Resource Instance Endpoints**
+7. **Resource Endpoints**
    - `GET /resources` - List all resources in environment
-   - `GET /resources/{id}` - Get resource details + outputs
-   - `POST /resources/{id}/consumers` - Add consumer
+   - `GET /resources/{id}` - Get resource details + outputs (hide sensitive)
+   - `POST /resources/{id}/consumers` - Add consumer to shared resource
    - `DELETE /resources/{id}/consumers/{appId}` - Remove consumer
+   - `GET /resources/{id}/dependencies` - Get dependency graph for resource
 
 8. **Deployment Integration**
    - Update `CreateDeploymentEndpoint` to parse Score file
-   - Extract resource requirements
-   - Call `ResourceProvisioningService`
+   - Extract resource requirements with dependencies
+   - Call `ResourceProvisioningService.ProvisionResourcesAsync()`
 
-### Phase 4: Cleanup & Dependencies (Week 4-5)
+### Phase 4: Cleanup with DAG (Week 2)
 
-9. **Resource Cleanup**
-   - `RemoveConsumerAsync()`
-   - Delete resource when last consumer removed
-   - Handle Terraform destroy
+9. **Resource Cleanup Service**
+   - ✅ Use existing `ResourceDependencyGraph` for deletion order
+   - `CleanupApplicationResourcesAsync()` - removes consumer, deletes if no consumers
+   - Build dependency graph for resources to delete
+   - Get deletion order via `ResolveOrder().Reverse()`
+   - Delete in correct order (dependents first, then dependencies)
 
-10. **Basic Dependency Support** (Optional)
-    - Parse `dependsOn` from Score file
-    - Simple ordering algorithm
-    - Output substitution
+10. **Dependency Tracking**
+   - Create `ResourceDependencies` table to persist dependency relationships
+   - Store links between Resource.Id and ResourceDependency.Id
+   - Rebuild graph from database for cleanup operations
 
 ---
 
@@ -1350,57 +1774,67 @@ resources:
 
 ---
 
-### Database Schema
+### Database Schema (Option 5)
 
 ```sql
--- ResourceInstances table
-CREATE TABLE ResourceInstances (
+-- Resources table (extends existing)
+CREATE TABLE Resources (
     Id UUID PRIMARY KEY,
     Name VARCHAR(255) NOT NULL,
-    TemplateVersionId UUID NOT NULL,
+    ResourceTemplateId UUID NOT NULL,
     EnvironmentId UUID NOT NULL,
     ReferenceMode VARCHAR(50) NOT NULL,
     State VARCHAR(50) NOT NULL,
     StateBackend VARCHAR(50),
     StateLocation TEXT,
-    ExistingResourceId VARCHAR(255),
+    DependencyNodeId UUID NULL,  -- Links to ResourceDependency graph node
     CreatedAt TIMESTAMP NOT NULL,
     UpdatedAt TIMESTAMP NOT NULL,
-    UNIQUE(Name, EnvironmentId)  -- Enforce unique names per environment
+    UNIQUE(Name, EnvironmentId),  -- Enforce unique names per environment
+    FOREIGN KEY (ResourceTemplateId) REFERENCES ResourceTemplates(Id),
+    FOREIGN KEY (EnvironmentId) REFERENCES Environments(Id)
 );
 
--- ResourceInstanceConsumers (many-to-many)
-CREATE TABLE ResourceInstanceConsumers (
-    ResourceInstanceId UUID NOT NULL,
+-- ResourceConsumers (many-to-many) - NEW for multi-consumer support
+CREATE TABLE ResourceConsumers (
+    ResourceId UUID NOT NULL,
     ApplicationId UUID NOT NULL,
     AddedAt TIMESTAMP NOT NULL,
-    PRIMARY KEY (ResourceInstanceId, ApplicationId)
+    PRIMARY KEY (ResourceId, ApplicationId),
+    FOREIGN KEY (ResourceId) REFERENCES Resources(Id) ON DELETE CASCADE,
+    FOREIGN KEY (ApplicationId) REFERENCES Applications(Id) ON DELETE CASCADE
 );
 
--- ResourceInstanceOutputs (key-value pairs)
-CREATE TABLE ResourceInstanceOutputs (
-    ResourceInstanceId UUID NOT NULL,
+-- ResourceOutputs (key-value pairs)
+CREATE TABLE ResourceOutputs (
+    ResourceId UUID NOT NULL,
     OutputKey VARCHAR(255) NOT NULL,
     OutputValue TEXT NOT NULL,
     Sensitive BOOLEAN DEFAULT FALSE,
-    PRIMARY KEY (ResourceInstanceId, OutputKey)
+    PRIMARY KEY (ResourceId, OutputKey),
+    FOREIGN KEY (ResourceId) REFERENCES Resources(Id) ON DELETE CASCADE
 );
 
--- ResourceInstanceParameters (key-value pairs)
-CREATE TABLE ResourceInstanceParameters (
-    ResourceInstanceId UUID NOT NULL,
+-- ResourceParameters (key-value pairs)
+CREATE TABLE ResourceParameters (
+    ResourceId UUID NOT NULL,
     ParameterKey VARCHAR(255) NOT NULL,
     ParameterValue TEXT NOT NULL,
-    PRIMARY KEY (ResourceInstanceId, ParameterKey)
+    PRIMARY KEY (ResourceId, ParameterKey),
+    FOREIGN KEY (ResourceId) REFERENCES Resources(Id) ON DELETE CASCADE
 );
 
--- ResourceDependencies (optional, for Option 4)
+-- ResourceDependencies - Persists dependency relationships for graph rebuilding
 CREATE TABLE ResourceDependencies (
-    DependentId UUID NOT NULL,
-    DependencyId UUID NOT NULL,
-    DependencyType VARCHAR(50) NOT NULL,
-    PRIMARY KEY (DependentId, DependencyId)
+    ResourceId UUID NOT NULL,           -- The resource that depends
+    DependsOnResourceId UUID NOT NULL,  -- The resource it depends on
+    PRIMARY KEY (ResourceId, DependsOnResourceId),
+    FOREIGN KEY (ResourceId) REFERENCES Resources(Id) ON DELETE CASCADE,
+    FOREIGN KEY (DependsOnResourceId) REFERENCES Resources(Id) ON DELETE CASCADE
 );
+
+-- NOTE: ResourceDependency domain model (graph nodes) is NOT persisted in database
+-- It is built in-memory from ResourceDependencies relationships when needed
 ```
 
 ---
