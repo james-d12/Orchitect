@@ -1,3 +1,4 @@
+using Conductor.Engine.Domain.Organisation;
 using Conductor.Engine.Domain.ResourceTemplate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -26,6 +27,12 @@ internal sealed class ResourceTemplateConfiguration : IEntityTypeConfiguration<R
                 id => id.Value,
                 value => new ResourceTemplateId(value)
             );
+
+        builder.HasOne<Organisation>()
+            .WithMany()
+            .HasForeignKey(r => r.OrganisationId)
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.OwnsMany(r => r.Versions, v =>
         {

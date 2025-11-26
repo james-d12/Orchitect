@@ -13,7 +13,7 @@ public sealed class UpdateResourceTemplateEndpoint : IEndpoint
 
     private sealed record UpdateResourceTemplateRequest(string Name, string Type, string Description, ResourceTemplateProvider Provider);
 
-    private sealed record UpdateResourceTemplateResponse(Guid Id, string Name, string Type, string Description, ResourceTemplateProvider Provider, DateTime CreatedAt, DateTime UpdatedAt);
+    private sealed record UpdateResourceTemplateResponse(Guid Id, Guid OrganisationId, string Name, string Type, string Description, ResourceTemplateProvider Provider, DateTime CreatedAt, DateTime UpdatedAt);
 
     private static async Task<Results<Ok<UpdateResourceTemplateResponse>, NotFound, InternalServerError>> HandleAsync(
         [FromRoute]
@@ -42,6 +42,7 @@ public sealed class UpdateResourceTemplateEndpoint : IEndpoint
 
         return TypedResults.Ok(new UpdateResourceTemplateResponse(
             resourceTemplateResponse.Id.Value,
+            resourceTemplateResponse.OrganisationId.Value,
             resourceTemplateResponse.Name,
             resourceTemplateResponse.Type,
             resourceTemplateResponse.Description,

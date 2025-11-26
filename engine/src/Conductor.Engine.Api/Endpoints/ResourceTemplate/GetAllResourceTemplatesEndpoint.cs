@@ -41,6 +41,7 @@ public sealed class GetAllResourceTemplatesEndpoint : IEndpoint
 
                     return new GetResourceTemplateEndpoint.GetResourceTemplateResponse(
                         Id: r.Id.Value,
+                        OrganisationId: r.OrganisationId.Value,
                         Name: r.Name,
                         Type: r.Type,
                         Description: r.Description,

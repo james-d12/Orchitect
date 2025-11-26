@@ -13,6 +13,7 @@ public sealed class GetResourceTemplateEndpoint : IEndpoint
 
     public sealed record GetResourceTemplateResponse(
         Guid Id,
+        Guid OrganisationId,
         string Name,
         string Type,
         string Description,
@@ -67,6 +68,7 @@ public sealed class GetResourceTemplateEndpoint : IEndpoint
 
             var response = new GetResourceTemplateResponse(
                 Id: resourceTemplateResponse.Id.Value,
+                OrganisationId: resourceTemplateResponse.OrganisationId.Value,
                 Name: resourceTemplateResponse.Name,
                 Type: resourceTemplateResponse.Type,
                 Description: resourceTemplateResponse.Description,

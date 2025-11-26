@@ -23,8 +23,11 @@ await builder.Services.ApplyMigrations();
 
 using IHost host = builder.Build();
 
+var organisation = Organisation.Create("my-organisation");
+
 var azureStorageAccount = ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest
 {
+    OrganisationId = organisation.Id,
     Name = "Azure Storage Account",
     Type = "azure.storage-account",
     Description = "Azure Storage Account Terraform Module",
@@ -42,6 +45,7 @@ var azureStorageAccount = ResourceTemplate.CreateWithVersion(new CreateResourceT
 
 var azureVirtualNetwork = ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest
 {
+    OrganisationId = organisation.Id,
     Name = "Azure Virtual Network",
     Type = "azure.virtual-network",
     Description = "Azure Virtual Network Terraform Module",
@@ -59,6 +63,7 @@ var azureVirtualNetwork = ResourceTemplate.CreateWithVersion(new CreateResourceT
 
 var azureContainerRegistry = ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest
 {
+    OrganisationId = organisation.Id,
     Name = "Azure Container Registry",
     Type = "azure.container-registry",
     Description = "Azure Container Registry Terraform Module",
@@ -76,6 +81,7 @@ var azureContainerRegistry = ResourceTemplate.CreateWithVersion(new CreateResour
 
 var argoCdTemplate = ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest
 {
+    OrganisationId = organisation.Id,
     Name = "ArgoCD Helm Chart",
     Type = "helm.argocd",
     Description = "An ArgoCD Helm Chart",
@@ -96,8 +102,6 @@ await resourceTemplateRepository.CreateAsync(azureStorageAccount);
 await resourceTemplateRepository.CreateAsync(azureVirtualNetwork);
 await resourceTemplateRepository.CreateAsync(azureContainerRegistry);
 await resourceTemplateRepository.CreateAsync(argoCdTemplate);
-
-var organisation = Organisation.Create("my-organisation");
 var paymentApi = Application.Create("payment-api", new Repository
 {
     Name = "payment api repository",
