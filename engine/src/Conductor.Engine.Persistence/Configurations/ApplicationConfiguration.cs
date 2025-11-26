@@ -14,6 +14,8 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
 
         builder.HasKey(a => a.Id);
 
+        builder.HasIndex(a => new { a.Name, a.OrganisationId }).IsUnique();
+
         builder.Property(b => b.Name).IsRequired();
         builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("now()");
         builder.Property(b => b.UpdatedAt).IsRequired().HasDefaultValueSql("now()");

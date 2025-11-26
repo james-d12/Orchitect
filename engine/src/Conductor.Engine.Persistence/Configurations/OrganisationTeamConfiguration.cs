@@ -1,6 +1,5 @@
 using Conductor.Engine.Domain.Organisation;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Conductor.Engine.Persistence.Configurations;
