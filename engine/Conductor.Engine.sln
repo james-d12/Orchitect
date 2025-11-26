@@ -5,6 +5,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Directory.Build.props = Directory.Build.props
 		stryker-config.json = stryker-config.json
 		global.json = global.json
+		CLAUDE.md = CLAUDE.md
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Engine.Api", "src\Conductor.Engine.Api\Conductor.Engine.Api.csproj", "{9FFFB719-DA35-4120-9BEB-6DA78CF28F59}"

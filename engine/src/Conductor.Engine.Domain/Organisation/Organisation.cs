@@ -23,8 +23,8 @@ public sealed record Organisation
             Name = name,
             Users = [],
             Teams = [],
-            CreatedAt = DateTime.Now,
-            UpdatedAt = DateTime.Now
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
     }
 
@@ -35,7 +35,110 @@ public sealed record Organisation
         return this with
         {
             Name = name,
-            UpdatedAt = DateTime.Now
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    public Organisation AddUser(string identityUserId)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(identityUserId);
+
+        if (Users.Any(u => u.IdentityUserId == identityUserId))
+        {
+            throw new InvalidOperationException($"User with IdentityUserId '{identityUserId}' already exists in this organisation.");
+        }
+
+        var newUser = OrganisationUser.Create(identityUserId, Id);
+        var updatedUsers = new List<OrganisationUser>(Users) { newUser };
+
+        return this with
+        {
+            Users = updatedUsers,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    public Organisation RemoveUser(OrganisationUserId userId)
+    {
+        var updatedUsers = Users.Where(u => u.Id != userId).ToList();
+        var updatedTeams = Teams.Select(t => t.RemoveUser(userId)).ToList();
+
+        return this with
+        {
+            Users = updatedUsers,
+            Teams = updatedTeams,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    public Organisation AddTeam(string name)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+
+        if (Teams.Any(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException($"Team with name '{name}' already exists in this organisation.");
+        }
+
+        var newTeam = OrganisationTeam.Create(name, Id);
+        var updatedTeams = new List<OrganisationTeam>(Teams) { newTeam };
+
+        return this with
+        {
+            Teams = updatedTeams,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    public Organisation RemoveTeam(OrganisationTeamId teamId)
+    {
+        var updatedTeams = Teams.Where(t => t.Id != teamId).ToList();
+
+        return this with
+        {
+            Teams = updatedTeams,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    public Organisation AddUserToTeam(OrganisationUserId userId, OrganisationTeamId teamId)
+    {
+        if (Users.All(u => u.Id != userId))
+        {
+            throw new InvalidOperationException($"User with Id '{userId}' does not exist in this organisation.");
+        }
+
+        var team = Teams.FirstOrDefault(t => t.Id == teamId);
+        if (team is null)
+        {
+            throw new InvalidOperationException($"Team with Id '{teamId}' does not exist in this organisation.");
+        }
+
+        var updatedTeam = team.AddUser(userId);
+        var updatedTeams = Teams.Select(t => t.Id == teamId ? updatedTeam : t).ToList();
+
+        return this with
+        {
+            Teams = updatedTeams,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    public Organisation RemoveUserFromTeam(OrganisationUserId userId, OrganisationTeamId teamId)
+    {
+        var team = Teams.FirstOrDefault(t => t.Id == teamId);
+        if (team is null)
+        {
+            throw new InvalidOperationException($"Team with Id '{teamId}' does not exist in this organisation.");
+        }
+
+        var updatedTeam = team.RemoveUser(userId);
+        var updatedTeams = Teams.Select(t => t.Id == teamId ? updatedTeam : t).ToList();
+
+        return this with
+        {
+            Teams = updatedTeams,
+            UpdatedAt = DateTime.UtcNow
         };
     }
 }

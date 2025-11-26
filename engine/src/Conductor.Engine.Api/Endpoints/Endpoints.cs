@@ -30,7 +30,9 @@ public static class Endpoints
             endpoints1.MapPrivateGroup()
                 .MapEndpoint<CreateApplicationEndpoint>()
                 .MapEndpoint<GetAllApplicationsEndpoint>()
-                .MapEndpoint<GetApplicationEndpoint>();
+                .MapEndpoint<GetApplicationEndpoint>()
+                .MapEndpoint<UpdateApplicationEndpoint>()
+                .MapEndpoint<DeleteApplicationEndpoint>();
         }
 
         private void MapEnvironmentEndpoints()
@@ -41,7 +43,9 @@ public static class Endpoints
             endpoints1.MapPrivateGroup()
                 .MapEndpoint<CreateEnvironmentEndpoint>()
                 .MapEndpoint<GetAllEnvironmentsEndpoint>()
-                .MapEndpoint<GetEnvironmentEndpoint>();
+                .MapEndpoint<GetEnvironmentEndpoint>()
+                .MapEndpoint<UpdateEnvironmentEndpoint>()
+                .MapEndpoint<DeleteEnvironmentEndpoint>();
         }
 
         private void MapDeploymentEndpoints()
@@ -62,7 +66,9 @@ public static class Endpoints
                 .MapEndpoint<CreateResourceTemplateEndpoint>()
                 .MapEndpoint<CreateResourceTemplateWithVersionEndpoint>()
                 .MapEndpoint<GetResourceTemplateEndpoint>()
-                .MapEndpoint<GetAllResourceTemplatesEndpoint>();
+                .MapEndpoint<GetAllResourceTemplatesEndpoint>()
+                .MapEndpoint<UpdateResourceTemplateEndpoint>()
+                .MapEndpoint<DeleteResourceTemplateEndpoint>();
         }
 
         private void MapUserEndpoints()

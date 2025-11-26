@@ -35,4 +35,25 @@ public sealed class ResourceTemplateRepository : IResourceTemplateRepository
     {
         return _dbContext.ResourceTemplates.FirstOrDefaultAsync(t => t.Type == type, cancellationToken);
     }
+
+    public async Task<ResourceTemplate?> UpdateAsync(ResourceTemplate resourceTemplate,
+        CancellationToken cancellationToken = default)
+    {
+        _dbContext.ResourceTemplates.Update(resourceTemplate);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return resourceTemplate;
+    }
+
+    public async Task<bool> DeleteAsync(ResourceTemplateId id, CancellationToken cancellationToken = default)
+    {
+        var resourceTemplate = await _dbContext.ResourceTemplates.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+        if (resourceTemplate is null)
+        {
+            return false;
+        }
+
+        _dbContext.ResourceTemplates.Remove(resourceTemplate);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

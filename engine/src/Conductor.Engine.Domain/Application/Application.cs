@@ -53,4 +53,17 @@ public sealed record Application
             UpdatedAt = DateTime.Now
         };
     }
+
+    public Application Update(string name, Repository repository)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentNullException.ThrowIfNull(repository);
+
+        return this with
+        {
+            Name = name,
+            Repository = repository,
+            UpdatedAt = DateTime.Now
+        };
+    }
 }

@@ -83,4 +83,17 @@ public sealed record ResourceTemplate
     {
         return _versions.LastOrDefault(v => v.State == ResourceTemplateVersionState.Active);
     }
+
+    public void Update(string name, string type, string description, ResourceTemplateProvider provider)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentException.ThrowIfNullOrEmpty(type);
+        ArgumentException.ThrowIfNullOrEmpty(description);
+
+        Name = name;
+        Type = type;
+        Description = description;
+        Provider = provider;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

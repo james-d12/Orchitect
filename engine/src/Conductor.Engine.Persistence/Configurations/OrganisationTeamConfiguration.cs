@@ -1,5 +1,6 @@
 using Conductor.Engine.Domain.Organisation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Conductor.Engine.Persistence.Configurations;
@@ -30,6 +31,27 @@ internal sealed class OrganisationTeamConfiguration : IEntityTypeConfiguration<O
             .HasConversion(
                 id => id.Value,
                 value => new OrganisationId(value)
+            );
+
+        builder.Ignore(t => t.UserIds);
+
+        builder.HasMany<OrganisationUser>()
+            .WithMany()
+            .UsingEntity<Dictionary<string, object>>(
+                "OrganisationTeamUsers",
+                j => j.HasOne<OrganisationUser>()
+                    .WithMany()
+                    .HasForeignKey("OrganisationUserId")
+                    .OnDelete(DeleteBehavior.Cascade),
+                j => j.HasOne<OrganisationTeam>()
+                    .WithMany()
+                    .HasForeignKey("OrganisationTeamId")
+                    .OnDelete(DeleteBehavior.Cascade),
+                j =>
+                {
+                    j.HasKey("OrganisationTeamId", "OrganisationUserId");
+                    j.ToTable("OrganisationTeamUsers");
+                }
             );
     }
 }

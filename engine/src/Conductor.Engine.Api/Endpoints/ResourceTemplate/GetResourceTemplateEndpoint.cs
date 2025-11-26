@@ -14,7 +14,7 @@ public sealed class GetResourceTemplateEndpoint : IEndpoint
     public sealed record GetResourceTemplateResponse(Guid Id, string Name, string Type, string Description);
 
     private static async Task<Results<Ok<GetResourceTemplateResponse>, NotFound, InternalServerError>> HandleAsync(
-        [FromQuery]
+        [FromRoute]
         Guid id,
         [FromServices]
         IResourceTemplateRepository repository,
