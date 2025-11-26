@@ -25,12 +25,31 @@ public sealed class GetAllResourceTemplatesEndpoint : IEndpoint
         {
             var resourceTemplates = repository.GetAll().ToList();
             var resourceTemplatesResponse = resourceTemplates
-                .Select(r => new GetResourceTemplateEndpoint.GetResourceTemplateResponse(
-                    Id: r.Id.Value,
-                    Name: r.Name,
-                    Type: r.Type,
-                    Description: r.Description
-                ))
+                .Select(r =>
+                {
+                    var versions = r.Versions.Select(v => new GetResourceTemplateEndpoint.ResourceTemplateVersionResponse(
+                        Id: v.Id.Value,
+                        Version: v.Version,
+                        Source: new GetResourceTemplateEndpoint.ResourceTemplateVersionSourceResponse(
+                            BaseUrl: v.Source.BaseUrl,
+                            FolderPath: v.Source.FolderPath,
+                            Tag: v.Source.Tag),
+                        Notes: v.Notes,
+                        State: v.State,
+                        CreatedAt: v.CreatedAt
+                    )).ToList();
+
+                    return new GetResourceTemplateEndpoint.GetResourceTemplateResponse(
+                        Id: r.Id.Value,
+                        Name: r.Name,
+                        Type: r.Type,
+                        Description: r.Description,
+                        Provider: r.Provider,
+                        CreatedAt: r.CreatedAt,
+                        UpdatedAt: r.UpdatedAt,
+                        Versions: versions
+                    );
+                })
                 .ToList();
 
             return TypedResults.Ok(new GetAllResourceTemplatesResponse(resourceTemplatesResponse));
