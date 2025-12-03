@@ -6,7 +6,8 @@ public sealed class NamespaceUsageTests
 {
     private static readonly string[] AllowedNamespaces =
     {
-        "CodeHub.Module.Shared"
+        "Conductor.Inventory.Infrastructure.Shared",
+        "Conductor.Inventory.Infrastructure.Discovery"
     };
 
     private static string GetRootPath()
@@ -14,7 +15,7 @@ public sealed class NamespaceUsageTests
         var baseDir = AppDomain.CurrentDomain.BaseDirectory;
         var solutionDir =
             Directory.GetParent(baseDir)?.Parent?.Parent?.Parent?.Parent?.FullName ?? string.Empty;
-        return Path.Combine(solutionDir, "CodeHub.Module");
+        return Path.Combine(solutionDir, "Conductor.Inventory.Infrastructure");
     }
 
     [Theory]
@@ -37,9 +38,9 @@ public sealed class NamespaceUsageTests
 
             foreach (var usedNamespace in usings)
             {
-                if (!usedNamespace.StartsWith("CodeHub.Module")) continue;
+                if (!usedNamespace.StartsWith("Conductor.Inventory.Infrastructure")) continue;
 
-                var isAllowed = usedNamespace.StartsWith($"CodeHub.Module.{moduleName}.") ||
+                var isAllowed = usedNamespace.StartsWith($"Conductor.Inventory.Infrastructure.{moduleName}.") ||
                                 AllowedNamespaces.Any(n => usedNamespace.StartsWith(n));
                 Assert.True(isAllowed, $"Disallowed namespace '{usedNamespace}' found in file '{file}'");
             }
