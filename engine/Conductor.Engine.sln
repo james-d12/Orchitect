@@ -24,6 +24,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{F08A
 		scripts\setup.sh = scripts\setup.sh
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Domain", "src\Conductor.Inventory.Domain\Conductor.Inventory.Domain.csproj", "{D1A2EB43-D11C-4E36-BA3E-AD3BB6F38CB3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Infrastructure", "src\Conductor.Inventory.Infrastructure\Conductor.Inventory.Infrastructure.csproj", "{9857B1FE-EB96-4E84-8A06-1E00E2DA6484}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -50,6 +54,14 @@ Global
 		{594E491C-478B-4B07-B330-72FACC0C3C52}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{594E491C-478B-4B07-B330-72FACC0C3C52}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{594E491C-478B-4B07-B330-72FACC0C3C52}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1A2EB43-D11C-4E36-BA3E-AD3BB6F38CB3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1A2EB43-D11C-4E36-BA3E-AD3BB6F38CB3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1A2EB43-D11C-4E36-BA3E-AD3BB6F38CB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1A2EB43-D11C-4E36-BA3E-AD3BB6F38CB3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9857B1FE-EB96-4E84-8A06-1E00E2DA6484}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9857B1FE-EB96-4E84-8A06-1E00E2DA6484}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9857B1FE-EB96-4E84-8A06-1E00E2DA6484}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9857B1FE-EB96-4E84-8A06-1E00E2DA6484}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 	EndGlobalSection
