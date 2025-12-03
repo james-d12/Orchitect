@@ -31,5 +31,26 @@ internal sealed class OrganisationTeamConfiguration : IEntityTypeConfiguration<O
                 id => id.Value,
                 value => new OrganisationId(value)
             );
+
+        builder.Ignore(t => t.UserIds);
+
+        builder.HasMany<OrganisationUser>()
+            .WithMany()
+            .UsingEntity<Dictionary<string, object>>(
+                "OrganisationTeamUsers",
+                j => j.HasOne<OrganisationUser>()
+                    .WithMany()
+                    .HasForeignKey("OrganisationUserId")
+                    .OnDelete(DeleteBehavior.Cascade),
+                j => j.HasOne<OrganisationTeam>()
+                    .WithMany()
+                    .HasForeignKey("OrganisationTeamId")
+                    .OnDelete(DeleteBehavior.Cascade),
+                j =>
+                {
+                    j.HasKey("OrganisationTeamId", "OrganisationUserId");
+                    j.ToTable("OrganisationTeamUsers");
+                }
+            );
     }
 }

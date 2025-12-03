@@ -43,6 +43,9 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("OrganisationId");
 
+                    b.HasIndex("Name", "OrganisationId")
+                        .IsUnique();
+
                     b.ToTable("Applications", (string)null);
                 });
 
@@ -113,10 +116,10 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
-                        .IsUnique();
-
                     b.HasIndex("OrganisationId");
+
+                    b.HasIndex("Name", "OrganisationId")
+                        .IsUnique();
 
                     b.ToTable("Environments", (string)null);
                 });
@@ -224,9 +227,14 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.Property<Guid>("OrganisationId")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("OrganisationId1")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrganisationId");
+
+                    b.HasIndex("OrganisationId1");
 
                     b.HasIndex("IdentityUserId", "OrganisationId")
                         .IsUnique();
@@ -287,6 +295,9 @@ namespace Conductor.Engine.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -302,7 +313,9 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("Name", "OrganisationId")
                         .IsUnique();
 
                     b.ToTable("ResourceTemplates", (string)null);
@@ -500,6 +513,21 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.ToTable("UserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("OrganisationTeamUsers", b =>
+                {
+                    b.Property<Guid>("OrganisationTeamId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OrganisationUserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("OrganisationTeamId", "OrganisationUserId");
+
+                    b.HasIndex("OrganisationUserId");
+
+                    b.ToTable("OrganisationTeamUsers", (string)null);
+                });
+
             modelBuilder.Entity("Conductor.Engine.Domain.Application.Application", b =>
                 {
                     b.HasOne("Conductor.Engine.Domain.Organisation.Organisation", null)
@@ -573,7 +601,7 @@ namespace Conductor.Engine.Persistence.Migrations
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationTeam", b =>
                 {
                     b.HasOne("Conductor.Engine.Domain.Organisation.Organisation", null)
-                        .WithMany()
+                        .WithMany("Teams")
                         .HasForeignKey("OrganisationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -592,10 +620,20 @@ namespace Conductor.Engine.Persistence.Migrations
                         .HasForeignKey("OrganisationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Conductor.Engine.Domain.Organisation.Organisation", null)
+                        .WithMany("Users")
+                        .HasForeignKey("OrganisationId1");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.ResourceTemplate.ResourceTemplate", b =>
                 {
+                    b.HasOne("Conductor.Engine.Domain.Organisation.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.OwnsMany("Conductor.Engine.Domain.ResourceTemplate.ResourceTemplateVersion", "Versions", b1 =>
                         {
                             b1.Property<Guid>("Id")
@@ -711,6 +749,28 @@ namespace Conductor.Engine.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("OrganisationTeamUsers", b =>
+                {
+                    b.HasOne("Conductor.Engine.Domain.Organisation.OrganisationTeam", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationTeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Conductor.Engine.Domain.Organisation.OrganisationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Conductor.Engine.Domain.Organisation.Organisation", b =>
+                {
+                    b.Navigation("Teams");
+
+                    b.Navigation("Users");
                 });
 #pragma warning restore 612, 618
         }

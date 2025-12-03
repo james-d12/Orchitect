@@ -1,10 +1,9 @@
+using Conductor.Engine.Domain.Shared;
+
 namespace Conductor.Engine.Domain.Environment;
 
-public interface IEnvironmentRepository
+public interface IEnvironmentRepository : IRepository<Environment, EnvironmentId>
 {
-    Task<Environment?> CreateAsync(Environment environment,
-        CancellationToken cancellationToken = default);
-
-    IEnumerable<Environment> GetAll();
-    Task<Environment?> GetByIdAsync(EnvironmentId id, CancellationToken cancellationToken = default);
+    Task<Environment?> UpdateAsync(Environment environment, CancellationToken cancellationToken = default);
+    Task<bool> DeleteAsync(EnvironmentId id, CancellationToken cancellationToken = default);
 }

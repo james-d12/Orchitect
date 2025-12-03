@@ -31,4 +31,25 @@ public sealed class EnvironmentRepository : IEnvironmentRepository
     {
         return _dbContext.Environments.FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
     }
+
+    public async Task<Environment?> UpdateAsync(Environment environment,
+        CancellationToken cancellationToken = default)
+    {
+        _dbContext.Environments.Update(environment);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return environment;
+    }
+
+    public async Task<bool> DeleteAsync(EnvironmentId id, CancellationToken cancellationToken = default)
+    {
+        var environment = await _dbContext.Environments.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+        if (environment is null)
+        {
+            return false;
+        }
+
+        _dbContext.Environments.Remove(environment);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

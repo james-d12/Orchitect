@@ -39,4 +39,17 @@ public sealed record Environment
     {
         return Create(request.Name, request.Description, request.OrganisationId);
     }
+
+    public Environment Update(string name, string description)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(description);
+
+        return this with
+        {
+            Name = name,
+            Description = description,
+            UpdatedAt = DateTime.Now
+        };
+    }
 }

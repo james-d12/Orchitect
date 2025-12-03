@@ -37,7 +37,7 @@ internal sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organ
             .IsRequired()
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany<OrganisationTeam>()
+        builder.HasMany(o => o.Teams)
             .WithOne()
             .HasForeignKey(ot => ot.OrganisationId)
             .IsRequired()
@@ -49,9 +49,10 @@ internal sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organ
             .IsRequired()
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany<OrganisationUser>()
+        builder.HasMany(o => o.Users)
             .WithOne()
             .HasForeignKey(u => u.OrganisationId)
-            .IsRequired();
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

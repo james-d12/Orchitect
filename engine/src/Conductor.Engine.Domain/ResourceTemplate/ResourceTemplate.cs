@@ -1,8 +1,11 @@
+using Conductor.Engine.Domain.Organisation;
+
 namespace Conductor.Engine.Domain.ResourceTemplate;
 
 public sealed record ResourceTemplate
 {
     public ResourceTemplateId Id { get; private init; }
+    public OrganisationId OrganisationId { get; private init; }
     public string Name { get; private set; } = string.Empty;
     public string Type { get; private set; } = string.Empty;
     public string Description { get; private set; } = string.Empty;
@@ -25,6 +28,7 @@ public sealed record ResourceTemplate
         return new ResourceTemplate
         {
             Id = new ResourceTemplateId(),
+            OrganisationId = request.OrganisationId,
             Name = request.Name,
             Type = request.Type,
             Description = request.Description,
@@ -38,6 +42,7 @@ public sealed record ResourceTemplate
     {
         var resourceTemplate = Create(new CreateResourceTemplateRequest
         {
+            OrganisationId = request.OrganisationId,
             Name = request.Name,
             Type = request.Type,
             Description = request.Description,
@@ -82,5 +87,18 @@ public sealed record ResourceTemplate
     public ResourceTemplateVersion? GetLatestVersion()
     {
         return _versions.LastOrDefault(v => v.State == ResourceTemplateVersionState.Active);
+    }
+
+    public void Update(string name, string type, string description, ResourceTemplateProvider provider)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentException.ThrowIfNullOrEmpty(type);
+        ArgumentException.ThrowIfNullOrEmpty(description);
+
+        Name = name;
+        Type = type;
+        Description = description;
+        Provider = provider;
+        UpdatedAt = DateTime.UtcNow;
     }
 }

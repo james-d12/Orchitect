@@ -11,10 +11,32 @@ public sealed class GetResourceTemplateEndpoint : IEndpoint
         .MapGet("/{id:guid}", HandleAsync)
         .WithSummary("Gets an existing resource template by id.");
 
-    public sealed record GetResourceTemplateResponse(Guid Id, string Name, string Type, string Description);
+    public sealed record GetResourceTemplateResponse(
+        Guid Id,
+        Guid OrganisationId,
+        string Name,
+        string Type,
+        string Description,
+        ResourceTemplateProvider Provider,
+        DateTime CreatedAt,
+        DateTime UpdatedAt,
+        IReadOnlyList<ResourceTemplateVersionResponse> Versions);
+
+    public sealed record ResourceTemplateVersionResponse(
+        Guid Id,
+        string Version,
+        ResourceTemplateVersionSourceResponse Source,
+        string Notes,
+        ResourceTemplateVersionState State,
+        DateTime CreatedAt);
+
+    public sealed record ResourceTemplateVersionSourceResponse(
+        Uri BaseUrl,
+        string FolderPath,
+        string Tag);
 
     private static async Task<Results<Ok<GetResourceTemplateResponse>, NotFound, InternalServerError>> HandleAsync(
-        [FromQuery]
+        [FromRoute]
         Guid id,
         [FromServices]
         IResourceTemplateRepository repository,
@@ -32,11 +54,28 @@ public sealed class GetResourceTemplateEndpoint : IEndpoint
                 return TypedResults.NotFound();
             }
 
+            var versions = resourceTemplateResponse.Versions.Select(v => new ResourceTemplateVersionResponse(
+                Id: v.Id.Value,
+                Version: v.Version,
+                Source: new ResourceTemplateVersionSourceResponse(
+                    BaseUrl: v.Source.BaseUrl,
+                    FolderPath: v.Source.FolderPath,
+                    Tag: v.Source.Tag),
+                Notes: v.Notes,
+                State: v.State,
+                CreatedAt: v.CreatedAt
+            )).ToList();
+
             var response = new GetResourceTemplateResponse(
                 Id: resourceTemplateResponse.Id.Value,
+                OrganisationId: resourceTemplateResponse.OrganisationId.Value,
                 Name: resourceTemplateResponse.Name,
                 Type: resourceTemplateResponse.Type,
-                Description: resourceTemplateResponse.Description
+                Description: resourceTemplateResponse.Description,
+                Provider: resourceTemplateResponse.Provider,
+                CreatedAt: resourceTemplateResponse.CreatedAt,
+                UpdatedAt: resourceTemplateResponse.UpdatedAt,
+                Versions: versions
             );
 
             return TypedResults.Ok(response);

@@ -31,4 +31,25 @@ public sealed class ApplicationRepository : IApplicationRepository
     {
         return _dbContext.Applications.FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
     }
+
+    public async Task<Application?> UpdateAsync(Application application,
+        CancellationToken cancellationToken = default)
+    {
+        _dbContext.Applications.Update(application);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return application;
+    }
+
+    public async Task<bool> DeleteAsync(ApplicationId id, CancellationToken cancellationToken = default)
+    {
+        var application = await _dbContext.Applications.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+        if (application is null)
+        {
+            return false;
+        }
+
+        _dbContext.Applications.Remove(application);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

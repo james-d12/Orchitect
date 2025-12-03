@@ -1,4 +1,5 @@
 using Conductor.Engine.Api.Common;
+using Conductor.Engine.Api.Queue;
 using Conductor.Engine.Domain.Application;
 using Conductor.Engine.Domain.Deployment;
 using Conductor.Engine.Domain.Environment;
@@ -28,6 +29,8 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             IEnvironmentRepository environmentRepository,
             [FromServices]
             IResourceProvisioner resourceProvisioner,
+            [FromServices]
+            IBackgroundTaskQueueProcessor backgroundTaskQueueProcessor,
             HttpContext httpContext,
             CancellationToken cancellationToken)
     {
@@ -53,7 +56,28 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             return TypedResults.InternalServerError();
         }
 
-        await resourceProvisioner.StartAsync(application, deployment, cancellationToken);
+        // Capture IDs to pass to background work item (avoiding captured scoped dependencies)
+        var deploymentId = deploymentResponse.Id;
+        var applicationId = application.Id;
+
+        await backgroundTaskQueueProcessor.QueueBackgroundWorkItemAsync(async (sp, ct) =>
+        {
+            // Resolve scoped dependencies within the background service scope
+            var deploymentRepo = sp.GetRequiredService<IDeploymentRepository>();
+            var appRepo = sp.GetRequiredService<IApplicationRepository>();
+            var provisioner = sp.GetRequiredService<IResourceProvisioner>();
+
+            var deployment = await deploymentRepo.GetByIdAsync(deploymentId, ct);
+            var app = await appRepo.GetByIdAsync(applicationId, ct);
+
+            if (deployment is null || app is null)
+            {
+                throw new InvalidOperationException(
+                    $"Deployment {deploymentId.Value} or Application {applicationId.Value} not found");
+            }
+
+            await provisioner.StartAsync(app, deployment, ct);
+        });
 
         var locationUrl =
             new Uri(
@@ -61,7 +85,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
 
         var response = new CreateDeploymentResponse(
             Id: deploymentResponse.Id.Value,
-            Status: "in_progress",
+            Status: deploymentResponse.Status.ToString(),
             Location: locationUrl
         );
 

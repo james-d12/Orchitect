@@ -20,6 +20,11 @@ public sealed class DeploymentRepository : IDeploymentRepository
         return result.Entity;
     }
 
+    public IEnumerable<Deployment> GetAll()
+    {
+        return _dbContext.Deployments.AsEnumerable();
+    }
+
     public Task<Deployment?> GetByIdAsync(DeploymentId id, CancellationToken cancellationToken = default)
     {
         return _dbContext.Deployments.FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);

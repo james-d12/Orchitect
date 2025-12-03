@@ -19,7 +19,14 @@ public sealed class GetAllApplicationsEndpoint : IEndpoint
     {
         var applications = repository.GetAll().ToList();
         var applicationsResponse = applications
-            .Select(r => new GetApplicationEndpoint.GetApplicationResponse(r.Id.Value, r.Name))
+            .Select(application => new GetApplicationEndpoint.GetApplicationResponse(
+                application.Id.Value,
+                application.Name,
+                application.Repository.Name,
+                application.Repository.Url.ToString(),
+                application.CreatedAt,
+                application.UpdatedAt
+                ))
             .ToList();
         return TypedResults.Ok(new GetAllApplicationsResponse(applicationsResponse));
     }

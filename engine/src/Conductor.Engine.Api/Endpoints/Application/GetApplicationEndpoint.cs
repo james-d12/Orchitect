@@ -12,7 +12,13 @@ public sealed class GetApplicationEndpoint : IEndpoint
         .MapGet("/{id:guid}", HandleAsync)
         .WithSummary("Gets an application by Id.");
 
-    public sealed record GetApplicationResponse(Guid Id, string Name);
+    public sealed record GetApplicationResponse(
+        Guid Id,
+        string Name,
+        string RepositoryName,
+        string RepositoryUrl,
+        DateTime CreatedAt,
+        DateTime UpdatedAt);
 
     private static async Task<Results<Ok<GetApplicationResponse>, NotFound>> HandleAsync(
         [FromQuery]
@@ -29,6 +35,13 @@ public sealed class GetApplicationEndpoint : IEndpoint
             return TypedResults.NotFound();
         }
 
-        return TypedResults.Ok(new GetApplicationResponse(applicationResponse.Id.Value, applicationResponse.Name));
+        return TypedResults.Ok(new GetApplicationResponse(
+            applicationResponse.Id.Value,
+            applicationResponse.Name,
+            applicationResponse.Repository.Name,
+            applicationResponse.Repository.Url.ToString(),
+            applicationResponse.CreatedAt,
+            applicationResponse.UpdatedAt
+            ));
     }
 }

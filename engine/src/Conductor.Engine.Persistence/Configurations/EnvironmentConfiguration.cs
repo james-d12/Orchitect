@@ -13,7 +13,7 @@ internal sealed class EnvironmentConfiguration : IEntityTypeConfiguration<Enviro
         builder.ToTable("Environments");
 
         builder.HasKey(r => r.Id);
-        builder.HasIndex(r => r.Name).IsUnique();
+        builder.HasIndex(r => new { r.Name, r.OrganisationId }).IsUnique();
 
         builder.Property(b => b.Name).IsRequired();
         builder.Property(b => b.Description).IsRequired();

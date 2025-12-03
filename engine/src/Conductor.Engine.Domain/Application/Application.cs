@@ -41,7 +41,7 @@ public sealed record Application
         return new Application
         {
             Id = new ApplicationId(),
-            OrganisationId = request.OrganisationId,
+            OrganisationId = new OrganisationId(Guid.Parse(request.OrganisationId)),
             Name = request.Name,
             Repository = new Repository
             {
@@ -50,6 +50,19 @@ public sealed record Application
                 Provider = request.Repository.Provider
             },
             CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
+        };
+    }
+
+    public Application Update(string name, Repository repository)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentNullException.ThrowIfNull(repository);
+
+        return this with
+        {
+            Name = name,
+            Repository = repository,
             UpdatedAt = DateTime.Now
         };
     }

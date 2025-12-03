@@ -1,10 +1,9 @@
+using Conductor.Engine.Domain.Shared;
+
 namespace Conductor.Engine.Domain.Application;
 
-public interface IApplicationRepository
+public interface IApplicationRepository : IRepository<Application, ApplicationId>
 {
-    Task<Application?> CreateAsync(Application application,
-        CancellationToken cancellationToken = default);
-
-    IEnumerable<Application> GetAll();
-    Task<Application?> GetByIdAsync(Domain.Application.ApplicationId id, CancellationToken cancellationToken = default);
+    Task<Application?> UpdateAsync(Application application, CancellationToken cancellationToken = default);
+    Task<bool> DeleteAsync(ApplicationId id, CancellationToken cancellationToken = default);
 }
