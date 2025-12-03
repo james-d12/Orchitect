@@ -6,8 +6,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\src\Conductor.Engine.Api\Conductor.Engine.Api.csproj"/>
-        <ProjectReference Include="..\src\Conductor.Engine.Playground\Conductor.Engine.Playground.csproj"/>
+        <ProjectReference Include="..\Conductor.Engine.Api\Conductor.Engine.Api.csproj"/>
+        <ProjectReference Include="..\Conductor.Engine.Playground\Conductor.Engine.Playground.csproj"/>
     </ItemGroup>
 
 </Project>

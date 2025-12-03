@@ -11,7 +11,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\Conductor.ServiceDefaults\Conductor.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\Conductor.ServiceDefaults\Conductor.ServiceDefaults.csproj" />
         <ProjectReference Include="..\Conductor.Engine.Domain\Conductor.Engine.Domain.csproj"/>
         <ProjectReference Include="..\Conductor.Engine.Infrastructure\Conductor.Engine.Infrastructure.csproj"/>
         <ProjectReference Include="..\Conductor.Engine.Persistence\Conductor.Engine.Persistence.csproj"/>
