@@ -8,6 +8,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Conductor.Engine.Api\Conductor.Engine.Api.csproj"/>
         <ProjectReference Include="..\Conductor.Engine.Playground\Conductor.Engine.Playground.csproj"/>
+        <ProjectReference Include="..\Conductor.Inventory.Application\Conductor.Inventory.Application.csproj" />
     </ItemGroup>
 
 </Project>
