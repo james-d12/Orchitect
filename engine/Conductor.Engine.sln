@@ -28,6 +28,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Domain"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Infrastructure", "src\Conductor.Inventory.Infrastructure\Conductor.Inventory.Infrastructure.csproj", "{9857B1FE-EB96-4E84-8A06-1E00E2DA6484}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Engine.AppHost", "Conductor.Engine.AppHost\Conductor.Engine.AppHost.csproj", "{0C62EDB5-9A60-4BF4-B867-24428BF6B9E6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Engine.ServiceDefaults", "Conductor.Engine.ServiceDefaults\Conductor.Engine.ServiceDefaults.csproj", "{4D2DF8DF-ECCE-4DE6-983B-11DB9F7295D8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,6 +66,14 @@ Global
 		{9857B1FE-EB96-4E84-8A06-1E00E2DA6484}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9857B1FE-EB96-4E84-8A06-1E00E2DA6484}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9857B1FE-EB96-4E84-8A06-1E00E2DA6484}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C62EDB5-9A60-4BF4-B867-24428BF6B9E6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C62EDB5-9A60-4BF4-B867-24428BF6B9E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C62EDB5-9A60-4BF4-B867-24428BF6B9E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C62EDB5-9A60-4BF4-B867-24428BF6B9E6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D2DF8DF-ECCE-4DE6-983B-11DB9F7295D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D2DF8DF-ECCE-4DE6-983B-11DB9F7295D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D2DF8DF-ECCE-4DE6-983B-11DB9F7295D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D2DF8DF-ECCE-4DE6-983B-11DB9F7295D8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 	EndGlobalSection

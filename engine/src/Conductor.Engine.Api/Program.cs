@@ -11,6 +11,8 @@ using Microsoft.OpenApi;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
+
 builder.Host.UseDefaultServiceProvider(options =>
 {
     options.ValidateScopes = true;
@@ -85,6 +87,8 @@ builder.Services.AddSwaggerGen(options =>
 await builder.Services.ApplyMigrations();
 
 WebApplication app = builder.Build();
+
+app.MapDefaultEndpoints();
 
 app.MapOpenApi();
 app.UseSwagger();

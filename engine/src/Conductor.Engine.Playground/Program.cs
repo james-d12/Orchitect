@@ -14,6 +14,8 @@ using Environment = Conductor.Engine.Domain.Environment.Environment;
 
 HostApplicationBuilder builder = Host.CreateApplicationBuilder();
 
+builder.AddServiceDefaults();
+
 builder.Services
     .AddPersistenceServices()
     .AddInfrastructureServices();

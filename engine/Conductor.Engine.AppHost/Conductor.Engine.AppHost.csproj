@@ -1,0 +1,13 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.0.1">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <UserSecretsId>62e6a42a-9340-42f9-a8fd-b78a29cf7a40</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\src\Conductor.Engine.Api\Conductor.Engine.Api.csproj"/>
+        <ProjectReference Include="..\src\Conductor.Engine.Playground\Conductor.Engine.Playground.csproj"/>
+    </ItemGroup>
+
+</Project>
