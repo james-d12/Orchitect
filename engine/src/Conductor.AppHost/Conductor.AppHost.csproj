@@ -11,4 +11,8 @@
         <ProjectReference Include="..\Conductor.Inventory.Application\Conductor.Inventory.Application.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Aspire.Hosting.AppHost" Version="13.0.2" />
+    </ItemGroup>
+
 </Project>
