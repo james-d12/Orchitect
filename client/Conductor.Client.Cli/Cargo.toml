@@ -8,8 +8,8 @@ name = "cdr"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.5.53", features = ["derive"] }
-reqwest = { version = "0.12.24", features = ["json"] }
+clap = { version = "4.5.54", features = ["derive"] }
+reqwest = { version = "0.13.1", features = ["json"] }
 serde = { version = "1.0.209", features = ["derive"] }
-serde_json = "1.0.127"
-tokio = { version = "1.48.0", features = ["full"] }
+serde_json = "1.0.148"
+tokio = { version = "1.49.0", features = ["full"] }
