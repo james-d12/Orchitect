@@ -8,11 +8,11 @@
     <ItemGroup>
         <ProjectReference Include="..\Conductor.Engine.Api\Conductor.Engine.Api.csproj"/>
         <ProjectReference Include="..\Conductor.Engine.Playground\Conductor.Engine.Playground.csproj"/>
-        <ProjectReference Include="..\Conductor.Inventory.Application\Conductor.Inventory.Application.csproj" />
+        <ProjectReference Include="..\Conductor.Inventory.Application\Conductor.Inventory.Application.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Aspire.Hosting.AppHost" Version="13.0.2" />
+      <PackageReference Include="Aspire.Hosting.AppHost" Version="13.1.0" />
     </ItemGroup>
 
 </Project>
