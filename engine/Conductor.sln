@@ -38,6 +38,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{D20827AD
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Infrastructure.Tests", "src\Conductor.Inventory.Infrastructure.Tests\Conductor.Inventory.Infrastructure.Tests.csproj", "{B55CAB39-4FFA-479C-A8D7-153715453216}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Persistence", "src\Conductor.Inventory.Persistence\Conductor.Inventory.Persistence.csproj", "{3B8E91D4-8199-4E12-A31C-90102E967C51}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -88,6 +90,10 @@ Global
 		{B55CAB39-4FFA-479C-A8D7-153715453216}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B55CAB39-4FFA-479C-A8D7-153715453216}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B55CAB39-4FFA-479C-A8D7-153715453216}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B8E91D4-8199-4E12-A31C-90102E967C51}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B8E91D4-8199-4E12-A31C-90102E967C51}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B8E91D4-8199-4E12-A31C-90102E967C51}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B8E91D4-8199-4E12-A31C-90102E967C51}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B55CAB39-4FFA-479C-A8D7-153715453216} = {D20827AD-858C-45B5-A096-C00461777544}
