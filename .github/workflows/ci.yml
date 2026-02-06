@@ -170,7 +170,7 @@ jobs:
             /n:"Conductor Engine" \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.qualitygate.wait=false \
-            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**"
+            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**,src/Conductor.Inventory.*"
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
