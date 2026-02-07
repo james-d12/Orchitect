@@ -1,6 +1,19 @@
 name: conductor
 services:
+  db:
+    image: postgres:14.20-alpine
+    restart: always
+    shm_size: 128mb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: conductor
+        
   api:
+    depends_on:
+      - db
     build:
       context: engine/
       dockerfile: src/Conductor.Engine.Api/Dockerfile
@@ -8,11 +21,18 @@ services:
       - /home/james/Documents/Conductor:/tmp/conductor
     ports:
       - "8081:8080"
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=conductor
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=example
     develop:
       watch:
         - action: sync+restart
           path: .engine/src/Conductor.Engine.Api
           target: .engine/src/Conductor.Engine.Api
+  
   cli:
     depends_on:
       - api
@@ -24,6 +44,7 @@ services:
         - action: sync+restart
           path: .client/Conductor.Client.Cli
           target: .client/Conductor.Client.Cli
+  
   web:
     depends_on:
       - api

@@ -4,6 +4,7 @@ using Conductor.Engine.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -16,29 +17,32 @@ namespace Conductor.Engine.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("inventory")
-                .HasAnnotation("ProductVersion", "10.0.2");
+                .HasDefaultSchema("engine")
+                .HasAnnotation("ProductVersion", "10.0.2")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Conductor.Engine.Domain.Application.Application", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("OrganisationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
@@ -48,36 +52,36 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("Applications", "inventory");
+                    b.ToTable("Applications", "engine");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Deployment.Deployment", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ApplicationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CommitId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("EnvironmentId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
@@ -87,33 +91,33 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("ApplicationId", "EnvironmentId", "CommitId", "Status")
                         .IsUnique();
 
-                    b.ToTable("Deployments", "inventory");
+                    b.ToTable("Deployments", "engine");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Environment.Environment", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("OrganisationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
@@ -123,26 +127,26 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("Environments", "inventory");
+                    b.ToTable("Environments", "engine");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.Organisation", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
@@ -150,29 +154,29 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Organisations", "inventory");
+                    b.ToTable("Organisations", "engine");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationService", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("OrganisationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
@@ -182,29 +186,29 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("OrganisationServices", "inventory");
+                    b.ToTable("OrganisationServices", "engine");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationTeam", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("OrganisationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
@@ -214,23 +218,23 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("OrganisationTeams", "inventory");
+                    b.ToTable("OrganisationTeams", "engine");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationUser", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("IdentityUserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("OrganisationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("OrganisationId1")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -241,76 +245,76 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("IdentityUserId", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("OrganisationUsers", "inventory");
+                    b.ToTable("OrganisationUsers", "engine");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Resource.Resource", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ApplicationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("EnvironmentId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("ResourceTemplateId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationId", "EnvironmentId", "ResourceTemplateId");
 
-                    b.ToTable("Resources", "inventory");
+                    b.ToTable("Resources", "engine");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.ResourceTemplate.ResourceTemplate", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("OrganisationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Provider")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
@@ -320,25 +324,25 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("ResourceTemplates", "inventory");
+                    b.ToTable("ResourceTemplates", "engine");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("NormalizedName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.HasKey("Id");
 
@@ -346,83 +350,85 @@ namespace Conductor.Engine.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("RoleNameIndex");
 
-                    b.ToTable("Roles", "inventory");
+                    b.ToTable("Roles", "identity");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("ClaimValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("RoleId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("RoleClaims", "inventory");
+                    b.ToTable("RoleClaims", "identity");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUser", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<int>("AccessFailedCount")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("PasswordHash")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("PhoneNumber")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("SecurityStamp")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.HasKey("Id");
 
@@ -433,101 +439,103 @@ namespace Conductor.Engine.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
-                    b.ToTable("Users", "inventory");
+                    b.ToTable("Users", "identity");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("ClaimValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserClaims", "inventory");
+                    b.ToTable("UserClaims", "identity");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
                     b.Property<string>("LoginProvider")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("ProviderKey")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("ProviderDisplayName")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.HasKey("LoginProvider", "ProviderKey");
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserLogins", "inventory");
+                    b.ToTable("UserLogins", "identity");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
                 {
                     b.Property<string>("UserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("RoleId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.HasKey("UserId", "RoleId");
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("UserRoles", "inventory");
+                    b.ToTable("UserRoles", "identity");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
                     b.Property<string>("UserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("LoginProvider")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Value")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
-                    b.ToTable("UserTokens", "inventory");
+                    b.ToTable("UserTokens", "identity");
                 });
 
             modelBuilder.Entity("OrganisationTeamUsers", b =>
                 {
                     b.Property<Guid>("OrganisationTeamId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("OrganisationUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("OrganisationTeamId", "OrganisationUserId");
 
                     b.HasIndex("OrganisationUserId");
 
-                    b.ToTable("OrganisationTeamUsers", "inventory");
+                    b.ToTable("OrganisationTeamUsers", "engine");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Application.Application", b =>
@@ -541,23 +549,23 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.OwnsOne("Conductor.Engine.Domain.Application.Repository", "Repository", b1 =>
                         {
                             b1.Property<Guid>("ApplicationId")
-                                .HasColumnType("TEXT");
+                                .HasColumnType("uuid");
 
                             b1.Property<string>("Name")
                                 .IsRequired()
-                                .HasColumnType("TEXT");
+                                .HasColumnType("text");
 
                             b1.Property<string>("Provider")
                                 .IsRequired()
-                                .HasColumnType("TEXT");
+                                .HasColumnType("text");
 
                             b1.Property<string>("Url")
                                 .IsRequired()
-                                .HasColumnType("TEXT");
+                                .HasColumnType("text");
 
                             b1.HasKey("ApplicationId");
 
-                            b1.ToTable("Applications", "inventory");
+                            b1.ToTable("Applications", "engine");
 
                             b1.WithOwner()
                                 .HasForeignKey("ApplicationId");
@@ -639,33 +647,33 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.OwnsMany("Conductor.Engine.Domain.ResourceTemplate.ResourceTemplateVersion", "Versions", b1 =>
                         {
                             b1.Property<Guid>("Id")
-                                .HasColumnType("TEXT");
+                                .HasColumnType("uuid");
 
                             b1.Property<DateTime>("CreatedAt")
                                 .ValueGeneratedOnAdd()
-                                .HasColumnType("TEXT")
+                                .HasColumnType("timestamp with time zone")
                                 .HasDefaultValueSql("now()");
 
                             b1.Property<string>("Notes")
                                 .IsRequired()
-                                .HasColumnType("TEXT");
+                                .HasColumnType("text");
 
                             b1.Property<int>("State")
-                                .HasColumnType("INTEGER");
+                                .HasColumnType("integer");
 
                             b1.Property<Guid>("TemplateId")
-                                .HasColumnType("TEXT");
+                                .HasColumnType("uuid");
 
                             b1.Property<string>("Version")
                                 .IsRequired()
-                                .HasColumnType("TEXT");
+                                .HasColumnType("text");
 
                             b1.HasKey("Id");
 
                             b1.HasIndex("TemplateId", "Version")
                                 .IsUnique();
 
-                            b1.ToTable("ResourceTemplateVersion", "inventory");
+                            b1.ToTable("ResourceTemplateVersion", "engine");
 
                             b1.WithOwner()
                                 .HasForeignKey("TemplateId");
@@ -673,23 +681,23 @@ namespace Conductor.Engine.Persistence.Migrations
                             b1.OwnsOne("Conductor.Engine.Domain.ResourceTemplate.ResourceTemplateVersionSource", "Source", b2 =>
                                 {
                                     b2.Property<Guid>("ResourceTemplateVersionId")
-                                        .HasColumnType("TEXT");
+                                        .HasColumnType("uuid");
 
                                     b2.Property<string>("BaseUrl")
                                         .IsRequired()
-                                        .HasColumnType("TEXT");
+                                        .HasColumnType("text");
 
                                     b2.Property<string>("FolderPath")
                                         .IsRequired()
-                                        .HasColumnType("TEXT");
+                                        .HasColumnType("text");
 
                                     b2.Property<string>("Tag")
                                         .IsRequired()
-                                        .HasColumnType("TEXT");
+                                        .HasColumnType("text");
 
                                     b2.HasKey("ResourceTemplateVersionId");
 
-                                    b2.ToTable("ResourceTemplateVersion", "inventory");
+                                    b2.ToTable("ResourceTemplateVersion", "engine");
 
                                     b2.WithOwner()
                                         .HasForeignKey("ResourceTemplateVersionId");

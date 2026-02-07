@@ -28,8 +28,7 @@ public static class PersistenceExtensions
         public async Task ApplyMigrations()
         {
             using IServiceScope scope = services.BuildServiceProvider().CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<EngineDbContext>();
-            await dbContext.Database.EnsureDeletedAsync();
+            var dbContext = scope.ServiceProvider.GetRequiredService<EngineDbContext>();;
             await dbContext.Database.MigrateAsync();
         }
     }

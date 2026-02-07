@@ -99,6 +99,9 @@ var argoCdTemplate = ResourceTemplate.CreateWithVersion(new CreateResourceTempla
     State = ResourceTemplateVersionState.Active
 });
 
+var organisationRepository = host.Services.GetRequiredService<IOrganisationRepository>();
+await organisationRepository.CreateAsync(organisation);
+
 var resourceTemplateRepository = host.Services.GetRequiredService<IResourceTemplateRepository>();
 await resourceTemplateRepository.CreateAsync(azureStorageAccount);
 await resourceTemplateRepository.CreateAsync(azureVirtualNetwork);
