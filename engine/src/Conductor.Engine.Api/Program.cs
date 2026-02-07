@@ -90,9 +90,13 @@ WebApplication app = builder.Build();
 
 app.MapDefaultEndpoints();
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.MapOpenApi();
-app.UseSwagger();
-app.UseSwaggerUI();
 app.UseAuthentication();
 app.UseAuthorization();
 

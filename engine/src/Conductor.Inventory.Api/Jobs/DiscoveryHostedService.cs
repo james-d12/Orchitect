@@ -3,7 +3,7 @@ using Conductor.Inventory.Infrastructure.Shared.Observability;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Conductor.Inventory.Application.Jobs;
+namespace Conductor.Inventory.Api.Jobs;
 
 public sealed class DiscoveryHostedService : BackgroundService
 {

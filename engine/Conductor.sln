@@ -18,7 +18,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.AppHost", "src\Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.ServiceDefaults", "src\Conductor.ServiceDefaults\Conductor.ServiceDefaults.csproj", "{DB8FEF55-ABEC-4C10-89D0-90AC4F13C721}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Application", "src\Conductor.Inventory.Application\Conductor.Inventory.Application.csproj", "{A59BD6C5-5CD4-4064-8032-73CB56269AA7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Api", "src\Conductor.Inventory.Api\Conductor.Inventory.Api.csproj", "{A59BD6C5-5CD4-4064-8032-73CB56269AA7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Infrastructure.Tests", "src\Conductor.Inventory.Infrastructure.Tests\Conductor.Inventory.Infrastructure.Tests.csproj", "{B55CAB39-4FFA-479C-A8D7-153715453216}"
 EndProject

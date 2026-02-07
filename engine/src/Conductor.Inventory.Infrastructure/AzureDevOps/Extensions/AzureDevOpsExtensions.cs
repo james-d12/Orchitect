@@ -39,10 +39,10 @@ public static class AzureDevOpsExtensions
     {
         services.TryAddSingleton<IAzureDevOpsService, AzureDevOpsService>();
         services.TryAddSingleton<IAzureDevOpsConnectionService, AzureDevOpsConnectionService>();
-        services.AddScoped<IGitQueryService, AzureDevOpsGitQueryService>();
-        services.AddScoped<ITicketingQueryService, AzureDevOpsTicketingQueryService>();
-        services.AddScoped<IAzureDevOpsQueryService, AzureDevOpsQueryService>();
-        services.AddSingleton<IDiscoveryService, AzureDevOpsDiscoveryService>();
+        services.TryAddScoped<IGitQueryService, AzureDevOpsGitQueryService>();
+        services.TryAddScoped<ITicketingQueryService, AzureDevOpsTicketingQueryService>();
+        services.TryAddScoped<IAzureDevOpsQueryService, AzureDevOpsQueryService>();
+        services.TryAddSingleton<IDiscoveryService, AzureDevOpsDiscoveryService>();
     }
 
     private static void RegisterOptions(this IServiceCollection services, IConfiguration configuration)

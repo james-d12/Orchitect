@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <IsPublishable>true</IsPublishable>
+        <UserSecretsId>6c9edfd1-7daf-4b60-b55c-fff368747278</UserSecretsId>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2"/>
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.2"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Conductor.Inventory.Infrastructure\Conductor.Inventory.Infrastructure.csproj"/>
+        <ProjectReference Include="..\Conductor.ServiceDefaults\Conductor.ServiceDefaults.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+
+</Project>
