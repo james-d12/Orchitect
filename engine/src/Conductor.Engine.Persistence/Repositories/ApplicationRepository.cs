@@ -6,9 +6,9 @@ namespace Conductor.Engine.Persistence.Repositories;
 
 public sealed class ApplicationRepository : IApplicationRepository
 {
-    private readonly ConductorDbContext _dbContext;
+    private readonly EngineDbContext _dbContext;
 
-    public ApplicationRepository(ConductorDbContext dbContext)
+    public ApplicationRepository(EngineDbContext dbContext)
     {
         _dbContext = dbContext;
     }

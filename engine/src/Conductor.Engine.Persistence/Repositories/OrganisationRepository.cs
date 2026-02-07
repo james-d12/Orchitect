@@ -5,9 +5,9 @@ namespace Conductor.Engine.Persistence.Repositories;
 
 public sealed class OrganisationRepository : IOrganisationRepository
 {
-    private readonly ConductorDbContext _dbContext;
+    private readonly EngineDbContext _dbContext;
 
-    public OrganisationRepository(ConductorDbContext dbContext)
+    public OrganisationRepository(EngineDbContext dbContext)
     {
         _dbContext = dbContext;
     }

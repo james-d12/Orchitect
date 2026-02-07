@@ -15,7 +15,7 @@ public static class PersistenceExtensions
     {
         public IServiceCollection AddPersistenceServices()
         {
-            services.AddDbContext<ConductorDbContext>();
+            services.AddDbContext<EngineDbContext>();
             services.AddScoped<IResourceTemplateRepository, ResourceTemplateRepository>();
             services.AddScoped<IApplicationRepository, ApplicationRepository>();
             services.AddScoped<IEnvironmentRepository, EnvironmentRepository>();
@@ -28,7 +28,7 @@ public static class PersistenceExtensions
         public async Task ApplyMigrations()
         {
             using IServiceScope scope = services.BuildServiceProvider().CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ConductorDbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<EngineDbContext>();
             await dbContext.Database.EnsureDeletedAsync();
             await dbContext.Database.MigrateAsync();
         }

@@ -35,7 +35,7 @@ builder.Services
     .AddInfrastructureServices();
 
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
-    .AddEntityFrameworkStores<ConductorDbContext>();
+    .AddEntityFrameworkStores<EngineDbContext>();
 
 builder.Services
     .AddAuthentication(options =>

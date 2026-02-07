@@ -6,9 +6,9 @@ namespace Conductor.Engine.Persistence.Repositories;
 
 public sealed class EnvironmentRepository : IEnvironmentRepository
 {
-    private readonly ConductorDbContext _dbContext;
+    private readonly EngineDbContext _dbContext;
 
-    public EnvironmentRepository(ConductorDbContext dbContext)
+    public EnvironmentRepository(EngineDbContext dbContext)
     {
         _dbContext = dbContext;
     }

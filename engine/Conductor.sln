@@ -1,13 +1,5 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{197AC97F-893D-40D8-ABEE-5C722375AFB7}"
-	ProjectSection(SolutionItems) = preProject
-		Directory.Build.props = Directory.Build.props
-		stryker-config.json = stryker-config.json
-		global.json = global.json
-		CLAUDE.md = CLAUDE.md
-	EndProjectSection
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Engine.Api", "src\Conductor.Engine.Api\Conductor.Engine.Api.csproj", "{9FFFB719-DA35-4120-9BEB-6DA78CF28F59}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Engine.Playground", "src\Conductor.Engine.Playground\Conductor.Engine.Playground.csproj", "{0E8A91D2-E999-4D7C-9984-2B04118A9604}"
@@ -17,12 +9,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Engine.Infrastructure", "src\Conductor.Engine.Infrastructure\Conductor.Engine.Infrastructure.csproj", "{0284C6DC-C050-4EE2-996E-504E47E2F0DA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Engine.Persistence", "src\Conductor.Engine.Persistence\Conductor.Engine.Persistence.csproj", "{594E491C-478B-4B07-B330-72FACC0C3C52}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{F08AFB2A-5E8E-4C91-9674-480DF987A640}"
-	ProjectSection(SolutionItems) = preProject
-		scripts\efm.sh = scripts\efm.sh
-		scripts\setup.sh = scripts\setup.sh
-	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Domain", "src\Conductor.Inventory.Domain\Conductor.Inventory.Domain.csproj", "{D1A2EB43-D11C-4E36-BA3E-AD3BB6F38CB3}"
 EndProject
@@ -34,11 +20,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.ServiceDefaults",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Application", "src\Conductor.Inventory.Application\Conductor.Inventory.Application.csproj", "{A59BD6C5-5CD4-4064-8032-73CB56269AA7}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{D20827AD-858C-45B5-A096-C00461777544}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Infrastructure.Tests", "src\Conductor.Inventory.Infrastructure.Tests\Conductor.Inventory.Infrastructure.Tests.csproj", "{B55CAB39-4FFA-479C-A8D7-153715453216}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Conductor.Inventory.Persistence", "src\Conductor.Inventory.Persistence\Conductor.Inventory.Persistence.csproj", "{3B8E91D4-8199-4E12-A31C-90102E967C51}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Inventory", "Inventory", "{AEAFD3B1-99D0-44F9-A8EA-BA1854CB6495}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Engine", "Engine", "{08D405AE-FC03-44CF-9320-2C8816BE1787}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -96,6 +84,15 @@ Global
 		{3B8E91D4-8199-4E12-A31C-90102E967C51}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{B55CAB39-4FFA-479C-A8D7-153715453216} = {D20827AD-858C-45B5-A096-C00461777544}
+		{A59BD6C5-5CD4-4064-8032-73CB56269AA7} = {AEAFD3B1-99D0-44F9-A8EA-BA1854CB6495}
+		{D1A2EB43-D11C-4E36-BA3E-AD3BB6F38CB3} = {AEAFD3B1-99D0-44F9-A8EA-BA1854CB6495}
+		{9857B1FE-EB96-4E84-8A06-1E00E2DA6484} = {AEAFD3B1-99D0-44F9-A8EA-BA1854CB6495}
+		{3B8E91D4-8199-4E12-A31C-90102E967C51} = {AEAFD3B1-99D0-44F9-A8EA-BA1854CB6495}
+		{B55CAB39-4FFA-479C-A8D7-153715453216} = {AEAFD3B1-99D0-44F9-A8EA-BA1854CB6495}
+		{9FFFB719-DA35-4120-9BEB-6DA78CF28F59} = {08D405AE-FC03-44CF-9320-2C8816BE1787}
+		{231859A8-49BF-42C2-BFBC-E8E980506FF8} = {08D405AE-FC03-44CF-9320-2C8816BE1787}
+		{0284C6DC-C050-4EE2-996E-504E47E2F0DA} = {08D405AE-FC03-44CF-9320-2C8816BE1787}
+		{594E491C-478B-4B07-B330-72FACC0C3C52} = {08D405AE-FC03-44CF-9320-2C8816BE1787}
+		{0E8A91D2-E999-4D7C-9984-2B04118A9604} = {08D405AE-FC03-44CF-9320-2C8816BE1787}
 	EndGlobalSection
 EndGlobal

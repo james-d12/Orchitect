@@ -5,9 +5,9 @@ namespace Conductor.Engine.Persistence.Repositories;
 
 public sealed class DeploymentRepository : IDeploymentRepository
 {
-    private readonly ConductorDbContext _dbContext;
+    private readonly EngineDbContext _dbContext;
 
-    public DeploymentRepository(ConductorDbContext dbContext)
+    public DeploymentRepository(EngineDbContext dbContext)
     {
         _dbContext = dbContext;
     }

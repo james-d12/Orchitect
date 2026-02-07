@@ -5,9 +5,9 @@ namespace Conductor.Engine.Persistence.Repositories;
 
 public sealed class ResourceTemplateRepository : IResourceTemplateRepository
 {
-    private readonly ConductorDbContext _dbContext;
+    private readonly EngineDbContext _dbContext;
 
-    public ResourceTemplateRepository(ConductorDbContext dbContext)
+    public ResourceTemplateRepository(EngineDbContext dbContext)
     {
         _dbContext = dbContext;
     }

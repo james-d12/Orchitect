@@ -10,7 +10,7 @@ using Environment = Conductor.Engine.Domain.Environment.Environment;
 
 namespace Conductor.Engine.Persistence;
 
-public sealed class ConductorDbContext : IdentityDbContext
+public sealed class EngineDbContext : IdentityDbContext
 {
     public required DbSet<ResourceTemplate> ResourceTemplates { get; init; }
     public required DbSet<Application> Applications { get; init; }
@@ -35,10 +35,11 @@ public sealed class ConductorDbContext : IdentityDbContext
     {
         base.OnModelCreating(modelBuilder);
         OverrideTableNamesForIdentity(modelBuilder);
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ConductorDbContext).Assembly);
+        modelBuilder.HasDefaultSchema("engine");
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(EngineDbContext).Assembly);
     }
 
-    private void OverrideTableNamesForIdentity(ModelBuilder builder)
+    private static void OverrideTableNamesForIdentity(ModelBuilder builder)
     {
         builder.Entity<IdentityUser>(b => { b.ToTable("Users"); });
         builder.Entity<IdentityRole>(b => { b.ToTable("Roles"); });

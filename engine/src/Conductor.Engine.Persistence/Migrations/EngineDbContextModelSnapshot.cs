@@ -3,22 +3,21 @@ using System;
 using Conductor.Engine.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
 namespace Conductor.Engine.Persistence.Migrations
 {
-    [DbContext(typeof(ConductorDbContext))]
-    [Migration("20251126154221_org-update")]
-    partial class orgupdate
+    [DbContext(typeof(EngineDbContext))]
+    partial class EngineDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
+            modelBuilder
+                .HasDefaultSchema("inventory")
+                .HasAnnotation("ProductVersion", "10.0.2");
 
             modelBuilder.Entity("Conductor.Engine.Domain.Application.Application", b =>
                 {
@@ -46,7 +45,10 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("OrganisationId");
 
-                    b.ToTable("Applications", (string)null);
+                    b.HasIndex("Name", "OrganisationId")
+                        .IsUnique();
+
+                    b.ToTable("Applications", "inventory");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Deployment.Deployment", b =>
@@ -85,7 +87,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("ApplicationId", "EnvironmentId", "CommitId", "Status")
                         .IsUnique();
 
-                    b.ToTable("Deployments", (string)null);
+                    b.ToTable("Deployments", "inventory");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Environment.Environment", b =>
@@ -116,12 +118,12 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
-                        .IsUnique();
-
                     b.HasIndex("OrganisationId");
 
-                    b.ToTable("Environments", (string)null);
+                    b.HasIndex("Name", "OrganisationId")
+                        .IsUnique();
+
+                    b.ToTable("Environments", "inventory");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.Organisation", b =>
@@ -148,7 +150,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Organisations", (string)null);
+                    b.ToTable("Organisations", "inventory");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationService", b =>
@@ -180,7 +182,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("OrganisationServices", (string)null);
+                    b.ToTable("OrganisationServices", "inventory");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationTeam", b =>
@@ -212,7 +214,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("Name", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("OrganisationTeams", (string)null);
+                    b.ToTable("OrganisationTeams", "inventory");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Organisation.OrganisationUser", b =>
@@ -239,7 +241,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     b.HasIndex("IdentityUserId", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("OrganisationUsers", (string)null);
+                    b.ToTable("OrganisationUsers", "inventory");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Resource.Resource", b =>
@@ -274,7 +276,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("ApplicationId", "EnvironmentId", "ResourceTemplateId");
 
-                    b.ToTable("Resources", (string)null);
+                    b.ToTable("Resources", "inventory");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.ResourceTemplate.ResourceTemplate", b =>
@@ -295,6 +297,9 @@ namespace Conductor.Engine.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -310,10 +315,12 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("Name", "OrganisationId")
                         .IsUnique();
 
-                    b.ToTable("ResourceTemplates", (string)null);
+                    b.ToTable("ResourceTemplates", "inventory");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -339,7 +346,7 @@ namespace Conductor.Engine.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("RoleNameIndex");
 
-                    b.ToTable("Roles", (string)null);
+                    b.ToTable("Roles", "inventory");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -362,7 +369,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("RoleClaims", (string)null);
+                    b.ToTable("RoleClaims", "inventory");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUser", b =>
@@ -426,7 +433,7 @@ namespace Conductor.Engine.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users", "inventory");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
@@ -449,7 +456,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserClaims", (string)null);
+                    b.ToTable("UserClaims", "inventory");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
@@ -471,7 +478,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserLogins", (string)null);
+                    b.ToTable("UserLogins", "inventory");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
@@ -486,7 +493,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("UserRoles", (string)null);
+                    b.ToTable("UserRoles", "inventory");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
@@ -505,7 +512,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
-                    b.ToTable("UserTokens", (string)null);
+                    b.ToTable("UserTokens", "inventory");
                 });
 
             modelBuilder.Entity("OrganisationTeamUsers", b =>
@@ -520,7 +527,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                     b.HasIndex("OrganisationUserId");
 
-                    b.ToTable("OrganisationTeamUsers", (string)null);
+                    b.ToTable("OrganisationTeamUsers", "inventory");
                 });
 
             modelBuilder.Entity("Conductor.Engine.Domain.Application.Application", b =>
@@ -550,7 +557,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                             b1.HasKey("ApplicationId");
 
-                            b1.ToTable("Applications");
+                            b1.ToTable("Applications", "inventory");
 
                             b1.WithOwner()
                                 .HasForeignKey("ApplicationId");
@@ -623,6 +630,12 @@ namespace Conductor.Engine.Persistence.Migrations
 
             modelBuilder.Entity("Conductor.Engine.Domain.ResourceTemplate.ResourceTemplate", b =>
                 {
+                    b.HasOne("Conductor.Engine.Domain.Organisation.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.OwnsMany("Conductor.Engine.Domain.ResourceTemplate.ResourceTemplateVersion", "Versions", b1 =>
                         {
                             b1.Property<Guid>("Id")
@@ -652,7 +665,7 @@ namespace Conductor.Engine.Persistence.Migrations
                             b1.HasIndex("TemplateId", "Version")
                                 .IsUnique();
 
-                            b1.ToTable("ResourceTemplateVersion");
+                            b1.ToTable("ResourceTemplateVersion", "inventory");
 
                             b1.WithOwner()
                                 .HasForeignKey("TemplateId");
@@ -676,7 +689,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
                                     b2.HasKey("ResourceTemplateVersionId");
 
-                                    b2.ToTable("ResourceTemplateVersion");
+                                    b2.ToTable("ResourceTemplateVersion", "inventory");
 
                                     b2.WithOwner()
                                         .HasForeignKey("ResourceTemplateVersionId");

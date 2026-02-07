@@ -11,8 +11,12 @@ namespace Conductor.Engine.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.EnsureSchema(
+                name: "inventory");
+
             migrationBuilder.CreateTable(
                 name: "Organisations",
+                schema: "inventory",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
@@ -27,6 +31,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "Resources",
+                schema: "inventory",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
@@ -43,24 +48,8 @@ namespace Conductor.Engine.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ResourceTemplates",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", nullable: false),
-                    Type = table.Column<string>(type: "TEXT", nullable: false),
-                    Description = table.Column<string>(type: "TEXT", nullable: false),
-                    Provider = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ResourceTemplates", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Roles",
+                schema: "inventory",
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "TEXT", nullable: false),
@@ -75,6 +64,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "Users",
+                schema: "inventory",
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "TEXT", nullable: false),
@@ -100,6 +90,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "Applications",
+                schema: "inventory",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
@@ -117,6 +108,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     table.ForeignKey(
                         name: "FK_Applications_Organisations_OrganisationId",
                         column: x => x.OrganisationId,
+                        principalSchema: "inventory",
                         principalTable: "Organisations",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -124,6 +116,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "Environments",
+                schema: "inventory",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
@@ -139,6 +132,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     table.ForeignKey(
                         name: "FK_Environments_Organisations_OrganisationId",
                         column: x => x.OrganisationId,
+                        principalSchema: "inventory",
                         principalTable: "Organisations",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -146,6 +140,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "OrganisationServices",
+                schema: "inventory",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
@@ -160,6 +155,7 @@ namespace Conductor.Engine.Persistence.Migrations
                     table.ForeignKey(
                         name: "FK_OrganisationServices_Organisations_OrganisationId",
                         column: x => x.OrganisationId,
+                        principalSchema: "inventory",
                         principalTable: "Organisations",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -167,6 +163,7 @@ namespace Conductor.Engine.Persistence.Migrations
 
             migrationBuilder.CreateTable(
                 name: "OrganisationTeams",
+                schema: "inventory",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
@@ -181,13 +178,225 @@ namespace Conductor.Engine.Persistence.Migrations
                     table.ForeignKey(
                         name: "FK_OrganisationTeams_Organisations_OrganisationId",
                         column: x => x.OrganisationId,
+                        principalSchema: "inventory",
                         principalTable: "Organisations",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
+                name: "ResourceTemplates",
+                schema: "inventory",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    OrganisationId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    Type = table.Column<string>(type: "TEXT", nullable: false),
+                    Description = table.Column<string>(type: "TEXT", nullable: false),
+                    Provider = table.Column<string>(type: "TEXT", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ResourceTemplates", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ResourceTemplates_Organisations_OrganisationId",
+                        column: x => x.OrganisationId,
+                        principalSchema: "inventory",
+                        principalTable: "Organisations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RoleClaims",
+                schema: "inventory",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    RoleId = table.Column<string>(type: "TEXT", nullable: false),
+                    ClaimType = table.Column<string>(type: "TEXT", nullable: true),
+                    ClaimValue = table.Column<string>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RoleClaims", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RoleClaims_Roles_RoleId",
+                        column: x => x.RoleId,
+                        principalSchema: "inventory",
+                        principalTable: "Roles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "OrganisationUsers",
+                schema: "inventory",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    IdentityUserId = table.Column<string>(type: "TEXT", nullable: false),
+                    OrganisationId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    OrganisationId1 = table.Column<Guid>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OrganisationUsers", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_OrganisationUsers_Organisations_OrganisationId",
+                        column: x => x.OrganisationId,
+                        principalSchema: "inventory",
+                        principalTable: "Organisations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_OrganisationUsers_Organisations_OrganisationId1",
+                        column: x => x.OrganisationId1,
+                        principalSchema: "inventory",
+                        principalTable: "Organisations",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_OrganisationUsers_Users_IdentityUserId",
+                        column: x => x.IdentityUserId,
+                        principalSchema: "inventory",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserClaims",
+                schema: "inventory",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    UserId = table.Column<string>(type: "TEXT", nullable: false),
+                    ClaimType = table.Column<string>(type: "TEXT", nullable: true),
+                    ClaimValue = table.Column<string>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserClaims", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_UserClaims_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "inventory",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserLogins",
+                schema: "inventory",
+                columns: table => new
+                {
+                    LoginProvider = table.Column<string>(type: "TEXT", nullable: false),
+                    ProviderKey = table.Column<string>(type: "TEXT", nullable: false),
+                    ProviderDisplayName = table.Column<string>(type: "TEXT", nullable: true),
+                    UserId = table.Column<string>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserLogins", x => new { x.LoginProvider, x.ProviderKey });
+                    table.ForeignKey(
+                        name: "FK_UserLogins_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "inventory",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserRoles",
+                schema: "inventory",
+                columns: table => new
+                {
+                    UserId = table.Column<string>(type: "TEXT", nullable: false),
+                    RoleId = table.Column<string>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserRoles", x => new { x.UserId, x.RoleId });
+                    table.ForeignKey(
+                        name: "FK_UserRoles_Roles_RoleId",
+                        column: x => x.RoleId,
+                        principalSchema: "inventory",
+                        principalTable: "Roles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_UserRoles_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "inventory",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserTokens",
+                schema: "inventory",
+                columns: table => new
+                {
+                    UserId = table.Column<string>(type: "TEXT", nullable: false),
+                    LoginProvider = table.Column<string>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    Value = table.Column<string>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserTokens", x => new { x.UserId, x.LoginProvider, x.Name });
+                    table.ForeignKey(
+                        name: "FK_UserTokens_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "inventory",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Deployments",
+                schema: "inventory",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ApplicationId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    EnvironmentId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    CommitId = table.Column<string>(type: "TEXT", nullable: false),
+                    Status = table.Column<string>(type: "TEXT", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Deployments", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Deployments_Applications_ApplicationId",
+                        column: x => x.ApplicationId,
+                        principalSchema: "inventory",
+                        principalTable: "Applications",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Deployments_Environments_EnvironmentId",
+                        column: x => x.EnvironmentId,
+                        principalSchema: "inventory",
+                        principalTable: "Environments",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ResourceTemplateVersion",
+                schema: "inventory",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
@@ -206,287 +415,202 @@ namespace Conductor.Engine.Persistence.Migrations
                     table.ForeignKey(
                         name: "FK_ResourceTemplateVersion_ResourceTemplates_TemplateId",
                         column: x => x.TemplateId,
+                        principalSchema: "inventory",
                         principalTable: "ResourceTemplates",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
-                name: "RoleClaims",
+                name: "OrganisationTeamUsers",
+                schema: "inventory",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    RoleId = table.Column<string>(type: "TEXT", nullable: false),
-                    ClaimType = table.Column<string>(type: "TEXT", nullable: true),
-                    ClaimValue = table.Column<string>(type: "TEXT", nullable: true)
+                    OrganisationTeamId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    OrganisationUserId = table.Column<Guid>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_RoleClaims", x => x.Id);
+                    table.PrimaryKey("PK_OrganisationTeamUsers", x => new { x.OrganisationTeamId, x.OrganisationUserId });
                     table.ForeignKey(
-                        name: "FK_RoleClaims_Roles_RoleId",
-                        column: x => x.RoleId,
-                        principalTable: "Roles",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "OrganisationUsers",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    IdentityUserId = table.Column<string>(type: "TEXT", nullable: false),
-                    OrganisationId = table.Column<Guid>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_OrganisationUsers", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_OrganisationUsers_Organisations_OrganisationId",
-                        column: x => x.OrganisationId,
-                        principalTable: "Organisations",
+                        name: "FK_OrganisationTeamUsers_OrganisationTeams_OrganisationTeamId",
+                        column: x => x.OrganisationTeamId,
+                        principalSchema: "inventory",
+                        principalTable: "OrganisationTeams",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_OrganisationUsers_Users_IdentityUserId",
-                        column: x => x.IdentityUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserClaims",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
-                    ClaimType = table.Column<string>(type: "TEXT", nullable: true),
-                    ClaimValue = table.Column<string>(type: "TEXT", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserClaims", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_UserClaims_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserLogins",
-                columns: table => new
-                {
-                    LoginProvider = table.Column<string>(type: "TEXT", nullable: false),
-                    ProviderKey = table.Column<string>(type: "TEXT", nullable: false),
-                    ProviderDisplayName = table.Column<string>(type: "TEXT", nullable: true),
-                    UserId = table.Column<string>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserLogins", x => new { x.LoginProvider, x.ProviderKey });
-                    table.ForeignKey(
-                        name: "FK_UserLogins_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserRoles",
-                columns: table => new
-                {
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
-                    RoleId = table.Column<string>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserRoles", x => new { x.UserId, x.RoleId });
-                    table.ForeignKey(
-                        name: "FK_UserRoles_Roles_RoleId",
-                        column: x => x.RoleId,
-                        principalTable: "Roles",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_UserRoles_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserTokens",
-                columns: table => new
-                {
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
-                    LoginProvider = table.Column<string>(type: "TEXT", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", nullable: false),
-                    Value = table.Column<string>(type: "TEXT", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserTokens", x => new { x.UserId, x.LoginProvider, x.Name });
-                    table.ForeignKey(
-                        name: "FK_UserTokens_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Deployments",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    ApplicationId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    EnvironmentId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    CommitId = table.Column<string>(type: "TEXT", nullable: false),
-                    Status = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Deployments", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Deployments_Applications_ApplicationId",
-                        column: x => x.ApplicationId,
-                        principalTable: "Applications",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Deployments_Environments_EnvironmentId",
-                        column: x => x.EnvironmentId,
-                        principalTable: "Environments",
+                        name: "FK_OrganisationTeamUsers_OrganisationUsers_OrganisationUserId",
+                        column: x => x.OrganisationUserId,
+                        principalSchema: "inventory",
+                        principalTable: "OrganisationUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Applications_Name_OrganisationId",
+                schema: "inventory",
+                table: "Applications",
+                columns: new[] { "Name", "OrganisationId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Applications_OrganisationId",
+                schema: "inventory",
                 table: "Applications",
                 column: "OrganisationId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Deployments_ApplicationId_EnvironmentId_CommitId_Status",
+                schema: "inventory",
                 table: "Deployments",
                 columns: new[] { "ApplicationId", "EnvironmentId", "CommitId", "Status" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Deployments_EnvironmentId",
+                schema: "inventory",
                 table: "Deployments",
                 column: "EnvironmentId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Environments_Name",
+                name: "IX_Environments_Name_OrganisationId",
+                schema: "inventory",
                 table: "Environments",
-                column: "Name",
+                columns: new[] { "Name", "OrganisationId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Environments_OrganisationId",
+                schema: "inventory",
                 table: "Environments",
                 column: "OrganisationId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Organisations_Name",
+                schema: "inventory",
                 table: "Organisations",
                 column: "Name",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrganisationServices_Name_OrganisationId",
+                schema: "inventory",
                 table: "OrganisationServices",
                 columns: new[] { "Name", "OrganisationId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrganisationServices_OrganisationId",
+                schema: "inventory",
                 table: "OrganisationServices",
                 column: "OrganisationId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrganisationTeams_Name_OrganisationId",
+                schema: "inventory",
                 table: "OrganisationTeams",
                 columns: new[] { "Name", "OrganisationId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrganisationTeams_OrganisationId",
+                schema: "inventory",
                 table: "OrganisationTeams",
                 column: "OrganisationId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_OrganisationTeamUsers_OrganisationUserId",
+                schema: "inventory",
+                table: "OrganisationTeamUsers",
+                column: "OrganisationUserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OrganisationUsers_IdentityUserId_OrganisationId",
+                schema: "inventory",
                 table: "OrganisationUsers",
                 columns: new[] { "IdentityUserId", "OrganisationId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrganisationUsers_OrganisationId",
+                schema: "inventory",
                 table: "OrganisationUsers",
                 column: "OrganisationId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_OrganisationUsers_OrganisationId1",
+                schema: "inventory",
+                table: "OrganisationUsers",
+                column: "OrganisationId1");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Resources_ApplicationId_EnvironmentId_ResourceTemplateId",
+                schema: "inventory",
                 table: "Resources",
                 columns: new[] { "ApplicationId", "EnvironmentId", "ResourceTemplateId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_ResourceTemplates_Name",
+                name: "IX_ResourceTemplates_Name_OrganisationId",
+                schema: "inventory",
                 table: "ResourceTemplates",
-                column: "Name",
+                columns: new[] { "Name", "OrganisationId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ResourceTemplates_OrganisationId",
+                schema: "inventory",
+                table: "ResourceTemplates",
+                column: "OrganisationId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ResourceTemplateVersion_TemplateId_Version",
+                schema: "inventory",
                 table: "ResourceTemplateVersion",
                 columns: new[] { "TemplateId", "Version" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_RoleClaims_RoleId",
+                schema: "inventory",
                 table: "RoleClaims",
                 column: "RoleId");
 
             migrationBuilder.CreateIndex(
                 name: "RoleNameIndex",
+                schema: "inventory",
                 table: "Roles",
                 column: "NormalizedName",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserClaims_UserId",
+                schema: "inventory",
                 table: "UserClaims",
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserLogins_UserId",
+                schema: "inventory",
                 table: "UserLogins",
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserRoles_RoleId",
+                schema: "inventory",
                 table: "UserRoles",
                 column: "RoleId");
 
             migrationBuilder.CreateIndex(
                 name: "EmailIndex",
+                schema: "inventory",
                 table: "Users",
                 column: "NormalizedEmail");
 
             migrationBuilder.CreateIndex(
                 name: "UserNameIndex",
+                schema: "inventory",
                 table: "Users",
                 column: "NormalizedUserName",
                 unique: true);
@@ -496,55 +620,76 @@ namespace Conductor.Engine.Persistence.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Deployments");
+                name: "Deployments",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "OrganisationServices");
+                name: "OrganisationServices",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "OrganisationTeams");
+                name: "OrganisationTeamUsers",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "OrganisationUsers");
+                name: "Resources",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "Resources");
+                name: "ResourceTemplateVersion",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "ResourceTemplateVersion");
+                name: "RoleClaims",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "RoleClaims");
+                name: "UserClaims",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "UserClaims");
+                name: "UserLogins",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "UserLogins");
+                name: "UserRoles",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "UserRoles");
+                name: "UserTokens",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "UserTokens");
+                name: "Applications",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "Applications");
+                name: "Environments",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "Environments");
+                name: "OrganisationTeams",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "ResourceTemplates");
+                name: "OrganisationUsers",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "Roles");
+                name: "ResourceTemplates",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "Users");
+                name: "Roles",
+                schema: "inventory");
 
             migrationBuilder.DropTable(
-                name: "Organisations");
+                name: "Users",
+                schema: "inventory");
+
+            migrationBuilder.DropTable(
+                name: "Organisations",
+                schema: "inventory");
         }
     }
 }
