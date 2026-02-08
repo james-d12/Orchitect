@@ -1,0 +1,20 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <UserSecretsId>62e6a42a-9340-42f9-a8fd-b78a29cf7a40</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Hosting.AppHost" Version="13.1.0"/>
+        <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.1.0" />
+        <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.1.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Orchitect.Engine.Api\Orchitect.Engine.Api.csproj" />
+      <ProjectReference Include="..\Orchitect.Engine.Playground\Orchitect.Engine.Playground.csproj" />
+      <ProjectReference Include="..\Orchitect.Inventory.Api\Orchitect.Inventory.Api.csproj" />
+    </ItemGroup>
+
+</Project>
