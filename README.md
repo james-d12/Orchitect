@@ -1,12 +1,12 @@
-# Conductor
+# Orchitect
 
-Conductor is a prototype self hosted Internal Developer Platform. It aims to be entirely self-hosted, and to provide a cohesive abstraction around managing applications and infrastructure.  
+Orchitect is a prototype self hosted Internal Developer Platform. It aims to be entirely self-hosted, and to provide a cohesive abstraction around managing applications and infrastructure.  
 
 It is currently a multi language monorepo, consisting of 3 main components: 
 
-- Platform: This is the heart of Conductor, it has all of the business logic, api, and persistence code.
-- CLI Portal: This is a rust CLI tool that allows you to interact with Conductor's API through an easy to use CLI.
-- Web Portal: This is a Typescript based Web Portal that allows you to interact with Conductor's API.
+- Platform: This is the heart of Orchitect, it has all of the business logic, api, and persistence code.
+- CLI Portal: This is a rust CLI tool that allows you to interact with Orchitect's API through an easy to use CLI.
+- Web Portal: This is a Typescript based Web Portal that allows you to interact with Orchitect's API.
 
 # Getting Started
 
@@ -31,4 +31,4 @@ and [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) insta
 
 # License
 
-Conductor is licensed under the [GPLV3 License](./LICENSE.md).
+Orchitect is licensed under the [GPLV3 License](./LICENSE.md).

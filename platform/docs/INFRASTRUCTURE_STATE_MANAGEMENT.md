@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document proposes approaches for storing and managing infrastructure state in Conductor Engine to support flexible resource provisioning scenarios, including shared resources across multiple applications. The primary challenge is enabling both dedicated and shared resource models while maintaining clean separation of concerns and accurate state tracking.
+This document proposes approaches for storing and managing infrastructure state in Orchitect Engine to support flexible resource provisioning scenarios, including shared resources across multiple applications. The primary challenge is enabling both dedicated and shared resource models while maintaining clean separation of concerns and accurate state tracking.
 
 **⚠️ IMPORTANT UPDATE:** The domain already contains a production-ready DAG (Directed Acyclic Graph) implementation in `ResourceDependencyGraph` with topological sorting (Kahn's algorithm) and cycle detection. **Option 5 (Recommended)** leverages this existing implementation instead of building graph algorithms from scratch, reducing complexity and implementation time from 4-6 weeks to 1-2 weeks.
 
@@ -1390,7 +1390,7 @@ public sealed record ResourceInstance
 ```hcl
 terraform {
   backend "azurerm" {
-    storage_account_name = "conductorstate"
+    storage_account_name = "orchitectstate"
     container_name       = "tfstate"
     key                  = "resources/${resource_instance_id}.tfstate"
   }

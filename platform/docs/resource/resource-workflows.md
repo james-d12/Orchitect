@@ -5,10 +5,10 @@
 Represents a provisioned resource instance (e.g., CosmosDB, VNet, Helm release, Kubernetes Pod).
 
 ```csharp
-using Conductor.Domain.Environment;
-using Conductor.Domain.ResourceTemplate;
+using Orchitect.Domain.Environment;
+using Orchitect.Domain.ResourceTemplate;
 
-namespace Conductor.Domain.Resource;
+namespace Orchitect.Domain.Resource;
 
 public sealed record Resource
 {

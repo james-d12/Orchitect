@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./portals/Conductor.Portal.Web
+        working-directory: ./portals/Orchitect.Portal.Web
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -63,7 +63,7 @@ jobs:
       #  env:
       #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       #  with:
-      #    projectBaseDir: ./portals/Conductor.Portal.Web
+      #    projectBaseDir: ./portals/Orchitect.Portal.Web
 
       - name: Build project
         run: pnpm run build
@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./portals/Conductor.Portal.Cli
+        working-directory: ./portals/Orchitect.Portal.Cli
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -90,7 +90,7 @@ jobs:
       #  env:
       #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       #  with:
-      #    projectBaseDir: ./portals/Conductor.Portal.Cli
+      #    projectBaseDir: ./portals/Orchitect.Portal.Cli
 
       - name: Build 
         run: cargo build --release
@@ -108,7 +108,7 @@ jobs:
       run:
         working-directory: ./platform
     env:
-      SOLUTION_FILE: Conductor.sln
+      SOLUTION_FILE: Orchitect.sln
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -169,12 +169,12 @@ jobs:
 #          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 #        run: |
 #          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
-#            /k:"personal-james_conductor-platform" \
+#            /k:"personal-james_orchitect-platform" \
 #            /o:"personal-james" \
-#            /n:"Conductor Platform" \
+#            /n:"Orchitect Platform" \
 #            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
 #            /d:sonar.qualitygate.wait=false \
-#            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**,src/Conductor.Inventory.*,src/Conductor.Inventory.Persistence/Migrations/**"
+#            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Orchitect.Engine.Persistence/Migrations/**,src/Orchitect.Inventory.*,src/Orchitect.Inventory.Persistence/Migrations/**"
 #
 #          dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 #
@@ -188,7 +188,7 @@ jobs:
 
       - name: Check No Pending Model Changes
         run: dotnet ef migrations has-pending-model-changes
-        working-directory: platform/src/Conductor.Engine.Persistence
+        working-directory: platform/src/Orchitect.Engine.Persistence
 
       - name: Check For Vulnerabilities
         run: dotnet list ${{ env.SOLUTION_FILE }} package --vulnerable
