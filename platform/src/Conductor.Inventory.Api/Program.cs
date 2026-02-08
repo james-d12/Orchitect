@@ -74,7 +74,7 @@ try
     });
 
     await builder.Services.ApplyInventoryMigrations();
-    
+
     var app = builder.Build();
 
     if (app.Environment.IsDevelopment())
@@ -92,12 +92,12 @@ try
 
     app.MapControllers();
 
-    app.Run();
+    await app.RunAsync();
 }
 catch (Exception exception)
 {
-    logger.LogCritical(exception, "Could not startup: {ApplicationName}.", applicationName);
-    throw;
+    logger.LogCritical(exception, "Could not startup: {ApplicationName} due to Exception: {Exception}.",
+        applicationName, exception);
 }
 finally
 {
