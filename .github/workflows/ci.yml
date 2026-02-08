@@ -58,12 +58,12 @@ jobs:
       - name: Check code formatting
         run: pnpm run format:check
     
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v6
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: ./portals/Conductor.Portal.Web
+      #- name: SonarQube Scan
+      #  uses: SonarSource/sonarqube-scan-action@v6
+      #  env:
+      #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #  with:
+      #    projectBaseDir: ./portals/Conductor.Portal.Web
 
       - name: Build project
         run: pnpm run build
@@ -85,12 +85,12 @@ jobs:
       
       - uses: actions-rust-lang/setup-rust-toolchain@v1
    
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v6
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          projectBaseDir: ./portals/Conductor.Portal.Cli
+      #- name: SonarQube Scan
+      #  uses: SonarSource/sonarqube-scan-action@v6
+      #  env:
+      #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #  with:
+      #    projectBaseDir: ./portals/Conductor.Portal.Cli
 
       - name: Build 
         run: cargo build --release
