@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./portals/Conductor..Web
+        working-directory: ./portals/Conductor.Portal.Web
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
