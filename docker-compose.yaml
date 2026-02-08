@@ -57,23 +57,23 @@ services:
     depends_on:
       - engine-api
     build:
-      context: portals/Conductor.Client.Cli
+      context: portals/Conductor.Portal.Cli
       dockerfile: Dockerfile
     develop:
       watch:
         - action: sync+restart
-          path: .portals/Conductor.Client.Cli
-          target: .portals/Conductor.Client.Cli
+          path: .portals/Conductor.Portal.Cli
+          target: .portals/Conductor.Portal.Cli
   
   web:
     depends_on:
       - engine-api
       - inventory-api
     build:
-      context: portals/Conductor.Client.Web
+      context: portals/Conductor.Portal.Web
       dockerfile: Dockerfile
     develop:
       watch:
         - action: sync+restart
-          path: .portals/Conductor.Client.Web
-          target: .portals/Conductor.Client.Web
+          path: .portals/Conductor.Portal.Web
+          target: .portals/Conductor.Portal.Web
