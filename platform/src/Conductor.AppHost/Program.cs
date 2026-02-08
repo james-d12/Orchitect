@@ -22,7 +22,7 @@ var inventoryApi = builder.AddProject<Projects.Conductor_Inventory_Api>("conduct
     .WithReference(conductorDb)
     .WaitFor(conductorDb);
 
-builder.AddJavaScriptApp("conductor-client-web", "../../../client/Conductor.Client.Web")
+builder.AddJavaScriptApp("conductor-portal-web", "../../../portals/Conductor.Client.Web")
     .WithPnpm()
     .WithRunScript("dev")
     .WithArgs("--port", "3001")
