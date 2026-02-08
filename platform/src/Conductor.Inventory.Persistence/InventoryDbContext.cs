@@ -8,14 +8,14 @@ namespace Conductor.Inventory.Persistence;
 
 public sealed class InventoryDbContext : DbContext
 {
-    public DbSet<CloudSecret> CloudSecrets { get; init; }
-    public DbSet<CloudResource> CloudResources { get; init; }
-    public DbSet<Owner> Owners { get; init; }
-    public DbSet<Pipeline> Pipelines { get; init; }
-    public DbSet<Repository> Repositories { get; init; }
-    public DbSet<PullRequest> PullRequests { get; init; }
-    public DbSet<User> TicketingUsers { get; init; }
-    public DbSet<WorkItem> WorkItems { get; init; }
+    public DbSet<CloudSecret> CloudSecrets { get; init; } = null!;
+    public DbSet<CloudResource> CloudResources { get; init; } = null!;
+    public DbSet<Owner> Owners { get; init; } = null!;
+    public DbSet<Pipeline> Pipelines { get; init; } = null!;
+    public DbSet<Repository> Repositories { get; init; } = null!;
+    public DbSet<PullRequest> PullRequests { get; init; } = null!;
+    public DbSet<User> TicketingUsers { get; init; } = null!;
+    public DbSet<WorkItem> WorkItems { get; init; } = null!;
 
     private static readonly ILoggerFactory LoggerFactoryInstance
         = LoggerFactory.Create(builder =>

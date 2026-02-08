@@ -12,12 +12,12 @@ namespace Conductor.Engine.Persistence;
 
 public sealed class EngineDbContext : IdentityDbContext
 {
-    public DbSet<ResourceTemplate> ResourceTemplates { get; init; }
-    public DbSet<Application> Applications { get; init; }
-    public DbSet<Conductor.Engine.Domain.Environment.Environment> Environments { get; init; }
-    public DbSet<Deployment> Deployments { get; init; }
-    public DbSet<Organisation> Organisations { get; init; }
-    public DbSet<Resource> Resources { get; init; }
+    public DbSet<ResourceTemplate> ResourceTemplates { get; init; } = null!;
+    public DbSet<Application> Applications { get; init; } = null!;
+    public DbSet<Conductor.Engine.Domain.Environment.Environment> Environments { get; init; } = null!;
+    public DbSet<Deployment> Deployments { get; init; } = null!;
+    public DbSet<Organisation> Organisations { get; init; } = null!;
+    public DbSet<Resource> Resources { get; init; } = null!;
 
     private static readonly ILoggerFactory LoggerFactoryInstance
         = LoggerFactory.Create(builder =>
@@ -45,12 +45,12 @@ public sealed class EngineDbContext : IdentityDbContext
             .EnableSensitiveDataLogging();
     }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(modelBuilder);
-        OverrideTableNamesForIdentity(modelBuilder);
-        modelBuilder.HasDefaultSchema("engine");
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(EngineDbContext).Assembly);
+        base.OnModelCreating(builder);
+        OverrideTableNamesForIdentity(builder);
+        builder.HasDefaultSchema("engine");
+        builder.ApplyConfigurationsFromAssembly(typeof(EngineDbContext).Assembly);
     }
 
     private static void OverrideTableNamesForIdentity(ModelBuilder builder)
