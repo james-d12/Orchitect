@@ -1,4 +1,4 @@
-name: conductor
+name: orchitect
 services:
   db:
     image: postgres:14.20-alpine
@@ -9,71 +9,71 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: example
-      POSTGRES_DB: conductor
+      POSTGRES_DB: orchitect
   
   engine-api:
     depends_on:
       - db
     build:
       context: platform/
-      dockerfile: src/Conductor.Engine.Api/Dockerfile
+      dockerfile: src/Orchitect.Engine.Api/Dockerfile
     volumes:
-      - /home/james/Documents/Conductor:/tmp/conductor
+      - /home/james/Documents/Orchitect:/tmp/orchitect
     ports:
       - "8081:8080"
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
-      - POSTGRES_DB=conductor
+      - POSTGRES_DB=orchitect
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=example
     develop:
       watch:
         - action: sync+restart
-          path: .platform/src/Conductor.Engine.Api
-          target: .platform/src/Conductor.Engine.Api
+          path: .platform/src/Orchitect.Engine.Api
+          target: .platform/src/Orchitect.Engine.Api
   
   inventory-api:
     depends_on:
       - db
     build:
       context: platform/
-      dockerfile: src/Conductor.Inventory.Api/Dockerfile
+      dockerfile: src/Orchitect.Inventory.Api/Dockerfile
     ports:
       - "8081:8080"
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
-      - POSTGRES_DB=conductor
+      - POSTGRES_DB=orchitect
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=example
     develop:
       watch:
         - action: sync+restart
-          path: .platform/src/Conductor.Inventory.Api
-          target: .platform/src/Conductor.Inventory.Api
+          path: .platform/src/Orchitect.Inventory.Api
+          target: .platform/src/Orchitect.Inventory.Api
   
   cli:
     depends_on:
       - engine-api
     build:
-      context: portals/Conductor.Portal.Cli
+      context: portals/Orchitect.Portal.Cli
       dockerfile: Dockerfile
     develop:
       watch:
         - action: sync+restart
-          path: .portals/Conductor.Portal.Cli
-          target: .portals/Conductor.Portal.Cli
+          path: .portals/Orchitect.Portal.Cli
+          target: .portals/Orchitect.Portal.Cli
   
   web:
     depends_on:
       - engine-api
       - inventory-api
     build:
-      context: portals/Conductor.Portal.Web
+      context: portals/Orchitect.Portal.Web
       dockerfile: Dockerfile
     develop:
       watch:
         - action: sync+restart
-          path: .portals/Conductor.Portal.Web
-          target: .portals/Conductor.Portal.Web
+          path: .portals/Orchitect.Portal.Web
+          target: .portals/Orchitect.Portal.Web

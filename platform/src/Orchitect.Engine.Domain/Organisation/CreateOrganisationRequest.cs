@@ -1,0 +1,3 @@
+namespace Orchitect.Engine.Domain.Organisation;
+
+public sealed record CreateOrganisationRequest(string Name);

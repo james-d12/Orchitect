@@ -7,7 +7,7 @@
     "mutate": [
       "**/*"
     ],
-    "solution": "Conductor.sln",
+    "solution": "Orchitect.sln",
     "coverage-analysis": "perTest",
     "thresholds": {
       "high": 80,

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Conductor Engine is a .NET 10 (C# latest) web API for infrastructure orchestration that integrates with existing Infrastructure as Code (IaC) solutions. The project uses minimal APIs with a custom endpoint pattern, Entity Framework Core with SQLite, and JWT authentication.
+Orchitect Engine is a .NET 10 (C# latest) web API for infrastructure orchestration that integrates with existing Infrastructure as Code (IaC) solutions. The project uses minimal APIs with a custom endpoint pattern, Entity Framework Core with SQLite, and JWT authentication.
 
 ## Building and Running
 
@@ -18,11 +18,11 @@ Conductor Engine is a .NET 10 (C# latest) web API for infrastructure orchestrati
 # Build the solution
 dotnet build
 
-# Run the API (from src/Conductor.Engine.Api)
-dotnet run --project src/Conductor.Engine.Api
+# Run the API (from src/Orchitect.Engine.Api)
+dotnet run --project src/Orchitect.Engine.Api
 
 # Run the playground project (for testing/experimentation)
-dotnet run --project src/Conductor.Engine.Playground
+dotnet run --project src/Orchitect.Engine.Playground
 
 # Restore dependencies
 dotnet restore
@@ -35,7 +35,7 @@ dotnet restore
 ./scripts/efm.sh <migration_name>
 
 # Or manually from the Persistence project
-cd src/Conductor.Engine.Persistence
+cd src/Orchitect.Engine.Persistence
 dotnet ef migrations add <migration_name>
 ```
 
@@ -43,13 +43,13 @@ Note: The database is automatically migrated on application startup via `ApplyMi
 
 ### Testing
 
-The project uses Stryker.NET for mutation testing (see stryker-config.json). Bruno API tests are available in `docs/Conductor Api - Bruno.json`.
+The project uses Stryker.NET for mutation testing (see stryker-config.json). Bruno API tests are available in `docs/Orchitect Api - Bruno.json`.
 
 ## Architecture
 
 This solution follows Clean Architecture principles with four main projects:
 
-### 1. Conductor.Engine.Domain
+### 1. Orchitect.Engine.Domain
 **Purpose**: Core business logic and domain models - the "heart of the project"
 
 **Key Concepts**:
@@ -57,12 +57,12 @@ This solution follows Clean Architecture principles with four main projects:
 - Domain logic and entity relationships live here
 - No dependencies on other layers
 
-### 2. Conductor.Engine.Persistence
+### 2. Orchitect.Engine.Persistence
 **Purpose**: Data access layer using Entity Framework Core
 
 **Key Concepts**:
-- `ConductorDbContext`: Main DbContext with all entity DbSets
-- Database: SQLite stored in temp directory (`Path.GetTempPath()/Conductor.db`)
+- `OrchitectDbContext`: Main DbContext with all entity DbSets
+- Database: SQLite stored in temp directory (`Path.GetTempPath()/Orchitect.db`)
 - Repository pattern for each aggregate root (IApplicationRepository, IEnvironmentRepository, etc.)
 - Entity configurations in `Configurations/` directory using EF Fluent API
 - Migrations in `Migrations/` directory
@@ -72,7 +72,7 @@ This solution follows Clean Architecture principles with four main projects:
 - Uses C# extension syntax for service registration
 - `AddPersistenceServices()` registers DbContext and repositories
 
-### 3. Conductor.Engine.Infrastructure
+### 3. Orchitect.Engine.Infrastructure
 **Purpose**: Integration with third-party IaC tools (Terraform, Helm)
 
 **Key Concepts**:
@@ -81,7 +81,7 @@ This solution follows Clean Architecture principles with four main projects:
 - Subdirectories: CommandLine, Helm, Terraform, Score, Resources
 - Uses extension pattern: `AddInfrastructureServices()`
 
-### 4. Conductor.Engine.Api
+### 4. Orchitect.Engine.Api
 **Purpose**: ASP.NET Core Web API with minimal API endpoints
 
 **Key Concepts**:
@@ -140,16 +140,16 @@ Strict compiler settings applied to all projects:
 ## Development Patterns
 
 ### Adding a New Endpoint
-1. Create endpoint class implementing `IEndpoint` in `src/Conductor.Engine.Api/Endpoints/<Domain>/`
+1. Create endpoint class implementing `IEndpoint` in `src/Orchitect.Engine.Api/Endpoints/<Domain>/`
 2. Implement static `Map()` method to configure route
 3. Implement static `HandleAsync()` method with typed results
 4. Register in `Endpoints.cs` using `.MapEndpoint<YourEndpoint>()`
 
 ### Adding a New Domain Entity
-1. Create entity in `src/Conductor.Engine.Domain/<Domain>/`
-2. Add DbSet to `ConductorDbContext`
-3. Create EF configuration in `src/Conductor.Engine.Persistence/Configurations/`
-4. Create repository interface and implementation in `src/Conductor.Engine.Persistence/Repositories/`
+1. Create entity in `src/Orchitect.Engine.Domain/<Domain>/`
+2. Add DbSet to `OrchitectDbContext`
+3. Create EF configuration in `src/Orchitect.Engine.Persistence/Configurations/`
+4. Create repository interface and implementation in `src/Orchitect.Engine.Persistence/Repositories/`
 5. Register repository in `PersistenceExtensions.AddPersistenceServices()`
 6. Create migration using `./scripts/efm.sh <name>`
 

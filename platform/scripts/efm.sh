@@ -1,7 +1,7 @@
 #!/usr/bin/sh 
 
-cd src/Conductor.Engine.Persistence
+cd src/Orchitect.Engine.Persistence
 dotnet ef migrations add $1
 
-cd ../Conductor.Inventory.Persistence
+cd ../Orchitect.Inventory.Persistence
 dotnet ef migrations add $1

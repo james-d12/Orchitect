@@ -1,16 +1,16 @@
-# Conductor Platform – High‑Level Architecture
+# Orchitect Platform – High‑Level Architecture
 
 ## Overview
 
-The **Conductor Platform** is a modular internal developer platform composed of a small shared **Core** and multiple independent **capabilities**. The platform is the product boundary; individual capabilities deliver specific functionality while sharing common concepts defined by Core.
+The **Orchitect Platform** is a modular internal developer platform composed of a small shared **Core** and multiple independent **capabilities**. The platform is the product boundary; individual capabilities deliver specific functionality while sharing common concepts defined by Core.
 
-This structure allows Conductor to scale horizontally (new capabilities) without tight coupling or architectural erosion.
+This structure allows Orchitect to scale horizontally (new capabilities) without tight coupling or architectural erosion.
 
 ---
 
 ## Platform vs Architecture
 
-* **Platform**: The full Conductor product (Core + all capabilities)
+* **Platform**: The full Orchitect product (Core + all capabilities)
 * **Architecture**: How the platform is implemented internally
 
 > Platform is how users understand the system. Architecture is how we build it.
@@ -142,7 +142,7 @@ Analysis ─── Core ─── Engine
 
 ## Naming Conventions
 
-* **Platform**: Conductor as a whole
+* **Platform**: Orchitect as a whole
 * **Core**: Shared foundation
 * **Capabilities**: Engine, Inventory, Analysis, etc.
 

@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document proposes architectural approaches to isolate the resource provisioning process from the Conductor Engine API. Currently, Terraform, Helm, and other IaC tools run within the API container, causing bloat, security concerns, and scalability limitations. This proposal outlines four architectural options with detailed analysis to guide decision-making.
+This document proposes architectural approaches to isolate the resource provisioning process from the Orchitect Engine API. Currently, Terraform, Helm, and other IaC tools run within the API container, causing bloat, security concerns, and scalability limitations. This proposal outlines four architectural options with detailed analysis to guide decision-making.
 
 ---
 
@@ -92,11 +92,11 @@ This document proposes architectural approaches to isolate the resource provisio
 
 ### Key Files
 
-- **API Dockerfile**: `src/Conductor.Engine.Api/Dockerfile` (lines 34-70 install IaC tools)
-- **Deployment Endpoint**: `src/Conductor.Engine.Api/Endpoints/Deployment/CreateDeploymentEndpoint.cs`
-- **Background Queue**: `src/Conductor.Engine.Api/Queue/QueuedHostedService.cs` (5 workers)
-- **Provisioner**: `src/Conductor.Engine.Infrastructure/Resources/ResourceProvisioner.cs`
-- **Terraform Driver**: `src/Conductor.Engine.Infrastructure/Terraform/TerraformDriver.cs`
+- **API Dockerfile**: `src/Orchitect.Engine.Api/Dockerfile` (lines 34-70 install IaC tools)
+- **Deployment Endpoint**: `src/Orchitect.Engine.Api/Endpoints/Deployment/CreateDeploymentEndpoint.cs`
+- **Background Queue**: `src/Orchitect.Engine.Api/Queue/QueuedHostedService.cs` (5 workers)
+- **Provisioner**: `src/Orchitect.Engine.Infrastructure/Resources/ResourceProvisioner.cs`
+- **Terraform Driver**: `src/Orchitect.Engine.Infrastructure/Terraform/TerraformDriver.cs`
 
 ---
 
@@ -227,7 +227,7 @@ Separate worker containers poll the database for pending deployments and execute
 
 #### Technical Implementation
 
-**New Project: Conductor.Engine.Worker**
+**New Project: Orchitect.Engine.Worker**
 
 ```csharp
 // Program.cs
@@ -342,14 +342,14 @@ public interface IDeploymentRepository
 }
 ```
 
-**New Dockerfile: Conductor.Engine.Worker/Dockerfile**
+**New Dockerfile: Orchitect.Engine.Worker/Dockerfile**
 
 ```dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /app
 COPY ./src ./
 COPY Directory.Build.props ./
-WORKDIR Conductor.Engine.Worker
+WORKDIR Orchitect.Engine.Worker
 RUN dotnet publish -c Release -o /app/out
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
@@ -376,7 +376,7 @@ RUN go install github.com/hashicorp/terraform-config-inspect@latest
 ENV PATH="/root/go/bin:${PATH}"
 
 COPY --from=build /app/out ./
-ENTRYPOINT ["./Conductor.Engine.Worker"]
+ENTRYPOINT ["./Orchitect.Engine.Worker"]
 ```
 
 **Updated API Dockerfile** (simplified)
@@ -386,7 +386,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /app
 COPY ./src ./
 COPY Directory.Build.props ./
-WORKDIR Conductor.Engine.Api
+WORKDIR Orchitect.Engine.Api
 RUN dotnet publish -c Release -o /app/out
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
@@ -394,7 +394,7 @@ RUN useradd -m appuser
 USER appuser
 WORKDIR /app
 COPY --from=build /app/out ./
-ENTRYPOINT ["./Conductor.Engine.Api"]
+ENTRYPOINT ["./Orchitect.Engine.Api"]
 ```
 
 #### Pros
@@ -664,7 +664,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
         var jobSpec = new JobSpec
         {
             Name = $"deployment-{deployment.Id.Value}",
-            Image = "conductor-worker:latest",
+            Image = "orchitect-worker:latest",
             Env = new Dictionary<string, string>
             {
                 ["DEPLOYMENT_ID"] = deployment.Id.Value.ToString(),
@@ -689,7 +689,7 @@ kind: Job
 metadata:
   name: deployment-{deploymentId}
   labels:
-    app: conductor-worker
+    app: orchitect-worker
     deployment-id: "{deploymentId}"
 spec:
   backoffLimit: 3
@@ -710,14 +710,14 @@ spec:
           mountPath: /workspace
       containers:
       - name: provisioner
-        image: conductor-worker:latest
+        image: orchitect-worker:latest
         env:
         - name: DEPLOYMENT_ID
           value: "{deploymentId}"
         - name: CONNECTION_STRING
           valueFrom:
             secretKeyRef:
-              name: conductor-db-secret
+              name: orchitect-db-secret
               key: connection-string
         resources:
           requests:
@@ -874,7 +874,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
         // Invoke Lambda asynchronously
         var invokeRequest = new InvokeRequest
         {
-            FunctionName = "conductor-provisioner",
+            FunctionName = "orchitect-provisioner",
             InvocationType = InvocationType.Event, // Async
             Payload = JsonSerializer.Serialize(new
             {
@@ -940,9 +940,9 @@ Resources:
   ProvisionerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: conductor-provisioner
+      FunctionName: orchitect-provisioner
       Runtime: provided.al2 # Custom .NET runtime
-      Handler: Conductor.Engine.Worker::Conductor.Engine.Worker.Function::FunctionHandler
+      Handler: Orchitect.Engine.Worker::Orchitect.Engine.Worker.Function::FunctionHandler
       MemorySize: 2048
       Timeout: 900 # 15 minutes (max)
       EphemeralStorage:
@@ -1119,7 +1119,7 @@ if (deployment.Status == InProgress &&
 ```hcl
 terraform {
   backend "azurerm" {
-    storage_account_name = "conductorstates"
+    storage_account_name = "orchitectstates"
     container_name       = "tfstate"
     key                  = "${deployment_id}.tfstate"
   }
@@ -1172,7 +1172,7 @@ terraform {
    - Deploy API changes (old flow still works)
 
 3. **Create Worker Project**
-   - New `Conductor.Engine.Worker` project
+   - New `Orchitect.Engine.Worker` project
    - Copy provisioning logic from API
    - Test locally
 
@@ -1287,10 +1287,10 @@ At any point during Phase 2:
 
 ### References
 
-- Current API Dockerfile: `src/Conductor.Engine.Api/Dockerfile`
-- Current Queue Service: `src/Conductor.Engine.Api/Queue/QueuedHostedService.cs`
-- Current Provisioner: `src/Conductor.Engine.Infrastructure/Resources/ResourceProvisioner.cs`
-- Terraform Driver: `src/Conductor.Engine.Infrastructure/Terraform/TerraformDriver.cs`
+- Current API Dockerfile: `src/Orchitect.Engine.Api/Dockerfile`
+- Current Queue Service: `src/Orchitect.Engine.Api/Queue/QueuedHostedService.cs`
+- Current Provisioner: `src/Orchitect.Engine.Infrastructure/Resources/ResourceProvisioner.cs`
+- Terraform Driver: `src/Orchitect.Engine.Infrastructure/Terraform/TerraformDriver.cs`
 - CLAUDE.md: Project architecture guidelines
 
 ---
