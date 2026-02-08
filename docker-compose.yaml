@@ -1,37 +1,79 @@
 name: conductor
 services:
-  api:
+  db:
+    image: postgres:14.20-alpine
+    restart: always
+    shm_size: 128mb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: conductor
+  
+  engine-api:
+    depends_on:
+      - db
     build:
-      context: engine/
+      context: platform/
       dockerfile: src/Conductor.Engine.Api/Dockerfile
     volumes:
       - /home/james/Documents/Conductor:/tmp/conductor
     ports:
       - "8081:8080"
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=conductor
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=example
     develop:
       watch:
         - action: sync+restart
-          path: .engine/src/Conductor.Engine.Api
-          target: .engine/src/Conductor.Engine.Api
+          path: .platform/src/Conductor.Engine.Api
+          target: .platform/src/Conductor.Engine.Api
+  
+  inventory-api:
+    depends_on:
+      - db
+    build:
+      context: platform/
+      dockerfile: src/Conductor.Inventory.Api/Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=conductor
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=example
+    develop:
+      watch:
+        - action: sync+restart
+          path: .platform/src/Conductor.Inventory.Api
+          target: .platform/src/Conductor.Inventory.Api
+  
   cli:
     depends_on:
-      - api
+      - engine-api
     build:
-      context: client/Conductor.Client.Cli
+      context: portals/Conductor.Portal.Cli
       dockerfile: Dockerfile
     develop:
       watch:
         - action: sync+restart
-          path: .client/Conductor.Client.Cli
-          target: .client/Conductor.Client.Cli
+          path: .portals/Conductor.Portal.Cli
+          target: .portals/Conductor.Portal.Cli
+  
   web:
     depends_on:
-      - api
+      - engine-api
+      - inventory-api
     build:
-      context: client/Conductor.Client.Web
+      context: portals/Conductor.Portal.Web
       dockerfile: Dockerfile
     develop:
       watch:
         - action: sync+restart
-          path: .client/Conductor.Client.Web
-          target: .client/Conductor.Client.Web
+          path: .portals/Conductor.Portal.Web
+          target: .portals/Conductor.Portal.Web

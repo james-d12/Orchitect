@@ -8,6 +8,7 @@ riderModule.iml
 StrykerOutput/
 *.env
 .vscode
+TestResults/
 
 
 # build output

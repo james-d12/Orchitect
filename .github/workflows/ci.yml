@@ -10,13 +10,17 @@ on:
     branches:
       - master
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-web:
-    name: "Build Web"
+    name: "Build Web Portal"
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./client/Conductor.Client.Web
+        working-directory: ./portals/Conductor.Portal.Web
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -59,7 +63,7 @@ jobs:
       #  env:
       #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       #  with:
-      #    projectBaseDir: ./client/Conductor.Client.Web
+      #    projectBaseDir: ./portals/Conductor.Portal.Web
 
       - name: Build project
         run: pnpm run build
@@ -68,11 +72,11 @@ jobs:
         run: pnpm audit
 
   build-cli:
-    name: "Build Cli"
+    name: "Build Cli Portal"
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./client/Conductor.Client.Cli
+        working-directory: ./portals/Conductor.Portal.Cli
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -86,7 +90,7 @@ jobs:
       #  env:
       #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       #  with:
-      #    projectBaseDir: ./client/Conductor.Client.Cli
+      #    projectBaseDir: ./portals/Conductor.Portal.Cli
 
       - name: Build 
         run: cargo build --release
@@ -97,14 +101,14 @@ jobs:
       - name: Format Check
         run: cargo fmt --check
 
-  build-engine:
-    name: "Build Engine"
+  build-platform:
+    name: "Build Platform"
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./engine
+        working-directory: ./platform
     env:
-      SOLUTION_FILE: Conductor.Engine.sln
+      SOLUTION_FILE: Conductor.sln
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -160,26 +164,31 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore ${{ env.SOLUTION_FILE }}
 
-      #- name: Build and analyze
-      #  env:
-      #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #  run: |
-      #    "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
-      #      /k:"personal-james_conductor-engine" \
-      #      /o:"personal-james" \
-      #      /n:"Conductor Engine" \
-      #      /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
-      #      /d:sonar.qualitygate.wait=false \
-      #      /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**"
+#      - name: Build and analyze
+#        env:
+#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#        run: |
+#          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
+#            /k:"personal-james_conductor-platform" \
+#            /o:"personal-james" \
+#            /n:"Conductor Platform" \
+#            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+#            /d:sonar.qualitygate.wait=false \
+#            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Conductor.Engine.Persistence/Migrations/**,src/Conductor.Inventory.*,src/Conductor.Inventory.Persistence/Migrations/**"
+#
+#          dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+#
+#          "${{ runner.temp }}/scanner/dotnet-sonarscanner" end \
+#            /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
-      #    dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
-
-      #    "${{ runner.temp }}/scanner/dotnet-sonarscanner" end \
-      #      /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+      - name: Build and analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
       - name: Check No Pending Model Changes
         run: dotnet ef migrations has-pending-model-changes
-        working-directory: engine/src/Conductor.Engine.Persistence
+        working-directory: platform/src/Conductor.Engine.Persistence
 
       - name: Check For Vulnerabilities
         run: dotnet list ${{ env.SOLUTION_FILE }} package --vulnerable

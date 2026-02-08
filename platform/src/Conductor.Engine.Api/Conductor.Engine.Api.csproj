@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+    <PropertyGroup>
+        <IsPublishable>true</IsPublishable>
+        <UserSecretsId>781d6964-4c3a-43fa-8814-7eacf81100fc</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.2" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Conductor.ServiceDefaults\Conductor.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\Conductor.Engine.Domain\Conductor.Engine.Domain.csproj"/>
+        <ProjectReference Include="..\Conductor.Engine.Infrastructure\Conductor.Engine.Infrastructure.csproj"/>
+        <ProjectReference Include="..\Conductor.Engine.Persistence\Conductor.Engine.Persistence.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Update="appsettings.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
+</Project>
