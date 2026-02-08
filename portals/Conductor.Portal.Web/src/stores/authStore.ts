@@ -1,4 +1,4 @@
-import { atom } from 'nanostores';
+import { atom } from "nanostores";
 
 interface AuthState {
   accessToken: string | null;
@@ -7,8 +7,8 @@ interface AuthState {
 
 // Initialize from localStorage if available
 const getInitialState = (): AuthState => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('accessToken');
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("accessToken");
     return {
       accessToken: token,
       isAuthenticated: !!token,
@@ -24,8 +24,8 @@ export const authStore = atom<AuthState>(getInitialState());
 
 // Actions
 export const setAccessToken = (token: string) => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('accessToken', token);
+  if (typeof window !== "undefined") {
+    localStorage.setItem("accessToken", token);
   }
   authStore.set({
     accessToken: token,
@@ -34,8 +34,8 @@ export const setAccessToken = (token: string) => {
 };
 
 export const clearAccessToken = () => {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('accessToken');
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("accessToken");
   }
   authStore.set({
     accessToken: null,

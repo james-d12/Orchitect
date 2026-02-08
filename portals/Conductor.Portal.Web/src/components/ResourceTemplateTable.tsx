@@ -10,7 +10,7 @@ export interface ResourceTemplateItem {
 }
 
 interface ResourceTemplatesResponse {
-    resourceTemplates: ResourceTemplateItem[];
+  resourceTemplates: ResourceTemplateItem[];
 }
 
 export default function ResourceTemplatesTable() {
@@ -25,7 +25,7 @@ export default function ResourceTemplatesTable() {
           {
             method: "GET",
             requiresAuth: true,
-          }
+          },
         );
         setItems(data.resourceTemplates);
       } catch (err) {

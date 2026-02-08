@@ -1,6 +1,6 @@
-import { getAccessToken } from '../stores/authStore';
+import { getAccessToken } from "../stores/authStore";
 
-const API_BASE_URL = 'http://localhost:5222';
+const API_BASE_URL = "http://localhost:5222";
 
 interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;
@@ -8,12 +8,12 @@ interface RequestOptions extends RequestInit {
 
 export async function apiRequest<T>(
   endpoint: string,
-  options: RequestOptions = {}
+  options: RequestOptions = {},
 ): Promise<T> {
   const { requiresAuth = false, headers = {}, ...fetchOptions } = options;
 
   const requestHeaders: HeadersInit = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...headers,
   };
 
@@ -21,7 +21,7 @@ export async function apiRequest<T>(
   if (requiresAuth) {
     const token = getAccessToken();
     if (token) {
-      requestHeaders['Authorization'] = `Bearer ${token}`;
+      requestHeaders["Authorization"] = `Bearer ${token}`;
     }
   }
 
