@@ -31,4 +31,4 @@ and [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) insta
 
 # License
 
-Orchitect is licensed under the [GPLV3 License](./LICENSE.md).
+Orchitect is licensed under the [AGPLv3 License](./LICENSE.md).
