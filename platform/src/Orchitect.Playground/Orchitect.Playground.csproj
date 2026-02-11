@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <IsPublishable>true</IsPublishable>
+        <UserSecretsId>51f3d920-5aff-4119-b555-faf9ae72320a</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Orchitect.Core.Persistence\Orchitect.Core.Persistence.csproj" />
+        <ProjectReference Include="..\Orchitect.Inventory.Persistence\Orchitect.Inventory.Persistence.csproj" />
+        <ProjectReference Include="..\Orchitect.ServiceDefaults\Orchitect.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\Orchitect.Engine.Infrastructure\Orchitect.Engine.Infrastructure.csproj" />
+        <ProjectReference Include="..\Orchitect.Engine.Persistence\Orchitect.Engine.Persistence.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="developer-config.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="example.yaml">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="example-after.yaml">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+</Project>

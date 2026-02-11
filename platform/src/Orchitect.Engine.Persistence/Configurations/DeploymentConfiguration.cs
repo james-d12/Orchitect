@@ -54,7 +54,7 @@ internal sealed class DeploymentConfiguration : IEntityTypeConfiguration<Deploym
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Property(d => d.Status).HasConversion<string>();
-        builder.Property(d => d.CreatedAt).IsRequired().HasDefaultValueSql("now()");
-        builder.Property(d => d.UpdatedAt).IsRequired().HasDefaultValueSql("now()");
+        builder.Property(d => d.CreatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
+        builder.Property(d => d.UpdatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
     }
 }

@@ -4,96 +4,126 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Orchitect Engine is a .NET 10 (C# latest) web API for infrastructure orchestration that integrates with existing Infrastructure as Code (IaC) solutions. The project uses minimal APIs with a custom endpoint pattern, Entity Framework Core with SQLite, and JWT authentication.
+Orchitect is a modular internal developer platform (IDP) built as a .NET 10 (C# latest) solution using .NET Aspire for orchestration. The platform is composed of a shared **Core** foundation and independent **capabilities** (Engine, Inventory), each with its own domain, persistence, and API layer. All services share a single PostgreSQL database with schema isolation.
 
 ## Building and Running
-
-### Prerequisites
-- .NET SDK 10.0.1 or later (specified in global.json)
-- dotnet-ef tool version 10.0.0 (install via `scripts/setup.sh`)
-
-### Development Commands
 
 ```bash
 # Build the solution
 dotnet build
 
-# Run the API (from src/Orchitect.Engine.Api)
+# Run all services via Aspire AppHost (preferred)
+dotnet run --project src/Orchitect.AppHost
+
+# Run individual APIs
+dotnet run --project src/Orchitect.Core.Api
 dotnet run --project src/Orchitect.Engine.Api
+dotnet run --project src/Orchitect.Inventory.Api
 
-# Run the playground project (for testing/experimentation)
-dotnet run --project src/Orchitect.Engine.Playground
-
-# Restore dependencies
-dotnet restore
+# Run the playground (manual start in Aspire, or standalone)
+dotnet run --project src/Orchitect.Playground
 ```
+
+### Prerequisites
+
+- .NET SDK 10.0.2+ (specified in global.json with latestMinor rollForward)
+- dotnet-ef tool (install via `scripts/setup.sh`)
+- PostgreSQL (provided automatically by Aspire AppHost on port 41031)
 
 ### Database Migrations
 
+Each bounded context has its own EF Core migrations. The helper script runs migrations across all three:
+
 ```bash
-# Create a new migration (use the helper script)
+# Create migration across all persistence projects
 ./scripts/efm.sh <migration_name>
 
-# Or manually from the Persistence project
-cd src/Orchitect.Engine.Persistence
-dotnet ef migrations add <migration_name>
+# Or individually from a specific persistence project
+cd src/Orchitect.Core.Persistence && dotnet ef migrations add <name>
+cd src/Orchitect.Engine.Persistence && dotnet ef migrations add <name>
+cd src/Orchitect.Inventory.Persistence && dotnet ef migrations add <name>
 ```
 
-Note: The database is automatically migrated on application startup via `ApplyMigrations()` in Program.cs:85. The database is SQLite stored in the system temp directory.
+All migrations are applied automatically on application startup. **The database is deleted and recreated on each startup** (development-only behavior).
 
 ### Testing
 
-The project uses Stryker.NET for mutation testing (see stryker-config.json). Bruno API tests are available in `docs/Orchitect Api - Bruno.json`.
+```bash
+# Run unit tests (xUnit + AutoFixture)
+dotnet test
+
+# Run a single test project
+dotnet test src/Orchitect.Inventory.Infrastructure.Tests
+```
+
+Stryker.NET is configured for mutation testing (see stryker-config.json). Bruno API tests are available in `docs/Orchitect Api - Bruno.json`.
 
 ## Architecture
 
-This solution follows Clean Architecture principles with four main projects:
+The platform follows a hub-and-spoke model: **Core** at the center, **capabilities** radiate outward. See `docs/HIGH_LEVEL_ARCHITECTURE.md` for the full design rationale.
 
-### 1. Orchitect.Engine.Domain
-**Purpose**: Core business logic and domain models - the "heart of the project"
+```
+          Inventory
+              |
+Analysis ─── Core ─── Engine
+              |
+        (future capabilities)
+```
 
-**Key Concepts**:
-- Contains all domain entities (Application, Environment, Deployment, Organisation, ResourceTemplate, Resource, etc.)
-- Domain logic and entity relationships live here
-- No dependencies on other layers
+**Hard dependency rules:**
+- Capabilities (Engine, Inventory) → Core: allowed
+- Core → any capability: forbidden
+- Capability → capability: forbidden (coordinate via Core or events)
 
-### 2. Orchitect.Engine.Persistence
-**Purpose**: Data access layer using Entity Framework Core
+### Aspire Orchestration (AppHost)
 
-**Key Concepts**:
-- `OrchitectDbContext`: Main DbContext with all entity DbSets
-- Database: SQLite stored in temp directory (`Path.GetTempPath()/Orchitect.db`)
-- Repository pattern for each aggregate root (IApplicationRepository, IEnvironmentRepository, etc.)
-- Entity configurations in `Configurations/` directory using EF Fluent API
-- Migrations in `Migrations/` directory
-- **Important**: `ApplyMigrations()` calls `EnsureDeletedAsync()` before migrating (development-only behavior)
+`src/Orchitect.AppHost/Program.cs` defines the service topology:
+- **PostgreSQL** on port 41031, database "orchitect"
+- **Core API** starts first, waits for database
+- **Engine API** and **Inventory API** wait for Core API
+- **Portal Web** (JavaScript/pnpm at `../../../portals/Orchitect.Portal.Web`, port 3001) waits for all APIs
 
-**Extension Pattern**:
-- Uses C# extension syntax for service registration
-- `AddPersistenceServices()` registers DbContext and repositories
+### Bounded Contexts
 
-### 3. Orchitect.Engine.Infrastructure
-**Purpose**: Integration with third-party IaC tools (Terraform, Helm)
+Each bounded context follows Clean Architecture: Domain → Persistence → Api.
 
-**Key Concepts**:
-- Contains "drivers" that apply resource templates to actual infrastructure
-- Designed to integrate with existing IaC solutions rather than replacing them
-- Subdirectories: CommandLine, Helm, Terraform, Score, Resources
-- Uses extension pattern: `AddInfrastructureServices()`
+**Core** (`Orchitect.Core.*`) — Schema: `core`
+- Owns identity (ASP.NET Identity), organisations, teams
+- Organisation is the tenant boundary shared by all capabilities
+- Provides user registration/login (public) and organisation CRUD (authenticated)
+- Uses minimal APIs with IEndpoint pattern
 
-### 4. Orchitect.Engine.Api
-**Purpose**: ASP.NET Core Web API with minimal API endpoints
+**Engine** (`Orchitect.Engine.*`) — Schema: `engine`
+- Infrastructure orchestration: applications, environments, deployments, resource templates, services
+- All entities reference OrganisationId from Core via cross-schema foreign keys with cascade delete
+- Background task queue (QueuedHostedService, capacity 5) for async processing
+- Infrastructure layer integrates with Terraform, Helm, and other IaC tools
+- Uses minimal APIs with IEndpoint pattern
 
-**Key Concepts**:
-- Uses **minimal APIs** with a custom endpoint pattern (NOT controllers)
-- Endpoint pattern: Each endpoint implements `IEndpoint` interface with a static `Map()` method
-- Endpoints organized by domain in `Endpoints/<Domain>/` directories
-- Authentication: JWT Bearer tokens (configured in appsettings.json JwtOptions section)
-- Authorization: Endpoints grouped into "Private" (requires auth) or "Public" (anonymous)
-- Background task processing: `QueuedHostedService` with `IBackgroundTaskQueueProcessor` (capacity: 5)
-- Identity: Uses ASP.NET Core Identity with custom table names (e.g., "Users" instead of "AspNetUsers")
+**Inventory** (`Orchitect.Inventory.*`) — Schema: `inventory`
+- Discovery and cataloging of external resources: cloud resources, git repos, pipelines, work items
+- Integrates with Azure, Azure DevOps, GitHub, GitLab
+- DiscoveryHostedService for periodic automated discovery
+- **Uses MVC controllers** (not minimal APIs, unlike Core/Engine)
 
-**Endpoint Pattern Example**:
+### Shared Projects
+
+- **Orchitect.Shared**: Common abstractions (`IEndpoint`, `ErrorResponse`) referenced by all API projects
+- **Orchitect.ServiceDefaults**: Aspire shared project providing OpenTelemetry, service discovery, resilience handlers, and health check endpoints (`/health`, `/alive`)
+
+### Database Architecture
+
+Single PostgreSQL database with schema-per-context:
+- Connection string via Aspire: `ConnectionStrings__orchitect`
+- Cross-schema foreign keys enforce referential integrity (e.g., engine.Applications → core.Organisations with cascade delete)
+- Each context has its own DbContext and migrations
+- Startup order matters: Core migrations run first (Aspire ensures Core API starts before Engine/Inventory)
+
+### Key Patterns
+
+**Strongly-typed IDs**: All entities use record-wrapped Guids (e.g., `OrganisationId(Guid Value)`). EF Core value conversions handle persistence.
+
+**Endpoint pattern** (Core & Engine):
 ```csharp
 public sealed class CreateOrganisationEndpoint : IEndpoint
 {
@@ -104,72 +134,39 @@ public sealed class CreateOrganisationEndpoint : IEndpoint
     private static async Task<Results<Ok<Response>, InternalServerError>> HandleAsync(
         [FromBody] Request request,
         [FromServices] IRepository repository,
-        CancellationToken cancellationToken)
-    {
-        // Implementation
-    }
+        CancellationToken cancellationToken) { /* ... */ }
 }
 ```
 
-**Endpoint Organization**:
-- Endpoints registered via extension methods in `Endpoints.cs`
-- Groups created with tags: `/applications`, `/environments`, `/deployments`, `/resource-templates`, `/users`, `/organisations`
-- Use `MapPrivateGroup()` for authenticated endpoints, `MapPublicGroup()` for anonymous
-
-## Project Configuration
-
-### Directory.Build.props
-Strict compiler settings applied to all projects:
-- .NET 10 (net10.0)
-- Nullable reference types enabled
-- TreatWarningsAsErrors: true
-- Code analysis enforced during build
-- Roslyn analyzers enabled
-
-### Authentication & Authorization
-- JWT Bearer authentication configured in Program.cs
-- JwtOptions bound from configuration (Issuer, Audience, Secret)
-- User registration and login endpoints in `/users` (public)
-- All other endpoints require authentication
-
-### API Documentation
-- OpenAPI/Swagger enabled on all environments
-- Swagger UI available at default endpoint
-- JWT Bearer auth configured in Swagger (use "Bearer {token}" format)
-
-## Development Patterns
-
-### Adding a New Endpoint
-1. Create endpoint class implementing `IEndpoint` in `src/Orchitect.Engine.Api/Endpoints/<Domain>/`
-2. Implement static `Map()` method to configure route
-3. Implement static `HandleAsync()` method with typed results
-4. Register in `Endpoints.cs` using `.MapEndpoint<YourEndpoint>()`
-
-### Adding a New Domain Entity
-1. Create entity in `src/Orchitect.Engine.Domain/<Domain>/`
-2. Add DbSet to `OrchitectDbContext`
-3. Create EF configuration in `src/Orchitect.Engine.Persistence/Configurations/`
-4. Create repository interface and implementation in `src/Orchitect.Engine.Persistence/Repositories/`
-5. Register repository in `PersistenceExtensions.AddPersistenceServices()`
-6. Create migration using `./scripts/efm.sh <name>`
-
-### Extension Methods Pattern
-The codebase uses C# extension syntax for organizing extension methods:
+**Extension methods**: Service registration uses C# extension syntax:
 ```csharp
 extension(IServiceCollection services)
 {
-    public IServiceCollection AddServices()
-    {
-        // Add services
-        return services;
-    }
+    public IServiceCollection AddCorePersistenceServices() { /* ... */ }
 }
 ```
 
-## Important Notes
+**Repository pattern**: Core and Engine use `IRepository<T, TId>` with concrete implementations. Inventory uses direct DbContext access (query-focused).
 
-- **C# Language Version**: "latest" with "strict" features enabled
-- **Database Behavior**: On startup, the database is deleted and recreated (see PersistenceExtensions.cs:32)
-- **Authentication Required**: Most endpoints require JWT authentication (only `/users/register` and `/users/login` are public)
-- **Background Tasks**: The API includes a background task queue processor with 5 worker capacity
-- **User Secrets**: Configured with UserSecretsId in Api project for development credentials
+**Endpoint groups**: `MapPrivateGroup()` for authenticated endpoints, `MapPublicGroup()` for anonymous.
+
+## Development Patterns
+
+### Adding a New Endpoint (Core/Engine)
+1. Create class implementing `IEndpoint` in `src/Orchitect.{Context}.Api/Endpoints/{Domain}/`
+2. Implement static `Map()` and `HandleAsync()` methods
+3. Register in the context's `Endpoints.cs` via `.MapEndpoint<YourEndpoint>()`
+
+### Adding a New Domain Entity
+1. Create entity in `src/Orchitect.{Context}.Domain/{Domain}/`
+2. Add DbSet to the context's DbContext
+3. Create EF configuration in `src/Orchitect.{Context}.Persistence/Configurations/`
+4. Create repository interface and implementation
+5. Register repository in the context's `Add{Context}PersistenceServices()` extension
+6. Create migration: `cd src/Orchitect.{Context}.Persistence && dotnet ef migrations add <name>`
+
+## Project Configuration
+
+- **Directory.Build.props**: TreatWarningsAsErrors, nullable enabled, Roslyn analyzers enforced, NuGet audit on all transitive dependencies
+- **Authentication**: JWT Bearer tokens (JwtOptions from appsettings.json). Only `/users/register` and `/users/login` are public; all other endpoints require auth
+- **API docs**: OpenAPI/Swagger on all environments with JWT Bearer security definition

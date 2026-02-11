@@ -12,9 +12,9 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Orchitect.ServiceDefaults\Orchitect.ServiceDefaults.csproj" />
-        <ProjectReference Include="..\Orchitect.Engine.Domain\Orchitect.Engine.Domain.csproj" />
         <ProjectReference Include="..\Orchitect.Engine.Infrastructure\Orchitect.Engine.Infrastructure.csproj" />
         <ProjectReference Include="..\Orchitect.Engine.Persistence\Orchitect.Engine.Persistence.csproj" />
+        <ProjectReference Include="..\Orchitect.Shared\Orchitect.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>

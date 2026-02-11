@@ -1,4 +1,4 @@
-using Orchitect.Engine.Domain.Organisation;
+using Orchitect.Core.Domain.Organisation;
 
 namespace Orchitect.Engine.Domain.Application;
 
@@ -29,8 +29,8 @@ public sealed record Application
             OrganisationId = organisationId,
             Name = name,
             Repository = repository,
-            CreatedAt = DateTime.Now,
-            UpdatedAt = DateTime.Now
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
     }
 
@@ -49,8 +49,8 @@ public sealed record Application
                 Url = request.Repository.Url,
                 Provider = request.Repository.Provider
             },
-            CreatedAt = DateTime.Now,
-            UpdatedAt = DateTime.Now
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
     }
 
@@ -63,7 +63,7 @@ public sealed record Application
         {
             Name = name,
             Repository = repository,
-            UpdatedAt = DateTime.Now
+            UpdatedAt = DateTime.UtcNow
         };
     }
 }

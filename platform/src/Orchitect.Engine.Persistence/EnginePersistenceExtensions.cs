@@ -1,35 +1,30 @@
+using Microsoft.EntityFrameworkCore;
 using Orchitect.Engine.Domain.Application;
 using Orchitect.Engine.Domain.Deployment;
 using Orchitect.Engine.Domain.Environment;
-using Orchitect.Engine.Domain.Organisation;
 using Orchitect.Engine.Domain.ResourceTemplate;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orchitect.Engine.Persistence.Repositories;
 
 namespace Orchitect.Engine.Persistence;
 
 public static class EnginePersistenceExtensions
 {
-    extension(IServiceCollection services)
+    public static IServiceCollection AddEnginePersistenceServices(this IServiceCollection services)
     {
-        public IServiceCollection AddPersistenceServices()
-        {
-            services.AddDbContext<EngineDbContext>();
-            services.AddScoped<IResourceTemplateRepository, ResourceTemplateRepository>();
-            services.AddScoped<IApplicationRepository, ApplicationRepository>();
-            services.AddScoped<IEnvironmentRepository, EnvironmentRepository>();
-            services.AddScoped<IDeploymentRepository, DeploymentRepository>();
-            services.AddScoped<IOrganisationRepository, OrganisationRepository>();
+        services.AddDbContext<EngineDbContext>();
+        services.TryAddScoped<IResourceTemplateRepository, ResourceTemplateRepository>();
+        services.TryAddScoped<IApplicationRepository, ApplicationRepository>();
+        services.TryAddScoped<IEnvironmentRepository, EnvironmentRepository>();
+        services.TryAddScoped<IDeploymentRepository, DeploymentRepository>();
+        return services;
+    }
 
-            return services;
-        }
-
-        public async Task ApplyMigrations()
-        {
-            using IServiceScope scope = services.BuildServiceProvider().CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<EngineDbContext>();
-            await dbContext.Database.MigrateAsync();
-        }
+    public static async Task ApplyEngineMigrations(this IServiceCollection services)
+    {
+        using IServiceScope scope = services.BuildServiceProvider().CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<EngineDbContext>();
+        await dbContext.Database.MigrateAsync();
     }
 }

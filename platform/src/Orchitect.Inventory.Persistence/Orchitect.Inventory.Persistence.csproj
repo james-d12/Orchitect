@@ -16,4 +16,8 @@
         <ProjectReference Include="..\Orchitect.Inventory.Domain\Orchitect.Inventory.Domain.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Migrations\" />
+    </ItemGroup>
+
 </Project>

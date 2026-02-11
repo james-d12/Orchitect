@@ -28,7 +28,7 @@ public sealed class ScoreDriver : IScoreDriver
         CancellationToken cancellationToken)
     {
         ScoreValidationResult scoreValidationResult =
-            await ValidateAsync(deployment, application, cancellationToken: cancellationToken);
+            await ValidateAsync(deployment, application);
 
         if (scoreValidationResult.State != ScoreValidationResultState.Valid)
         {
@@ -50,14 +50,13 @@ public sealed class ScoreDriver : IScoreDriver
         return scoreFile;
     }
 
-    private async Task<ScoreValidationResult> ValidateAsync(Deployment deployment, Application application,
-        CancellationToken cancellationToken)
+    private async Task<ScoreValidationResult> ValidateAsync(Deployment deployment, Application application)
     {
         _logger.LogInformation("Validating Score File for Application: {Application}", application.Name);
 
         var commit = deployment.CommitId.Value;
         var safeDirectoryName = string.Join("_", application.Name.Replace(" ", "_").Trim(),
-            deployment.CommitId.Value.Take(6), DateTime.Now);
+            deployment.CommitId.Value.Take(6), DateTime.UtcNow);
         var destination = Path.Combine(Path.GetTempPath(), "orchitect", "score", safeDirectoryName);
 
         var result = await _gitCommandLine.CloneCommitAsync(application.Repository.Url, commit, destination);

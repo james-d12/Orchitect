@@ -1,4 +1,4 @@
-using Orchitect.Engine.Domain.Organisation;
+using Orchitect.Core.Domain.Organisation;
 
 namespace Orchitect.Engine.Domain.Environment;
 
@@ -30,8 +30,8 @@ public sealed record Environment
             OrganisationId = organisationId,
             Name = name,
             Description = description,
-            CreatedAt = DateTime.Now,
-            UpdatedAt = DateTime.Now
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
     }
 
@@ -49,7 +49,7 @@ public sealed record Environment
         {
             Name = name,
             Description = description,
-            UpdatedAt = DateTime.Now
+            UpdatedAt = DateTime.UtcNow
         };
     }
 }

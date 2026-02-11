@@ -1,10 +1,8 @@
-using Orchitect.Engine.Api.Common;
 using Orchitect.Engine.Api.Endpoints.Application;
 using Orchitect.Engine.Api.Endpoints.Deployment;
 using Orchitect.Engine.Api.Endpoints.Environment;
-using Orchitect.Engine.Api.Endpoints.Organisation;
 using Orchitect.Engine.Api.Endpoints.ResourceTemplate;
-using Orchitect.Engine.Api.Endpoints.User;
+using Orchitect.Shared;
 
 namespace Orchitect.Engine.Api.Endpoints;
 
@@ -18,8 +16,6 @@ public static class Endpoints
             endpoints.MapEnvironmentEndpoints();
             endpoints.MapDeploymentEndpoints();
             endpoints.MapResourceTemplateEndpoints();
-            endpoints.MapUserEndpoints();
-            endpoints.MapOrganisationEndpoints();
         }
 
         private void MapApplicationEndpoints()
@@ -69,35 +65,6 @@ public static class Endpoints
                 .MapEndpoint<GetAllResourceTemplatesEndpoint>()
                 .MapEndpoint<UpdateResourceTemplateEndpoint>()
                 .MapEndpoint<DeleteResourceTemplateEndpoint>();
-        }
-
-        private void MapUserEndpoints()
-        {
-            var endpoints1 = endpoints.MapGroup("/users")
-                .WithTags("User");
-
-            endpoints1.MapPublicGroup()
-                .MapEndpoint<RegisterUserEndpoint>()
-                .MapEndpoint<LoginUserEndpoint>();
-        }
-
-        private void MapOrganisationEndpoints()
-        {
-            var endpoints1 = endpoints.MapGroup("/organisations")
-                .WithTags("Organisation");
-
-            endpoints1.MapPrivateGroup()
-                .MapEndpoint<CreateOrganisationEndpoint>()
-                .MapEndpoint<GetAllOrganisationsEndpoint>()
-                .MapEndpoint<GetOrganisationEndpoint>()
-                .MapEndpoint<UpdateOrganisationEndpoint>()
-                .MapEndpoint<DeleteOrganisationEndpoint>();
-        }
-
-        private RouteGroupBuilder MapPublicGroup(string? prefix = null)
-        {
-            return endpoints.MapGroup(prefix ?? string.Empty)
-                .AllowAnonymous();
         }
 
         private RouteGroupBuilder MapPrivateGroup(string? prefix = null)

@@ -8,6 +8,7 @@ namespace Orchitect.Inventory.Persistence;
 
 public sealed class InventoryDbContext : DbContext
 {
+    private const string Schema = "inventory";
     public DbSet<CloudSecret> CloudSecrets { get; init; } = null!;
     public DbSet<CloudResource> CloudResources { get; init; } = null!;
     public DbSet<Owner> Owners { get; init; } = null!;
@@ -46,7 +47,7 @@ public sealed class InventoryDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.HasDefaultSchema("inventory");
+        modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(InventoryDbContext).Assembly);
     }
 }
