@@ -12,7 +12,7 @@ updates:
         dependency-type: "production"
 
   - package-ecosystem: "npm"
-    directory: "/client/Orchitect.Client.Web"
+    directory: "/client/Orchitect.Portal.Web"
     schedule:
       interval: "daily"
     commit-message:
@@ -23,7 +23,7 @@ updates:
         dependency-type: "production"
   
   - package-ecosystem: "cargo"
-    directory: "/client/Orchitect.Client.Cli"
+    directory: "/client/Orchitect.Portal.Cli"
     schedule:
       interval: "daily"
     commit-message:
