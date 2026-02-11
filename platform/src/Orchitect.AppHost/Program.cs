@@ -22,7 +22,7 @@ var inventoryApi = builder.AddProject<Projects.Orchitect_Inventory_Api>("orchite
     .WithReference(orchitectDb)
     .WaitFor(orchitectDb);
 
-builder.AddJavaScriptApp("orchitect-portal-web", "../../../portals/Orchitect.Client.Web")
+builder.AddJavaScriptApp("orchitect-portal-web", "../../../portals/Orchitect.Portal.Web")
     .WithPnpm()
     .WithRunScript("dev")
     .WithArgs("--port", "3001")
