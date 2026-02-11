@@ -1,7 +1,7 @@
-using Orchitect.Engine.Domain.Organisation;
 using Orchitect.Engine.Domain.ResourceTemplate;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Orchitect.Core.Domain.Organisation;
 
 namespace Orchitect.Engine.Persistence.Configurations;
 
@@ -19,8 +19,8 @@ internal sealed class ResourceTemplateConfiguration : IEntityTypeConfiguration<R
         builder.Property(b => b.Type).IsRequired();
         builder.Property(b => b.Description).IsRequired();
         builder.Property(b => b.Provider).IsRequired().HasConversion<string>();
-        builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("now()");
-        builder.Property(b => b.UpdatedAt).IsRequired().HasDefaultValueSql("now()");
+        builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
+        builder.Property(b => b.UpdatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
 
         builder.Property(r => r.Id)
             .HasConversion(
@@ -28,11 +28,12 @@ internal sealed class ResourceTemplateConfiguration : IEntityTypeConfiguration<R
                 value => new ResourceTemplateId(value)
             );
 
-        builder.HasOne<Organisation>()
-            .WithMany()
-            .HasForeignKey(r => r.OrganisationId)
+        builder.Property(r => r.OrganisationId)
             .IsRequired()
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasConversion(
+                id => id.Value,
+                value => new OrganisationId(value)
+            );
 
         builder.OwnsMany(r => r.Versions, v =>
         {
@@ -42,7 +43,7 @@ internal sealed class ResourceTemplateConfiguration : IEntityTypeConfiguration<R
             v.Property(x => x.Version).IsRequired();
             v.Property(x => x.Notes).IsRequired();
             v.Property(x => x.State).IsRequired().HasConversion<int>();
-            v.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("now()");
+            v.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
 
             v.Property(r => r.Id)
                 .HasConversion(

@@ -4,8 +4,8 @@ using Orchitect.Engine.Domain.Environment;
 using Orchitect.Engine.Infrastructure.Resources;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using Orchitect.Engine.Api.Common;
 using Orchitect.Engine.Api.Queue;
+using Orchitect.Shared;
 
 namespace Orchitect.Engine.Api.Endpoints.Deployment;
 

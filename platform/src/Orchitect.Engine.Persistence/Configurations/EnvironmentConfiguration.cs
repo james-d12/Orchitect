@@ -1,7 +1,7 @@
 using Orchitect.Engine.Domain.Environment;
-using Orchitect.Engine.Domain.Organisation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Orchitect.Core.Domain.Organisation;
 using Environment = Orchitect.Engine.Domain.Environment.Environment;
 
 namespace Orchitect.Engine.Persistence.Configurations;
@@ -17,8 +17,8 @@ internal sealed class EnvironmentConfiguration : IEntityTypeConfiguration<Enviro
 
         builder.Property(b => b.Name).IsRequired();
         builder.Property(b => b.Description).IsRequired();
-        builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("now()");
-        builder.Property(b => b.UpdatedAt).IsRequired().HasDefaultValueSql("now()");
+        builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
+        builder.Property(b => b.UpdatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
 
         builder.Property(r => r.Id)
             .HasConversion(
@@ -26,10 +26,11 @@ internal sealed class EnvironmentConfiguration : IEntityTypeConfiguration<Enviro
                 value => new EnvironmentId(value)
             );
 
-        builder.HasOne<Organisation>()
-            .WithMany()
-            .HasForeignKey(a => a.OrganisationId)
+        builder.Property(e => e.OrganisationId)
             .IsRequired()
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasConversion(
+                id => id.Value,
+                value => new OrganisationId(value)
+            );
     }
 }

@@ -1,6 +1,9 @@
 #!/usr/bin/sh 
 
-cd src/Orchitect.Engine.Persistence
+cd src/Orchitect.Core.Persistence
+dotnet ef migrations add $1
+
+cd ../Orchitect.Engine.Persistence
 dotnet ef migrations add $1
 
 cd ../Orchitect.Inventory.Persistence

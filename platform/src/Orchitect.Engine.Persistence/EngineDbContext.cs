@@ -1,22 +1,19 @@
 using Orchitect.Engine.Domain.Application;
 using Orchitect.Engine.Domain.Deployment;
-using Orchitect.Engine.Domain.Organisation;
 using Orchitect.Engine.Domain.Resource;
 using Orchitect.Engine.Domain.ResourceTemplate;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Orchitect.Engine.Persistence;
 
-public sealed class EngineDbContext : IdentityDbContext
+public sealed class EngineDbContext : DbContext
 {
+    private const string Schema = "engine";
     public DbSet<ResourceTemplate> ResourceTemplates { get; init; } = null!;
     public DbSet<Application> Applications { get; init; } = null!;
     public DbSet<Orchitect.Engine.Domain.Environment.Environment> Environments { get; init; } = null!;
     public DbSet<Deployment> Deployments { get; init; } = null!;
-    public DbSet<Organisation> Organisations { get; init; } = null!;
     public DbSet<Resource> Resources { get; init; } = null!;
 
     private static readonly ILoggerFactory LoggerFactoryInstance
@@ -45,24 +42,10 @@ public sealed class EngineDbContext : IdentityDbContext
             .EnableSensitiveDataLogging();
     }
 
-    protected override void OnModelCreating(ModelBuilder builder)
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        base.OnModelCreating(builder);
-        OverrideTableNamesForIdentity(builder);
-        builder.HasDefaultSchema("engine");
-        builder.ApplyConfigurationsFromAssembly(typeof(EngineDbContext).Assembly);
-    }
-
-    private static void OverrideTableNamesForIdentity(ModelBuilder builder)
-    {
-        const string identitySchema = "identity";
-
-        builder.Entity<IdentityUser>(b => b.ToTable("Users", identitySchema));
-        builder.Entity<IdentityRole>(b => b.ToTable("Roles", identitySchema));
-        builder.Entity<IdentityUserRole<string>>(b => b.ToTable("UserRoles", identitySchema));
-        builder.Entity<IdentityUserClaim<string>>(b => b.ToTable("UserClaims", identitySchema));
-        builder.Entity<IdentityRoleClaim<string>>(b => b.ToTable("RoleClaims", identitySchema));
-        builder.Entity<IdentityUserLogin<string>>(b => b.ToTable("UserLogins", identitySchema));
-        builder.Entity<IdentityUserToken<string>>(b => b.ToTable("UserTokens", identitySchema));
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(EngineDbContext).Assembly);
     }
 }

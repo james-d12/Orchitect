@@ -1,4 +1,4 @@
-using Orchitect.Engine.Domain.Organisation;
+using Orchitect.Core.Domain.Organisation;
 
 namespace Orchitect.Engine.Domain.ResourceTemplate;
 

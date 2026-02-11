@@ -10,7 +10,7 @@ namespace Orchitect.Engine.Infrastructure;
 
 public static class InfrastructureExtensions
 {
-    public static void AddInfrastructureServices(this IServiceCollection services)
+    public static void AddEngineInfrastructureServices(this IServiceCollection services)
     {
         services.AddSharedServices();
         services.AddScoreServices();

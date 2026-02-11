@@ -1,7 +1,7 @@
 using Orchitect.Engine.Domain.Environment;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using Orchitect.Engine.Api.Common;
+using Orchitect.Shared;
 
 namespace Orchitect.Engine.Api.Endpoints.Environment;
 

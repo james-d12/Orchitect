@@ -1,1 +1,5 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Orchitect.Core.Domain\Orchitect.Core.Domain.csproj" />
+  </ItemGroup>
+</Project>

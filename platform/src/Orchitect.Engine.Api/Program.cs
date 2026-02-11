@@ -1,11 +1,9 @@
 using System.Text;
-using Orchitect.Engine.Api.Common;
 using Orchitect.Engine.Api.Endpoints;
 using Orchitect.Engine.Api.Queue;
 using Orchitect.Engine.Infrastructure;
 using Orchitect.Engine.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
@@ -23,19 +21,10 @@ builder.Services.AddHostedService<QueuedHostedService>();
 builder.Services.AddSingleton<IBackgroundTaskQueueProcessor>(ctx => new BackgroundTaskQueueProcessor(5));
 
 builder.Services.AddLogging();
-builder.Services.AddOptions<JwtOptions>()
-    .Bind(builder.Configuration.GetSection("JwtOptions"))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-builder.Services
-    .AddOpenApi()
+builder.Services.AddOpenApi()
     .AddEndpointsApiExplorer()
-    .AddPersistenceServices()
-    .AddInfrastructureServices();
-
-builder.Services.AddIdentity<IdentityUser, IdentityRole>()
-    .AddEntityFrameworkStores<EngineDbContext>();
+    .AddEnginePersistenceServices()
+    .AddEngineInfrastructureServices();
 
 builder.Services
     .AddAuthentication(options =>
@@ -84,7 +73,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-await builder.Services.ApplyMigrations();
+await builder.Services.ApplyEngineMigrations();
 
 WebApplication app = builder.Build();
 

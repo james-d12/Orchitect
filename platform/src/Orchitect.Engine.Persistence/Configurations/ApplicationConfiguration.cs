@@ -1,7 +1,7 @@
 using Orchitect.Engine.Domain.Application;
-using Orchitect.Engine.Domain.Organisation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Orchitect.Core.Domain.Organisation;
 using ApplicationId = Orchitect.Engine.Domain.Application.ApplicationId;
 
 namespace Orchitect.Engine.Persistence.Configurations;
@@ -17,8 +17,8 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.HasIndex(a => new { a.Name, a.OrganisationId }).IsUnique();
 
         builder.Property(b => b.Name).IsRequired();
-        builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("now()");
-        builder.Property(b => b.UpdatedAt).IsRequired().HasDefaultValueSql("now()");
+        builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
+        builder.Property(b => b.UpdatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
 
         builder.Property(a => a.Id)
             .HasConversion(
@@ -26,11 +26,12 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
                 value => new ApplicationId(value)
             );
 
-        builder.HasOne<Organisation>()
-            .WithMany()
-            .HasForeignKey(a => a.OrganisationId)
+        builder.Property(a => a.OrganisationId)
             .IsRequired()
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasConversion(
+                id => id.Value,
+                value => new OrganisationId(value)
+            );
 
         builder.OwnsOne(a => a.Repository, r =>
         {

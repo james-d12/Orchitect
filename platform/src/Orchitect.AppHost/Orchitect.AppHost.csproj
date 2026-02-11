@@ -12,8 +12,9 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\Orchitect.Core.Api\Orchitect.Core.Api.csproj" />
       <ProjectReference Include="..\Orchitect.Engine.Api\Orchitect.Engine.Api.csproj" />
-      <ProjectReference Include="..\Orchitect.Engine.Playground\Orchitect.Engine.Playground.csproj" />
+      <ProjectReference Include="..\Orchitect.Playground\Orchitect.Playground.csproj" />
       <ProjectReference Include="..\Orchitect.Inventory.Api\Orchitect.Inventory.Api.csproj" />
     </ItemGroup>
 

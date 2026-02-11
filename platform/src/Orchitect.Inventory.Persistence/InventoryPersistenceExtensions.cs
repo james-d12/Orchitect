@@ -5,19 +5,16 @@ namespace Orchitect.Inventory.Persistence;
 
 public static class InventoryPersistenceExtensions
 {
-    extension(IServiceCollection services)
+    public static IServiceCollection AddInventoryPersistenceServices(this IServiceCollection services)
     {
-        public IServiceCollection AddInventoryPersistenceServices()
-        {
-            services.AddDbContext<InventoryDbContext>();
-            return services;
-        }
+        services.AddDbContext<InventoryDbContext>();
+        return services;
+    }
 
-        public async Task ApplyInventoryMigrations()
-        {
-            using IServiceScope scope = services.BuildServiceProvider().CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
-            await dbContext.Database.MigrateAsync();
-        }
+    public static async Task ApplyInventoryMigrations(this IServiceCollection services)
+    {
+        using IServiceScope scope = services.BuildServiceProvider().CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+        await dbContext.Database.MigrateAsync();
     }
 }

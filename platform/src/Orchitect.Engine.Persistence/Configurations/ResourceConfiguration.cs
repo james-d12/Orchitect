@@ -42,7 +42,7 @@ internal sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
             ).IsRequired();
 
         builder.Property(b => b.Name).IsRequired();
-        builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("now()");
-        builder.Property(b => b.UpdatedAt).IsRequired().HasDefaultValueSql("now()");
+        builder.Property(b => b.CreatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
+        builder.Property(b => b.UpdatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
     }
 }
