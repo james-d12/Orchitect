@@ -13,13 +13,13 @@ var engineApi = builder.AddProject<Projects.Orchitect_Engine_Api>("orchitect-eng
     .WithOtlpExporter()
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
     .WithReference(orchitectDb)
-    .WaitFor(orchitectDb);
+    .WaitFor(coreApi);
 
 var inventoryApi = builder.AddProject<Projects.Orchitect_Inventory_Api>("orchitect-inventory-api")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
     .WithOtlpExporter()
     .WithReference(orchitectDb)
-    .WaitFor(orchitectDb);
+    .WaitFor(coreApi);
 
 builder.AddProject<Projects.Orchitect_Playground>("orchitect-playground")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
