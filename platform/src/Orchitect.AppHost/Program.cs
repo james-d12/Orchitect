@@ -1,6 +1,6 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var postgres = builder.AddPostgres("postgres");
+var postgres = builder.AddPostgres("postgres").WithHostPort(41031);
 var orchitectDb = postgres.AddDatabase("orchitect");
 
 var engineApi = builder.AddProject<Projects.Orchitect_Engine_Api>("orchitect-engine-api")
