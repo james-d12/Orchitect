@@ -19,8 +19,8 @@ Organisations need to store authorised credentials (PATs, OAuth tokens, service 
 | # | File | Description |
 |---|------|-------------|
 | 1 | `CredentialId.cs` | `readonly record struct CredentialId(Guid Value)` - strongly-typed ID |
-| 2 | `CredentialType.cs` | Enum: `PersonalAccessToken`, `OAuth`, `ServicePrincipal`, `BasicAuth` |
-| 3 | `CredentialPlatform.cs` | Enum: `GitHub`, `AzureDevOps`, `GitLab`, `Azure`, `Custom` |
+| 2 | `CredentialType.cs` | Enum: `PersonalAccessToken`, `OAuth`, `ServicePrincipal`, `BasicAuth`, `TerraformProvider` |
+| 3 | `CredentialPlatform.cs` | Enum: `GitHub`, `AzureDevOps`, `GitLab`, `Azure`, `AWS`, `GCP`, `Custom` |
 | 4 | `IEncryptionService.cs` | Interface with `Encrypt(string)` and `Decrypt(string)` methods |
 | 5 | `Credential.cs` | Sealed record entity with `Id`, `OrganisationId`, `Name`, `Type`, `Platform`, `EncryptedPayload`, `CreatedAt`, `UpdatedAt`. Factory `Create()` and `Update()` methods |
 | 6 | `ICredentialRepository.cs` | Extends `IRepository<Credential, CredentialId>`, adds `GetAllByOrganisationId`, `UpdateAsync`, `DeleteAsync` |
@@ -105,6 +105,40 @@ Organisations need to store authorised credentials (PATs, OAuth tokens, service 
 {
     "username": "...",
     "password": "..."
+}
+```
+
+**TerraformProvider (Azure):**
+```json
+{
+    "provider": "Azure",
+    "subscriptionId": "...",
+    "tenantId": "...",
+    "clientId": "...",
+    "clientSecret": "...",
+    "useMsi": false,
+    "msiApiVersion": "2019-08-01"
+}
+```
+
+**TerraformProvider (AWS):**
+```json
+{
+    "provider": "AWS",
+    "accessKeyId": "AKIA...",
+    "secretAccessKey": "...",
+    "sessionToken": "",
+    "region": "eu-west-1"
+}
+```
+
+**TerraformProvider (GCP):**
+```json
+{
+    "provider": "GCP",
+    "credentialsJson": "{...service account JSON...}",
+    "project": "my-project-id",
+    "region": "europe-west2"
 }
 ```
 
@@ -430,6 +464,181 @@ CredentialPayloadResolver decrypts + deserializes to typed record
 Typed payload (e.g., PersonalAccessTokenPayload) used to build API client
 ```
 
+### Terraform Provider Payload Records
+
+The `TerraformProvider` credential type uses a discriminated model based on the cloud provider. A base record captures the shared `Provider` discriminator, and each cloud has its own payload:
+
+```csharp
+// src/Orchitect.Core.Domain/Credential/Payloads/TerraformAzurePayload.cs
+namespace Orchitect.Core.Domain.Credential.Payloads;
+
+public sealed record TerraformAzurePayload
+{
+    public required string SubscriptionId { get; init; }
+    public required string TenantId { get; init; }
+    public required string ClientId { get; init; }
+    public required string ClientSecret { get; init; }
+    public required bool UseMsi { get; init; }
+    public string MsiApiVersion { get; init; } = "2019-08-01";
+}
+```
+
+```csharp
+// src/Orchitect.Core.Domain/Credential/Payloads/TerraformAwsPayload.cs
+namespace Orchitect.Core.Domain.Credential.Payloads;
+
+public sealed record TerraformAwsPayload
+{
+    public required string AccessKeyId { get; init; }
+    public required string SecretAccessKey { get; init; }
+    public string SessionToken { get; init; } = string.Empty;
+    public required string Region { get; init; }
+}
+```
+
+```csharp
+// src/Orchitect.Core.Domain/Credential/Payloads/TerraformGcpPayload.cs
+namespace Orchitect.Core.Domain.Credential.Payloads;
+
+public sealed record TerraformGcpPayload
+{
+    public required string CredentialsJson { get; init; }
+    public required string Project { get; init; }
+    public required string Region { get; init; }
+}
+```
+
+### Example: Using a Terraform Credential in Engine (Setting Environment Variables)
+
+This shows how the Engine bounded context would use a `TerraformProvider` credential to set the required environment variables when executing Terraform commands:
+
+```csharp
+// In Engine.Infrastructure - Terraform execution service
+public sealed class TerraformExecutionService(
+    ICredentialRepository credentialRepository,
+    CredentialPayloadResolver payloadResolver)
+{
+    public async Task<Dictionary<string, string>> BuildTerraformEnvVarsAsync(
+        CredentialId credentialId,
+        CancellationToken cancellationToken)
+    {
+        var credential = await credentialRepository.GetByIdAsync(credentialId, cancellationToken)
+            ?? throw new InvalidOperationException($"Credential {credentialId} not found.");
+
+        return credential.Platform switch
+        {
+            CredentialPlatform.Azure => BuildAzureEnvVars(credential),
+            CredentialPlatform.AWS => BuildAwsEnvVars(credential),
+            CredentialPlatform.GCP => BuildGcpEnvVars(credential),
+            _ => throw new InvalidOperationException(
+                $"Unsupported Terraform platform: {credential.Platform}")
+        };
+    }
+
+    private Dictionary<string, string> BuildAzureEnvVars(Credential credential)
+    {
+        var payload = payloadResolver.Resolve<TerraformAzurePayload>(credential);
+
+        return new Dictionary<string, string>
+        {
+            ["ARM_SUBSCRIPTION_ID"] = payload.SubscriptionId,
+            ["ARM_TENANT_ID"] = payload.TenantId,
+            ["ARM_CLIENT_ID"] = payload.ClientId,
+            ["ARM_CLIENT_SECRET"] = payload.ClientSecret,
+            ["ARM_USE_MSI"] = payload.UseMsi.ToString().ToLowerInvariant(),
+            ["ARM_MSI_API_VERSION"] = payload.MsiApiVersion
+        };
+    }
+
+    private Dictionary<string, string> BuildAwsEnvVars(Credential credential)
+    {
+        var payload = payloadResolver.Resolve<TerraformAwsPayload>(credential);
+
+        var envVars = new Dictionary<string, string>
+        {
+            ["AWS_ACCESS_KEY_ID"] = payload.AccessKeyId,
+            ["AWS_SECRET_ACCESS_KEY"] = payload.SecretAccessKey,
+            ["AWS_DEFAULT_REGION"] = payload.Region
+        };
+
+        if (!string.IsNullOrEmpty(payload.SessionToken))
+        {
+            envVars["AWS_SESSION_TOKEN"] = payload.SessionToken;
+        }
+
+        return envVars;
+    }
+
+    private Dictionary<string, string> BuildGcpEnvVars(Credential credential)
+    {
+        var payload = payloadResolver.Resolve<TerraformGcpPayload>(credential);
+
+        return new Dictionary<string, string>
+        {
+            ["GOOGLE_CREDENTIALS"] = payload.CredentialsJson,
+            ["GOOGLE_PROJECT"] = payload.Project,
+            ["GOOGLE_REGION"] = payload.Region
+        };
+    }
+}
+```
+
+### Example: Applying Terraform Env Vars to a Process
+
+```csharp
+// Using the env vars when spawning a Terraform process
+public async Task RunTerraformApplyAsync(
+    CredentialId credentialId,
+    string workingDirectory,
+    CancellationToken cancellationToken)
+{
+    var envVars = await BuildTerraformEnvVarsAsync(credentialId, cancellationToken);
+
+    var processStartInfo = new ProcessStartInfo
+    {
+        FileName = "terraform",
+        Arguments = "apply -auto-approve",
+        WorkingDirectory = workingDirectory,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false
+    };
+
+    // Inject decrypted credentials as environment variables
+    foreach (var (key, value) in envVars)
+    {
+        processStartInfo.Environment[key] = value;
+    }
+
+    using var process = Process.Start(processStartInfo);
+    // ... handle process output
+}
+```
+
+### Example: Creating a Terraform Credential via the API
+
+**Request** (POST `/credentials`):
+```json
+{
+    "name": "Azure Terraform Production",
+    "organisationId": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+    "type": "TerraformProvider",
+    "platform": "Azure",
+    "payload": "{\"subscriptionId\":\"abc-123\",\"tenantId\":\"def-456\",\"clientId\":\"ghi-789\",\"clientSecret\":\"super-secret\",\"useMsi\":false,\"msiApiVersion\":\"2019-08-01\"}"
+}
+```
+
+**Request** (POST `/credentials` - AWS):
+```json
+{
+    "name": "AWS Terraform Staging",
+    "organisationId": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+    "type": "TerraformProvider",
+    "platform": "AWS",
+    "payload": "{\"accessKeyId\":\"AKIAIOSFODNN7EXAMPLE\",\"secretAccessKey\":\"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\",\"sessionToken\":\"\",\"region\":\"eu-west-1\"}"
+}
+```
+
 ### Additional Files from This Section
 
 | # | File | Description |
@@ -439,3 +648,6 @@ Typed payload (e.g., PersonalAccessTokenPayload) used to build API client
 | 19 | `src/Orchitect.Core.Domain/Credential/Payloads/ServicePrincipalPayload.cs` | Service principal payload record |
 | 20 | `src/Orchitect.Core.Domain/Credential/Payloads/BasicAuthPayload.cs` | Basic auth payload record |
 | 21 | `src/Orchitect.Core.Domain/Credential/CredentialPayloadResolver.cs` | Decrypt + deserialize helper |
+| 22 | `src/Orchitect.Core.Domain/Credential/Payloads/TerraformAzurePayload.cs` | Azure Terraform env var payload |
+| 23 | `src/Orchitect.Core.Domain/Credential/Payloads/TerraformAwsPayload.cs` | AWS Terraform env var payload |
+| 24 | `src/Orchitect.Core.Domain/Credential/Payloads/TerraformGcpPayload.cs` | GCP Terraform env var payload |
