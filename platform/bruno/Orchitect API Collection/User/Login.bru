@@ -1,0 +1,28 @@
+meta {
+  name: Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{CORE_API_BASE_URL}}/users/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "TestUser@gmail.com",
+    "password": "TestPassword1234!"
+  }
+}
+
+script:post-response {
+  var token = res.body.accessToken
+  console.log("Token: ", token)
+  bru.setEnvVar("ACCESS_TOKEN", token, {})
+}
+
+docs {
+  This request retrieves a list of users from the JSONPlaceholder API.
+}

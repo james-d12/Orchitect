@@ -1,4 +1,4 @@
-namespace Orchitect.Shared;
+namespace Orchitect.Core.Domain;
 
 public interface IRepository<T, in TId>
 {

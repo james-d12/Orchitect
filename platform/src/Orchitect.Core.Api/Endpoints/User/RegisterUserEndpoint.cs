@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Orchitect.Shared;
 
-namespace Orchitect.Core.Application.User;
+namespace Orchitect.Core.Api.Endpoints.User;
 
 public sealed class RegisterUserEndpoint : IEndpoint
 {

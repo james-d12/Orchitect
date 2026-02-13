@@ -1,0 +1,22 @@
+meta {
+  name: Get Organisation After Created
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{CORE_API_BASE_URL}}/organisations/{{ORGANISATION_ID}}
+  body: none
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Test Organisation (Updated)"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

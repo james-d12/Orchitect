@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Orchitect.Core.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class test : Migration
+    public partial class credentials : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -22,8 +22,8 @@ namespace Orchitect.Core.Persistence.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc', now())"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc', now())")
                 },
                 constraints: table =>
                 {
@@ -72,6 +72,32 @@ namespace Orchitect.Core.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Credentials",
+                schema: "core",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganisationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "text", nullable: false),
+                    Type = table.Column<string>(type: "text", nullable: false),
+                    Platform = table.Column<string>(type: "text", nullable: false),
+                    EncryptedPayload = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc', now())"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc', now())")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Credentials", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Credentials_Organisations_OrganisationId",
+                        column: x => x.OrganisationId,
+                        principalSchema: "core",
+                        principalTable: "Organisations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "OrganisationTeams",
                 schema: "core",
                 columns: table => new
@@ -79,8 +105,8 @@ namespace Orchitect.Core.Persistence.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     OrganisationId = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc', now())"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc', now())")
                 },
                 constraints: table =>
                 {
@@ -274,6 +300,19 @@ namespace Orchitect.Core.Persistence.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Credentials_Name_OrganisationId",
+                schema: "core",
+                table: "Credentials",
+                columns: new[] { "Name", "OrganisationId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Credentials_OrganisationId",
+                schema: "core",
+                table: "Credentials",
+                column: "OrganisationId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Organisations_Name",
                 schema: "core",
                 table: "Organisations",
@@ -366,6 +405,10 @@ namespace Orchitect.Core.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "Credentials",
+                schema: "core");
+
             migrationBuilder.DropTable(
                 name: "OrganisationTeamUsers",
                 schema: "core");

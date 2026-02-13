@@ -1,0 +1,22 @@
+meta {
+  name: Delete Resource Template
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{ENGINE_API_BASE_URL}}/resource-templates/{{RESOURCE_TEMPLATE_ID}}
+  body: none
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Test Organisation (Updated)"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

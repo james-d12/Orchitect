@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Orchitect.Core.Domain.Credential;
 using Orchitect.Core.Domain.Organisation;
 
 namespace Orchitect.Core.Persistence;
@@ -10,6 +11,7 @@ public sealed class CoreDbContext : IdentityDbContext
 {
     private const string Schema = "core";
     public DbSet<Organisation> Organisations { get; init; } = null!;
+    public DbSet<Credential> Credentials { get; init; } = null!;
 
     private static readonly ILoggerFactory LoggerFactoryInstance
         = LoggerFactory.Create(builder =>
