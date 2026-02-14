@@ -1,5 +1,3 @@
-using Orchitect.Shared;
-
 namespace Orchitect.Core.Domain.Organisation;
 
 public interface IOrganisationRepository : IRepository<Organisation, OrganisationId>

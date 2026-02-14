@@ -12,6 +12,7 @@ using Orchitect.Engine.Domain.Resource;
 using Orchitect.Engine.Domain.ResourceDependency;
 using Orchitect.Engine.Domain.ResourceTemplate;
 using Orchitect.Inventory.Persistence;
+using Orchitect.ServiceDefaults;
 using Environment = Orchitect.Engine.Domain.Environment.Environment;
 
 HostApplicationBuilder builder = Host.CreateApplicationBuilder();

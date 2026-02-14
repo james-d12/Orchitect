@@ -1,4 +1,4 @@
-using Orchitect.Shared;
+using Orchitect.Core.Domain;
 
 namespace Orchitect.Engine.Domain.Environment;
 

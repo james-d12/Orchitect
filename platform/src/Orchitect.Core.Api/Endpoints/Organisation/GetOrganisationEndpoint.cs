@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Orchitect.Core.Domain.Organisation;
 using Orchitect.Shared;
 
-namespace Orchitect.Core.Application.Organisation;
+namespace Orchitect.Core.Api.Endpoints.Organisation;
 
 public sealed class GetOrganisationEndpoint : IEndpoint
 {

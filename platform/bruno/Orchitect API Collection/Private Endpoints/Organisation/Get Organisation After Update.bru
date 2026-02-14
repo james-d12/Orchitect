@@ -1,0 +1,16 @@
+meta {
+  name: Get Organisation After Update
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{CORE_API_BASE_URL}}/organisations/{{ORGANISATION_ID}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

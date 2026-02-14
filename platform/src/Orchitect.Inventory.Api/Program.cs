@@ -1,6 +1,5 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
-using CodeHub.Api.Settings;
 using Orchitect.Inventory.Api.Jobs;
 using Orchitect.Inventory.Infrastructure.Azure.Extensions;
 using Orchitect.Inventory.Infrastructure.AzureDevOps.Extensions;
@@ -13,6 +12,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.Services.Common;
+using Orchitect.Inventory.Api.Settings;
+using Orchitect.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 var applicationName = AppDomain.CurrentDomain.FriendlyName;

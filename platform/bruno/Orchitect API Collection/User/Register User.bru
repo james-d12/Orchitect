@@ -1,0 +1,23 @@
+meta {
+  name: Register User
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{CORE_API_BASE_URL}}/users/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "username": "TestUser",
+    "email": "TestUser@gmail.com",
+    "password": "TestPassword1234!"
+  }
+}
+
+docs {
+  This request retrieves a list of users from the JSONPlaceholder API.
+}

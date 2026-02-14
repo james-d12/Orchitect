@@ -1,11 +1,14 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Orchitect.Core.Api.Configuration;
-using Orchitect.Core.Application.Endpoints;
+using Orchitect.Core.Api.Endpoints;
 using Orchitect.Core.Persistence;
+using Orchitect.Core.Persistence.Services;
+using Orchitect.ServiceDefaults;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +25,11 @@ builder.Services.AddOptions<JwtOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddOptions<EncryptionOptions>()
+    .Bind(builder.Configuration.GetSection("EncryptionOptions"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
 builder.Services.AddLogging();
 builder.Services
     .AddOpenApi()
@@ -29,6 +37,12 @@ builder.Services
     .AddCorePersistenceServices();
 
 builder.Services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<CoreDbContext>();
+
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters
+        .Add(new JsonStringEnumConverter());
+});
 
 builder.Services
     .AddAuthentication(options =>

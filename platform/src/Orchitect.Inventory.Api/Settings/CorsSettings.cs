@@ -1,4 +1,4 @@
-namespace CodeHub.Api.Settings;
+namespace Orchitect.Inventory.Api.Settings;
 
 public sealed record CorsSettings
 {

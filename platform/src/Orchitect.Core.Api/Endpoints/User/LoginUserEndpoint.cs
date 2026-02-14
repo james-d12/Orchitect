@@ -9,7 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Orchitect.Core.Api.Configuration;
 using Orchitect.Shared;
 
-namespace Orchitect.Core.Application.User;
+namespace Orchitect.Core.Api.Endpoints.User;
 
 public sealed class LoginUserEndpoint : IEndpoint
 {

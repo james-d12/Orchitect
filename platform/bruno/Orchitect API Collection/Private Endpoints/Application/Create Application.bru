@@ -1,0 +1,28 @@
+meta {
+  name: Create Application
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{ENGINE_API_BASE_URL}}/applications
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Test Payment API Application",
+    "organisationId": "{{ORGANISATION_ID}}",
+    "repository": {
+      "name": "Test.Payment.Api",
+      "url": "https://github.com/test/Test.Payment.Api",
+      "provider": 1
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

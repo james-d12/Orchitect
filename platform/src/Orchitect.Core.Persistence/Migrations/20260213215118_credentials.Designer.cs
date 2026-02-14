@@ -12,8 +12,8 @@ using Orchitect.Core.Persistence;
 namespace Orchitect.Core.Persistence.Migrations
 {
     [DbContext(typeof(CoreDbContext))]
-    [Migration("20260211215959_datetime_utc")]
-    partial class datetime_utc
+    [Migration("20260213215118_credentials")]
+    partial class credentials
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -222,6 +222,50 @@ namespace Orchitect.Core.Persistence.Migrations
                     b.ToTable("UserTokens", "core");
                 });
 
+            modelBuilder.Entity("Orchitect.Core.Domain.Credential.Credential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("timezone('utc', now())");
+
+                    b.Property<string>("EncryptedPayload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("timezone('utc', now())");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("Name", "OrganisationId")
+                        .IsUnique();
+
+                    b.ToTable("Credentials", "core");
+                });
+
             modelBuilder.Entity("Orchitect.Core.Domain.Organisation.Organisation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -370,6 +414,15 @@ namespace Orchitect.Core.Persistence.Migrations
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchitect.Core.Domain.Credential.Credential", b =>
+                {
+                    b.HasOne("Orchitect.Core.Domain.Organisation.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

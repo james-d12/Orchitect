@@ -1,0 +1,28 @@
+meta {
+  name: Create Organisation
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{CORE_API_BASE_URL}}/organisations
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Test Organisation"
+  }
+}
+
+script:post-response {
+  var id = res.body.id
+  console.log("Organisation Id: ", id)
+  bru.setEnvVar("ORGANISATION_ID", id, {})
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

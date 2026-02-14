@@ -1,0 +1,22 @@
+meta {
+  name: Get Resource Template After Created
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{ENGINE_API_BASE_URL}}/resource-templates/{{RESOURCE_TEMPLATE_ID}}
+  body: none
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Test Organisation (Updated)"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,8 +1,9 @@
-using Orchitect.Core.Application.Organisation;
-using Orchitect.Core.Application.User;
+using Orchitect.Core.Api.Endpoints.Credential;
+using Orchitect.Core.Api.Endpoints.Organisation;
+using Orchitect.Core.Api.Endpoints.User;
 using Orchitect.Shared;
 
-namespace Orchitect.Core.Application.Endpoints;
+namespace Orchitect.Core.Api.Endpoints;
 
 public static class Endpoints
 {
@@ -12,6 +13,7 @@ public static class Endpoints
         {
             endpoints.MapUserEndpoints();
             endpoints.MapOrganisationEndpoints();
+            endpoints.MapCredentialEndpoints();
         }
 
         private void MapUserEndpoints()
@@ -35,6 +37,19 @@ public static class Endpoints
                 .MapEndpoint<GetOrganisationEndpoint>()
                 .MapEndpoint<UpdateOrganisationEndpoint>()
                 .MapEndpoint<DeleteOrganisationEndpoint>();
+        }
+
+        private void MapCredentialEndpoints()
+        {
+            var endpoints1 = endpoints.MapGroup("/credentials")
+                .WithTags("Credential");
+
+            endpoints1.MapPrivateGroup()
+                .MapEndpoint<CreateCredentialEndpoint>()
+                .MapEndpoint<GetAllCredentialsEndpoint>()
+                .MapEndpoint<GetCredentialEndpoint>()
+                .MapEndpoint<UpdateCredentialEndpoint>()
+                .MapEndpoint<DeleteCredentialEndpoint>();
         }
 
         private RouteGroupBuilder MapPublicGroup(string? prefix = null)
