@@ -21,13 +21,13 @@ public sealed class DiscoveryHostedService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var activity = Tracing.StartActivity();
-        _logger.LogDebug("Worker running at: {time}", DateTimeOffset.Now);
+        _logger.LogDebug("Worker running at: {Time}", DateTimeOffset.Now);
 
         foreach (var discoveryService in _discoveryServices)
         {
             await discoveryService.DiscoveryAsync(stoppingToken);
         }
 
-        _logger.LogDebug("Worker finished running at: {time}", DateTimeOffset.Now);
+        _logger.LogDebug("Worker finished running at: {Time}", DateTimeOffset.Now);
     }
 }

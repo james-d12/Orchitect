@@ -52,11 +52,22 @@ builder.Services
     })
     .AddJwtBearer(options =>
     {
-        options.TokenValidationParameters.ValidIssuer = builder.Configuration["JwtOptions:Issuer"];
-        options.TokenValidationParameters.ValidAudience = builder.Configuration["JwtOptions:Audience"];
-        options.TokenValidationParameters.IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["JwtOptions:Secret"]!));
-        options.TokenValidationParameters.ClockSkew = TimeSpan.Zero;
+        options.TokenValidationParameters = new TokenValidationParameters()
+        {
+            ValidateActor = true,
+            ValidateIssuer = true,
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+            ValidateAudience = true,
+            ValidateSignatureLast = true,
+
+            ValidIssuer = builder.Configuration["JwtOptions:Issuer"],
+            ValidAudience = builder.Configuration["JwtOptions:Audience"],
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["JwtOptions:Secret"]!)),
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
     });
 
 builder.Services.AddAuthorization();
