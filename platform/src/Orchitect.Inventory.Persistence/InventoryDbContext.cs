@@ -1,4 +1,5 @@
 using Orchitect.Inventory.Domain.Cloud;
+using Orchitect.Inventory.Domain.Discovery;
 using Orchitect.Inventory.Domain.Git;
 using Orchitect.Inventory.Domain.Ticketing;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ public sealed class InventoryDbContext : DbContext
     private const string Schema = "inventory";
     public DbSet<CloudSecret> CloudSecrets { get; init; } = null!;
     public DbSet<CloudResource> CloudResources { get; init; } = null!;
+    public DbSet<DiscoveryConfiguration> DiscoveryConfigurations { get; init; } = null!;
     public DbSet<Owner> Owners { get; init; } = null!;
     public DbSet<Pipeline> Pipelines { get; init; } = null!;
     public DbSet<Repository> Repositories { get; init; } = null!;

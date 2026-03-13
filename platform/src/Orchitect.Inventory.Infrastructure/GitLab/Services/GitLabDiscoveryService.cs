@@ -2,46 +2,66 @@ using Orchitect.Inventory.Infrastructure.GitLab.Extensions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Orchitect.Inventory.Infrastructure.Discovery;
-using Orchitect.Inventory.Infrastructure.GitLab.Constants;
 using Orchitect.Inventory.Infrastructure.GitLab.Models;
 using Orchitect.Inventory.Infrastructure.Shared.Observability;
+using Orchitect.Inventory.Domain.Discovery;
+using Orchitect.Core.Domain.Credential;
 
 namespace Orchitect.Inventory.Infrastructure.GitLab.Services;
 
 public sealed class GitLabDiscoveryService : DiscoveryService
 {
-    private readonly IGitLabService _gitLabService;
     private readonly IMemoryCache _memoryCache;
+    private readonly CredentialPayloadResolver _payloadResolver;
+    private readonly ILoggerFactory _loggerFactory;
 
     public GitLabDiscoveryService(
         ILogger<GitLabDiscoveryService> logger,
-        IGitLabService gitLabService,
-        IMemoryCache memoryCache) : base(logger)
+        IMemoryCache memoryCache,
+        CredentialPayloadResolver payloadResolver,
+        ILoggerFactory loggerFactory) : base(logger)
     {
-        _gitLabService = gitLabService;
         _memoryCache = memoryCache;
+        _payloadResolver = payloadResolver;
+        _loggerFactory = loggerFactory;
     }
 
     public override string Platform => "GitLab";
 
-    protected override Task StartAsync(CancellationToken cancellationToken)
+    protected override Task StartAsync(
+        DiscoveryConfiguration configuration,
+        Credential credential,
+        CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
-        var projects = _gitLabService.GetProjects();
+
+        // Create connection service from credential
+        var connectionService = GitLabConnectionService.FromCredential(
+            credential,
+            _payloadResolver,
+            configuration.PlatformConfig);
+
+        // Create GitLab service with this connection
+        var gitLabServiceLogger = _loggerFactory.CreateLogger<GitLabService>();
+        var gitLabService = new GitLabService(gitLabServiceLogger, connectionService);
+
+        var projects = gitLabService.GetProjects();
 
         var repositories = projects.Select(p => p.MapToGitLabRepository()).ToList();
-        var pullRequests = _gitLabService.GetPullRequests();
+        var pullRequests = gitLabService.GetPullRequests();
 
         var pipelines = new List<GitLabPipeline>();
         foreach (var project in projects)
         {
-            var projectPipelines = _gitLabService.GetPipelines(project);
+            var projectPipelines = gitLabService.GetPipelines(project);
             pipelines.AddRange(projectPipelines);
         }
 
-        _memoryCache.Set(GitLabCacheConstants.PipelineCacheKey, pipelines);
-        _memoryCache.Set(GitLabCacheConstants.PullRequestCacheKey, pullRequests);
-        _memoryCache.Set(GitLabCacheConstants.RepositoryCacheKey, repositories);
+        // Use org-specific cache keys
+        var orgId = configuration.OrganisationId.Value;
+        _memoryCache.Set($"GitLab:Pipelines:{orgId}", pipelines);
+        _memoryCache.Set($"GitLab:PullRequests:{orgId}", pullRequests);
+        _memoryCache.Set($"GitLab:Repositories:{orgId}", repositories);
 
         return Task.FromResult(true);
     }

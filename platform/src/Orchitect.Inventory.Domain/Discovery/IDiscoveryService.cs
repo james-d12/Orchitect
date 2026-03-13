@@ -1,7 +1,13 @@
-﻿namespace Orchitect.Inventory.Domain.Discovery;
+﻿using Orchitect.Core.Domain.Credential;
+
+namespace Orchitect.Inventory.Domain.Discovery;
 
 public interface IDiscoveryService
 {
     string Platform { get; }
-    Task DiscoveryAsync(CancellationToken cancellationToken);
+
+    Task DiscoverAsync(
+        DiscoveryConfiguration configuration,
+        Credential credential,
+        CancellationToken cancellationToken);
 }

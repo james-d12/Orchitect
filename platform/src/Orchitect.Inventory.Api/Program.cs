@@ -1,12 +1,14 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orchitect.Inventory.Api.Jobs;
+using Orchitect.Inventory.Api.Endpoints.Discovery;
 using Orchitect.Inventory.Infrastructure.Azure.Extensions;
 using Orchitect.Inventory.Infrastructure.AzureDevOps.Extensions;
 using Orchitect.Inventory.Infrastructure.GitHub.Extensions;
 using Orchitect.Inventory.Infrastructure.GitLab.Extensions;
 using Orchitect.Inventory.Persistence;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +16,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.Services.Common;
 using Orchitect.Inventory.Api.Settings;
 using Orchitect.ServiceDefaults;
+using Orchitect.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 var applicationName = AppDomain.CurrentDomain.FriendlyName;
@@ -46,10 +49,10 @@ try
         .AddSwaggerGen();
     builder.Services.AddHostedService<DiscoveryHostedService>();
 
-    builder.Services.RegisterAzure(builder.Configuration);
-    builder.Services.RegisterAzureDevOps(builder.Configuration);
-    builder.Services.RegisterGitHub(builder.Configuration);
-    builder.Services.RegisterGitLab(builder.Configuration);
+    builder.Services.RegisterAzure();
+    builder.Services.RegisterAzureDevOps();
+    builder.Services.RegisterGitHub();
+    builder.Services.RegisterGitLab();
     builder.Services.AddInventoryPersistenceServices();
 
     var corsSettings = builder.Configuration.GetSection(nameof(CorsSettings)).Get<CorsSettings>();
@@ -92,6 +95,17 @@ try
     app.UseAuthorization();
 
     app.MapControllers();
+
+    // Map discovery configuration endpoints
+    var discoveryGroup = app.MapGroup("/api/discovery")
+        .RequireAuthorization()
+        .WithTags("Discovery");
+
+    discoveryGroup.MapEndpoint<CreateDiscoveryConfigurationEndpoint>();
+    discoveryGroup.MapEndpoint<ListDiscoveryConfigurationsEndpoint>();
+    discoveryGroup.MapEndpoint<UpdateDiscoveryConfigurationEndpoint>();
+    discoveryGroup.MapEndpoint<DeleteDiscoveryConfigurationEndpoint>();
+    discoveryGroup.MapEndpoint<TriggerDiscoveryEndpoint>();
 
     await app.RunAsync();
 }
