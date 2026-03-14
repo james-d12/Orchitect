@@ -5,6 +5,12 @@ var orchitectDb = postgres.AddDatabase("orchitect");
 
 var api = builder.AddProject<Projects.Orchitect_Api>("orchitect-api")
     .WithOtlpExporter()
+    .WithHttpEndpoint()
+    .WithUrlForEndpoint("http", url =>
+    {
+        url.DisplayText = "Swagger";
+        url.Url = $"{url.Url}/swagger/index.html";
+    })
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
     .WithEnvironment("CorsSettings__AllowedFrontend", "https://localhost:3001")
     .WithReference(orchitectDb)
