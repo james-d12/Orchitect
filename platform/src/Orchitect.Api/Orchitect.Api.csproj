@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <IsPublishable>true</IsPublishable>
+        <UserSecretsId>e3456f70-5d43-4dd2-b438-2c5ca83d1e61</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.5" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Orchitect.Infrastructure\Orchitect.Infrastructure.csproj" />
+      <ProjectReference Include="..\Orchitect.Persistence\Orchitect.Persistence.csproj" />
+      <ProjectReference Include="..\Orchitect.ServiceDefaults\Orchitect.ServiceDefaults.csproj" />
+      <ProjectReference Include="..\Orchitect.Shared\Orchitect.Shared.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="appsettings.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
+</Project>

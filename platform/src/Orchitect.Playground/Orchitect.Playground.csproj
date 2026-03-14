@@ -11,11 +11,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Orchitect.Core.Persistence\Orchitect.Core.Persistence.csproj" />
-        <ProjectReference Include="..\Orchitect.Inventory.Persistence\Orchitect.Inventory.Persistence.csproj" />
+        <ProjectReference Include="..\Orchitect.Infrastructure\Orchitect.Infrastructure.csproj" />
+        <ProjectReference Include="..\Orchitect.Persistence\Orchitect.Persistence.csproj" />
         <ProjectReference Include="..\Orchitect.ServiceDefaults\Orchitect.ServiceDefaults.csproj" />
-        <ProjectReference Include="..\Orchitect.Engine.Infrastructure\Orchitect.Engine.Infrastructure.csproj" />
-        <ProjectReference Include="..\Orchitect.Engine.Persistence\Orchitect.Engine.Persistence.csproj" />
     </ItemGroup>
 
     <ItemGroup>
