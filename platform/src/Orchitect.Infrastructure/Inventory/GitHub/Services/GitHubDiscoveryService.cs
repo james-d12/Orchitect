@@ -40,7 +40,7 @@ public sealed class GitHubDiscoveryService : DiscoveryService
         // Create GitHub service with this connection
         var gitHubService = new GitHubService(connectionService);
 
-        var repositories = await gitHubService.GetRepositoriesAsync();
+        var repositories = await gitHubService.GetRepositoriesAsync(configuration.OrganisationId);
 
         var pullRequests = new List<GitHubPullRequest>();
         var pipelines = new List<GitHubPipeline>();

@@ -1,4 +1,5 @@
-﻿using Orchitect.Infrastructure.Inventory.GitHub.Extensions;
+﻿using Orchitect.Domain.Core.Organisation;
+using Orchitect.Infrastructure.Inventory.GitHub.Extensions;
 using Orchitect.Infrastructure.Inventory.GitHub.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
@@ -13,12 +14,12 @@ public sealed class GitHubService : IGitHubService
         _gitHubConnectionService = gitHubConnectionService;
     }
 
-    public async Task<List<GitHubRepository>> GetRepositoriesAsync()
+    public async Task<List<GitHubRepository>> GetRepositoriesAsync(OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
         var repositories =
             await _gitHubConnectionService.Client.Repository.GetAllForCurrent() ?? [];
-        return repositories.Select(r => r.MapToGitHubRepository()).ToList();
+        return repositories.Select(r => r.MapToGitHubRepository(organisationId)).ToList();
     }
 
     public async Task<List<GitHubPipeline>> GetPipelinesAsync(GitHubRepository repository)

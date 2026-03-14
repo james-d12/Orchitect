@@ -10,6 +10,7 @@ using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Inventory.Shared;
 using Orchitect.Domain.Inventory.Ticketing;
 
 namespace Orchitect.Persistence;
@@ -23,6 +24,7 @@ public sealed class OrchitectDbContext : IdentityDbContext
     public DbSet<Pipeline> Pipelines { get; init; } = null!;
     public DbSet<Repository> Repositories { get; init; } = null!;
     public DbSet<PullRequest> PullRequests { get; init; } = null!;
+    public DbSet<Team> Teams { get; init; } = null!;
     public DbSet<User> TicketingUsers { get; init; } = null!;
     public DbSet<WorkItem> WorkItems { get; init; } = null!;
 

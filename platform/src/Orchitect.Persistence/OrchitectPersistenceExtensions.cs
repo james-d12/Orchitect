@@ -9,7 +9,11 @@ using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
 using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Domain.Inventory.Cloud.Service;
 using Orchitect.Domain.Inventory.Discovery;
+using Orchitect.Domain.Inventory.Git.Service;
+using Orchitect.Domain.Inventory.Shared.Service;
+using Orchitect.Domain.Inventory.Ticketing.Service;
 using Orchitect.Persistence.Repositories.Core;
 using Orchitect.Persistence.Repositories.Engine;
 using Orchitect.Persistence.Repositories.Inventory;
@@ -38,6 +42,13 @@ public static class OrchitectPersistenceExtensions
         services.TryAddScoped<ICredentialRepository, CredentialRepository>();
 
         services.TryAddScoped<IDiscoveryConfigurationRepository, DiscoveryConfigurationRepository>();
+        services.TryAddScoped<IRepositoryRepository, RepositoryRepository>();
+        services.TryAddScoped<IPipelineRepository, PipelineRepository>();
+        services.TryAddScoped<IPullRequestRepository, PullRequestRepository>();
+        services.TryAddScoped<IOwnerRepository, OwnerRepository>();
+        services.TryAddScoped<ICloudResourceRepository, CloudResourceRepository>();
+        services.TryAddScoped<IWorkItemRepository, WorkItemRepository>();
+        services.TryAddScoped<ITeamRepository, TeamRepository>();
 
         services.TryAddScoped<IResourceTemplateRepository, ResourceTemplateRepository>();
         services.TryAddScoped<IApplicationRepository, ApplicationRepository>();

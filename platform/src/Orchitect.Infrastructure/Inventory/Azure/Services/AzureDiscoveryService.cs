@@ -67,7 +67,7 @@ public sealed class AzureDiscoveryService : DiscoveryService
             }
 
             var subscriptionResources =
-                await azureService.GetResourcesAsync(subscription, tenantResource, cancellationToken);
+                await azureService.GetResourcesAsync(subscription, tenantResource, configuration.OrganisationId, cancellationToken);
             cloudResources.AddRange(subscriptionResources);
         }
 

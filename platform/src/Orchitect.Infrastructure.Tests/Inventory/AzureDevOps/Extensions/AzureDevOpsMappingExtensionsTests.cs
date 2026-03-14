@@ -4,6 +4,7 @@ using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.VisualStudio.Services.Identity;
 using Microsoft.VisualStudio.Services.WebApi;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Git;
 using Orchitect.Domain.Inventory.Ticketing;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Extensions;
@@ -40,7 +41,7 @@ public sealed class AzureDevOpsMappingExtensionsTests
             .Create();
 
         // Act
-        var to = from.MapToAzureDevOpsPipeline(projectUrl);
+        var to = from.MapToAzureDevOpsPipeline(projectUrl, new OrganisationId(Guid.NewGuid()));
 
         // Assert
         Assert.Equal(from.Id.ToString(), to.Id.Value);
@@ -91,7 +92,7 @@ public sealed class AzureDevOpsMappingExtensionsTests
             .Create();
 
         // Act
-        var to = from.MapToAzureDevOpsRepository();
+        var to = from.MapToAzureDevOpsRepository(new OrganisationId(Guid.NewGuid()));
 
         // Assert
         Assert.Equal(from.Id.ToString(), to.Id.Value);
@@ -161,7 +162,7 @@ public sealed class AzureDevOpsMappingExtensionsTests
             .Create();
 
         // Act
-        var to = from.MapToAzureDevOpsPullRequest(projectUri);
+        var to = from.MapToAzureDevOpsPullRequest(projectUri, new OrganisationId(Guid.NewGuid()));
 
         // Assert
         Assert.Equal(from.PullRequestId.ToString(), to.Id.Value);
@@ -195,7 +196,7 @@ public sealed class AzureDevOpsMappingExtensionsTests
             .Create();
 
         // Act
-        var to = from.MapToAzureDevOpsWorkItem(projectUri);
+        var to = from.MapToAzureDevOpsWorkItem(projectUri, new OrganisationId(Guid.NewGuid()));
 
         // Assert
         Assert.Equal(from.Id.ToString(), to.Id.Value);

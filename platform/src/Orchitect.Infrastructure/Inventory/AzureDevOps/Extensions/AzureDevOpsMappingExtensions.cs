@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Git;
 using Orchitect.Domain.Inventory.Ticketing;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
@@ -15,15 +16,18 @@ namespace Orchitect.Infrastructure.Inventory.AzureDevOps.Extensions;
 public static class AzureDevOpsMappingExtensions
 {
     public static AzureDevOpsPipeline MapToAzureDevOpsPipeline(this BuildDefinitionReference buildDefinitionReference,
-        Uri projectUri)
+        Uri projectUri,
+        OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
 
         var url = new Uri($"{projectUri}/_build?definitionId={buildDefinitionReference.Id}");
+        var now = DateTime.UtcNow;
 
         return new AzureDevOpsPipeline
         {
             Id = new PipelineId(buildDefinitionReference.Id.ToString()),
+            OrganisationId = organisationId,
             Name = buildDefinitionReference.Name,
             Url = url,
             Path = buildDefinitionReference.Path,
@@ -31,12 +35,17 @@ public static class AzureDevOpsMappingExtensions
             Owner = new Owner
             {
                 Id = new OwnerId(buildDefinitionReference.Project.Id.ToString()),
+                OrganisationId = organisationId,
                 Name = buildDefinitionReference.Project.Name,
                 Description = buildDefinitionReference.Project.Description,
                 Url = new Uri(buildDefinitionReference.Project.Url.Replace("_apis/", string.Empty)
                     .Replace("projects/", string.Empty)),
                 Platform = OwnerPlatform.AzureDevOps,
-            }
+                DiscoveredAt = now,
+                UpdatedAt = now
+            },
+            DiscoveredAt = now,
+            UpdatedAt = now
         };
     }
 
@@ -55,12 +64,14 @@ public static class AzureDevOpsMappingExtensions
         };
     }
 
-    public static AzureDevOpsRepository MapToAzureDevOpsRepository(this GitRepository gitRepository)
+    public static AzureDevOpsRepository MapToAzureDevOpsRepository(this GitRepository gitRepository, OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
+        var now = DateTime.UtcNow;
         return new AzureDevOpsRepository
         {
             Id = new RepositoryId(gitRepository.Id.ToString()),
+            OrganisationId = organisationId,
             Name = gitRepository.Name,
             Url = new Uri(gitRepository.WebUrl),
             DefaultBranch = gitRepository.DefaultBranch?.Replace("refs/heads/", string.Empty) ?? string.Empty,
@@ -70,12 +81,17 @@ public static class AzureDevOpsMappingExtensions
             Owner = new Owner
             {
                 Id = new OwnerId(gitRepository.ProjectReference.Id.ToString()),
+                OrganisationId = organisationId,
                 Name = gitRepository.ProjectReference.Name,
                 Description = gitRepository.ProjectReference.Description,
                 Url = new Uri(gitRepository.ProjectReference.Url.Replace("_apis/", string.Empty)
                     .Replace("projects/", string.Empty)),
                 Platform = OwnerPlatform.AzureDevOps,
-            }
+                DiscoveredAt = now,
+                UpdatedAt = now
+            },
+            DiscoveredAt = now,
+            UpdatedAt = now
         };
     }
 
@@ -92,7 +108,8 @@ public static class AzureDevOpsMappingExtensions
     }
 
     public static AzureDevOpsPullRequest MapToAzureDevOpsPullRequest(this GitPullRequest gitPullRequest,
-        Uri projectUri)
+        Uri projectUri,
+        OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
         var status = gitPullRequest.Status switch
@@ -106,10 +123,12 @@ public static class AzureDevOpsMappingExtensions
 
         var url = $"{projectUri}/_git/{gitPullRequest.Repository.Name}/pullrequest/{gitPullRequest.PullRequestId}";
         var repoUrl = $"{projectUri}/_git/{gitPullRequest.Repository.Name}";
+        var now = DateTime.UtcNow;
 
         return new AzureDevOpsPullRequest
         {
             Id = new PullRequestId(gitPullRequest.PullRequestId.ToString()),
+            OrganisationId = organisationId,
             Name = gitPullRequest.Title,
             Description = gitPullRequest.Description,
             Url = new Uri(url),
@@ -128,18 +147,22 @@ public static class AzureDevOpsMappingExtensions
             RepositoryName = gitPullRequest.Repository?.Name ?? string.Empty,
             RepositoryUrl = new Uri(repoUrl),
             CreatedOnDate = DateOnly.FromDateTime(gitPullRequest.CreationDate),
+            DiscoveredAt = now,
+            UpdatedAt = now
         };
     }
 
-    public static AzureDevOpsWorkItem MapToAzureDevOpsWorkItem(this WorkItem workItem, Uri projectUri)
+    public static AzureDevOpsWorkItem MapToAzureDevOpsWorkItem(this WorkItem workItem, Uri projectUri, OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
 
         var url = $"{projectUri}/_workitems/edit/{workItem.Id}";
+        var now = DateTime.UtcNow;
 
         return new AzureDevOpsWorkItem
         {
             Id = new WorkItemId(workItem.Id?.ToString() ?? string.Empty),
+            OrganisationId = organisationId,
             Title = workItem.Fields["System.Title"]?.ToString() ?? string.Empty,
             Description = string.Empty,
             Type = workItem.Fields["System.WorkItemType"]?.ToString() ?? string.Empty,
@@ -150,7 +173,9 @@ public static class AzureDevOpsMappingExtensions
             Relations = workItem.Relations?.Select(r => r.Title)
                             .ToImmutableHashSet() ??
                         [],
-            Platform = WorkItemPlatform.AzureDevOps
+            Platform = WorkItemPlatform.AzureDevOps,
+            DiscoveredAt = now,
+            UpdatedAt = now
         };
     }
 }

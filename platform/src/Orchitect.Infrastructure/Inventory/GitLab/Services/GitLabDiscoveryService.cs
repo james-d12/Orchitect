@@ -47,13 +47,13 @@ public sealed class GitLabDiscoveryService : DiscoveryService
 
         var projects = gitLabService.GetProjects();
 
-        var repositories = projects.Select(p => p.MapToGitLabRepository()).ToList();
-        var pullRequests = gitLabService.GetPullRequests();
+        var repositories = projects.Select(p => p.MapToGitLabRepository(configuration.OrganisationId)).ToList();
+        var pullRequests = gitLabService.GetPullRequests(configuration.OrganisationId);
 
         var pipelines = new List<GitLabPipeline>();
         foreach (var project in projects)
         {
-            var projectPipelines = gitLabService.GetPipelines(project);
+            var projectPipelines = gitLabService.GetPipelines(project, configuration.OrganisationId);
             pipelines.AddRange(projectPipelines);
         }
 

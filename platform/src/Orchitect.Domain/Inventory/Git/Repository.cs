@@ -1,4 +1,6 @@
-﻿namespace Orchitect.Domain.Inventory.Git;
+﻿using Orchitect.Domain.Core.Organisation;
+
+namespace Orchitect.Domain.Inventory.Git;
 
 public enum RepositoryPlatform
 {
@@ -12,9 +14,12 @@ public readonly record struct RepositoryId(string Value);
 public record Repository
 {
     public required RepositoryId Id { get; init; }
+    public required OrganisationId OrganisationId { get; init; }
     public required string Name { get; init; }
     public required Uri Url { get; init; }
     public required string DefaultBranch { get; init; }
     public required Owner Owner { get; init; }
     public required RepositoryPlatform Platform { get; init; }
+    public required DateTime DiscoveredAt { get; init; }
+    public required DateTime UpdatedAt { get; init; }
 }
