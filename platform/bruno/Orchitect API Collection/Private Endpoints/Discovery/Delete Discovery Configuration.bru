@@ -1,0 +1,16 @@
+meta {
+  name: Delete Discovery Configuration
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{API_BASE_URL}}/discovery/{{DISCOVERY_CONFIG_ID}}?organisationId={{ORGANISATION_ID}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

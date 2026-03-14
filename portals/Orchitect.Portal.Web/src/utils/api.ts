@@ -1,6 +1,6 @@
 import { getAccessToken } from "../stores/authStore";
 
-const API_BASE_URL = "http://localhost:5222";
+const API_BASE_URL = import.meta.env.API_BASE_URL;
 
 interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;

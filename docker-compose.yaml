@@ -11,12 +11,12 @@ services:
       POSTGRES_PASSWORD: example
       POSTGRES_DB: orchitect
   
-  engine-api:
+  api:
     depends_on:
       - db
     build:
       context: platform/
-      dockerfile: src/Orchitect.Engine.Api/Dockerfile
+      dockerfile: src/Orchitect.Api/Dockerfile
     volumes:
       - /home/james/Documents/Orchitect:/tmp/orchitect
     ports:
@@ -30,32 +30,12 @@ services:
     develop:
       watch:
         - action: sync+restart
-          path: .platform/src/Orchitect.Engine.Api
-          target: .platform/src/Orchitect.Engine.Api
-  
-  inventory-api:
-    depends_on:
-      - db
-    build:
-      context: platform/
-      dockerfile: src/Orchitect.Inventory.Api/Dockerfile
-    ports:
-      - "8081:8080"
-    environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=orchitect
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=example
-    develop:
-      watch:
-        - action: sync+restart
-          path: .platform/src/Orchitect.Inventory.Api
-          target: .platform/src/Orchitect.Inventory.Api
+          path: .platform/src/Orchitect.Api
+          target: .platform/src/Orchitect.Api
   
   cli:
     depends_on:
-      - engine-api
+      - api
     build:
       context: portals/Orchitect.Portal.Cli
       dockerfile: Dockerfile
@@ -67,8 +47,7 @@ services:
   
   web:
     depends_on:
-      - engine-api
-      - inventory-api
+      - api
     build:
       context: portals/Orchitect.Portal.Web
       dockerfile: Dockerfile

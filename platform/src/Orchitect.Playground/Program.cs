@@ -1,34 +1,28 @@
-﻿using Orchitect.Engine.Infrastructure;
-using Orchitect.Engine.Infrastructure.Resources;
-using Orchitect.Engine.Persistence;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orchitect.Core.Domain.Organisation;
-using Orchitect.Core.Persistence;
-using Orchitect.Engine.Domain.Application;
-using Orchitect.Engine.Domain.Deployment;
-using Orchitect.Engine.Domain.Resource;
-using Orchitect.Engine.Domain.ResourceDependency;
-using Orchitect.Engine.Domain.ResourceTemplate;
-using Orchitect.Inventory.Persistence;
+using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Engine.Application;
+using Orchitect.Domain.Engine.Deployment;
+using Orchitect.Domain.Engine.Resource;
+using Orchitect.Domain.Engine.ResourceDependency;
+using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Infrastructure;
+using Orchitect.Infrastructure.Engine.Resources;
+using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
-using Environment = Orchitect.Engine.Domain.Environment.Environment;
+using Environment = Orchitect.Domain.Engine.Environment.Environment;
 
 HostApplicationBuilder builder = Host.CreateApplicationBuilder();
 
 builder.AddServiceDefaults();
 
 builder.Services
-    .AddCorePersistenceServices()
-    .AddEnginePersistenceServices()
-    .AddInventoryPersistenceServices()
-    .AddEngineInfrastructureServices();
+    .AddPersistenceServices()
+    .AddInfrastructureServices();
 builder.Configuration.AddUserSecrets<Program>();
 
-await builder.Services.ApplyCoreMigrations();
-await builder.Services.ApplyEngineMigrations();
-await builder.Services.ApplyInventoryMigrations();
+await builder.Services.ApplyMigrations();
 
 using IHost host = builder.Build();
 

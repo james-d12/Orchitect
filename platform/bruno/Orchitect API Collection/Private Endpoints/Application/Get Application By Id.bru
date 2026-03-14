@@ -1,0 +1,16 @@
+meta {
+  name: Get Application By Id
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{API_BASE_URL}}/applications/{{APPLICATION_ID}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,0 +1,33 @@
+using Microsoft.EntityFrameworkCore;
+using Orchitect.Domain.Engine.Deployment;
+
+namespace Orchitect.Persistence.Repositories.Engine;
+
+public sealed class DeploymentRepository : IDeploymentRepository
+{
+    private readonly OrchitectDbContext _dbContext;
+
+    public DeploymentRepository(OrchitectDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<Deployment?> CreateAsync(Deployment deployment,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _dbContext.Deployments.AddAsync(deployment, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return result.Entity;
+    }
+
+    public IEnumerable<Deployment> GetAll()
+    {
+        return _dbContext.Deployments.AsEnumerable();
+    }
+
+    public Task<Deployment?> GetByIdAsync(DeploymentId id, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Deployments.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
+    }
+}
