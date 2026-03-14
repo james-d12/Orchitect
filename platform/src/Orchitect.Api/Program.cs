@@ -63,7 +63,7 @@ try
         .ValidateOnStart();
 
     builder.Services.AddHostedService<DiscoveryHostedService>();
-    
+
     builder.Services.ConfigureHttpJsonOptions(options =>
     {
         options.SerializerOptions.Converters
