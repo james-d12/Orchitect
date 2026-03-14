@@ -1,0 +1,16 @@
+meta {
+  name: Trigger Discovery
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{API_BASE_URL}}/discovery/{{DISCOVERY_CONFIG_ID}}/trigger
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

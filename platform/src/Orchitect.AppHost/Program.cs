@@ -5,7 +5,7 @@ var orchitectDb = postgres.AddDatabase("orchitect");
 
 var api = builder.AddProject<Projects.Orchitect_Api>("orchitect-api")
     .WithOtlpExporter()
-    .WithHttpEndpoint()
+    .WithHttpEndpoint(port: 41005)
     .WithUrlForEndpoint("http", url =>
     {
         url.DisplayText = "Swagger";

@@ -14,7 +14,7 @@ namespace Orchitect.Api.Endpoints.Inventory.Discovery;
 public sealed class CreateDiscoveryConfigurationEndpoint : IEndpoint
 {
     public record CreateDiscoveryConfigurationRequest(
-        CredentialId CredentialId,
+        Guid CredentialId,
         DiscoveryPlatform Platform,
         bool IsEnabled,
         Dictionary<string, string>? PlatformConfig);
@@ -40,9 +40,10 @@ public sealed class CreateDiscoveryConfigurationEndpoint : IEndpoint
         CancellationToken cancellationToken)
     {
         var organisationId = user.GetOrganisationId();
+        var credentialId = new CredentialId(createDiscoveryConfigurationRequest.CredentialId);
 
         // Validate credential exists and belongs to this organisation
-        var credential = await credentialRepository.GetByIdAsync(createDiscoveryConfigurationRequest.CredentialId, cancellationToken);
+        var credential = await credentialRepository.GetByIdAsync(credentialId, cancellationToken);
         if (credential == null)
             return TypedResults.BadRequest(CreateError("CREDENTIAL_NOT_FOUND", "Credential not found"));
 
@@ -60,7 +61,7 @@ public sealed class CreateDiscoveryConfigurationEndpoint : IEndpoint
         // Create configuration
         var config = DiscoveryConfiguration.Create(
             organisationId,
-            createDiscoveryConfigurationRequest.CredentialId,
+            credentialId,
             createDiscoveryConfigurationRequest.Platform,
             createDiscoveryConfigurationRequest.IsEnabled,
             createDiscoveryConfigurationRequest.PlatformConfig);

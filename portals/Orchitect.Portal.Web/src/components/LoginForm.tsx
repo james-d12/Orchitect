@@ -10,6 +10,8 @@ interface LoginResponse {
   accessToken: string;
 }
 
+const API_BASE_URL = import.meta.env.API_BASE_URL;
+
 export default function LoginForm() {
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
@@ -26,7 +28,7 @@ export default function LoginForm() {
     setSuccess(false);
 
     try {
-      const response = await fetch("http://localhost:5222/users/login", {
+      const response = await fetch(`${API_BASE_URL}/users/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

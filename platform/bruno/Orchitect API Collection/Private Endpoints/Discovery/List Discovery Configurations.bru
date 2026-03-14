@@ -1,0 +1,16 @@
+meta {
+  name: List Discovery Configurations
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{API_BASE_URL}}/discovery
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
