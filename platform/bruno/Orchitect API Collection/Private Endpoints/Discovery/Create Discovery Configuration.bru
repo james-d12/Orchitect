@@ -23,7 +23,7 @@ body:json {
 }
 
 script:post-response {
-  var id = res.body.id
+  var id = res.body.id.value
   console.log("Discovery Configuration Id: ", id)
   bru.setEnvVar("DISCOVERY_CONFIG_ID", id, {})
 }
