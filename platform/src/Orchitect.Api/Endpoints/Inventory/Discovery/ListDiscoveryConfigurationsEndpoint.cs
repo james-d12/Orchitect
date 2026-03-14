@@ -1,12 +1,11 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Orchitect.Api.Extensions;
 using Orchitect.Api.Shared;
 using Orchitect.Domain.Core.Credential;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
 
 namespace Orchitect.Api.Endpoints.Inventory.Discovery;
@@ -30,16 +29,17 @@ public sealed class ListDiscoveryConfigurationsEndpoint : IEndpoint
         .Produces<IEnumerable<ListDiscoveryConfigurationResponse>>(StatusCodes.Status200OK);
 
     private static async Task<Ok<IEnumerable<ListDiscoveryConfigurationResponse>>> HandleAsync(
+        [FromQuery]
+        string organisationId,
         [FromServices]
         IDiscoveryConfigurationRepository configRepository,
         [FromServices]
         ICredentialRepository credentialRepository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
-        var organisationId = user.GetOrganisationId();
+        var orgId = new OrganisationId(Guid.Parse(organisationId));
 
-        var configs = await configRepository.GetByOrganisationIdAsync(organisationId, cancellationToken);
+        var configs = await configRepository.GetByOrganisationIdAsync(orgId, cancellationToken);
 
         // Join with credentials to get credential names
         var credentials = new Dictionary<CredentialId, string>();

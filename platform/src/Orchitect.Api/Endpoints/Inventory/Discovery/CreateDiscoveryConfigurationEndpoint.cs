@@ -1,12 +1,11 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Orchitect.Api.Extensions;
 using Orchitect.Api.Shared;
 using Orchitect.Domain.Core.Credential;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
 
 namespace Orchitect.Api.Endpoints.Inventory.Discovery;
@@ -14,6 +13,7 @@ namespace Orchitect.Api.Endpoints.Inventory.Discovery;
 public sealed class CreateDiscoveryConfigurationEndpoint : IEndpoint
 {
     public record CreateDiscoveryConfigurationRequest(
+        string OrganisationId,
         Guid CredentialId,
         DiscoveryPlatform Platform,
         bool IsEnabled,
@@ -36,10 +36,9 @@ public sealed class CreateDiscoveryConfigurationEndpoint : IEndpoint
         IDiscoveryConfigurationRepository configRepository,
         [FromServices]
         ICredentialRepository credentialRepository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
-        var organisationId = user.GetOrganisationId();
+        var organisationId = new OrganisationId(Guid.Parse(createDiscoveryConfigurationRequest.OrganisationId));
         var credentialId = new CredentialId(createDiscoveryConfigurationRequest.CredentialId);
 
         // Validate credential exists and belongs to this organisation

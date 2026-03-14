@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Orchitect.Api.Extensions;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
 
 namespace Orchitect.Api.Endpoints.Inventory.Discovery;
@@ -22,16 +21,17 @@ public sealed class DeleteDiscoveryConfigurationEndpoint : IEndpoint
     private static async Task<Results<NoContent, NotFound<ErrorResponse>>> HandleAsync(
         [FromRoute]
         Guid id,
+        [FromQuery]
+        string organisationId,
         [FromServices]
         IDiscoveryConfigurationRepository repository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
-        var organisationId = user.GetOrganisationId();
+        var orgId = new OrganisationId(Guid.Parse(organisationId));
         var configId = new DiscoveryConfigurationId(id);
 
         var existing = await repository.GetByIdAsync(configId, cancellationToken);
-        if (existing == null || existing.OrganisationId != organisationId)
+        if (existing == null || existing.OrganisationId != orgId)
             return TypedResults.NotFound(CreateError("CONFIG_NOT_FOUND", "Discovery configuration not found"));
 
         await repository.DeleteAsync(configId, cancellationToken);

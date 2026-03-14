@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Orchitect.Api.Extensions;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
 
 namespace Orchitect.Api.Endpoints.Inventory.Discovery;
@@ -13,6 +12,7 @@ namespace Orchitect.Api.Endpoints.Inventory.Discovery;
 public sealed class UpdateDiscoveryConfigurationEndpoint : IEndpoint
 {
     public record Request(
+        string OrganisationId,
         bool IsEnabled,
         Dictionary<string, string>? PlatformConfig);
 
@@ -30,10 +30,9 @@ public sealed class UpdateDiscoveryConfigurationEndpoint : IEndpoint
         Request request,
         [FromServices]
         IDiscoveryConfigurationRepository repository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
-        var organisationId = user.GetOrganisationId();
+        var organisationId = new OrganisationId(Guid.Parse(request.OrganisationId));
         var configId = new DiscoveryConfigurationId(id);
 
         var existing = await repository.GetByIdAsync(configId, cancellationToken);
