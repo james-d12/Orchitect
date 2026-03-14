@@ -8,6 +8,7 @@ var api = builder.AddProject<Projects.Orchitect_Api>("orchitect-api")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
     .WithEnvironment("CorsSettings__AllowedFrontend", "https://localhost:3001")
     .WithReference(orchitectDb)
+    .WithExternalHttpEndpoints()
     .WaitFor(orchitectDb);
 
 builder.AddProject<Projects.Orchitect_Playground>("orchitect-playground")
