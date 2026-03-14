@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Npgsql;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
@@ -18,7 +20,19 @@ public static class OrchitectPersistenceExtensions
 {
     public static IServiceCollection AddPersistenceServices(this IServiceCollection services)
     {
-        services.AddDbContext<OrchitectDbContext>();
+        var connectionString = System.Environment.GetEnvironmentVariable("ConnectionStrings__orchitect");
+        ArgumentException.ThrowIfNullOrEmpty(connectionString);
+
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+        dataSourceBuilder.EnableDynamicJson();
+        var dataSource = dataSourceBuilder.Build();
+
+        var loggerFactory = LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Information));
+
+        services.AddDbContext<OrchitectDbContext>(options =>
+            options.UseNpgsql(dataSource, opt => opt.EnableRetryOnFailure())
+                .UseLoggerFactory(loggerFactory)
+                .EnableSensitiveDataLogging());
 
         services.TryAddScoped<IOrganisationRepository, OrganisationRepository>();
         services.TryAddScoped<ICredentialRepository, CredentialRepository>();

@@ -56,7 +56,7 @@ public sealed class OrchitectDbContext : IdentityDbContext
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__orchitect");
         ArgumentException.ThrowIfNullOrEmpty(connectionString);
         optionsBuilder
-            .UseNpgsql(connectionString, opt => { opt.EnableRetryOnFailure(); })
+            .UseNpgsql(connectionString, opt => opt.EnableRetryOnFailure())
             .UseLoggerFactory(LoggerFactoryInstance)
             .EnableSensitiveDataLogging();
     }
