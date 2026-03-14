@@ -7,6 +7,8 @@ using Orchitect.Inventory.Infrastructure.AzureDevOps.Extensions;
 using Orchitect.Inventory.Infrastructure.GitHub.Extensions;
 using Orchitect.Inventory.Infrastructure.GitLab.Extensions;
 using Orchitect.Inventory.Persistence;
+using Orchitect.Core.Persistence;
+using Orchitect.Core.Persistence.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -14,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.Services.Common;
+using Orchitect.Inventory.Api.Endpoints;
 using Orchitect.Inventory.Api.Settings;
 using Orchitect.ServiceDefaults;
 using Orchitect.Shared;
@@ -38,6 +41,13 @@ try
 
     builder.AddServiceDefaults();
     builder.Services.AddLogging();
+
+    // Configure encryption options (required by Core's IEncryptionService)
+    builder.Services.AddOptions<EncryptionOptions>()
+        .Bind(builder.Configuration.GetSection("EncryptionOptions"))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
@@ -48,6 +58,9 @@ try
         .AddEndpointsApiExplorer()
         .AddSwaggerGen();
     builder.Services.AddHostedService<DiscoveryHostedService>();
+
+    // Add Core services (provides IEncryptionService, ICredentialRepository, etc.)
+    builder.Services.AddCorePersistenceServices();
 
     builder.Services.RegisterAzure();
     builder.Services.RegisterAzureDevOps();
@@ -91,21 +104,9 @@ try
     app.UseCors("AllowFrontendOrigin");
 
     app.UseHttpsRedirection();
-
     app.UseAuthorization();
 
-    app.MapControllers();
-
-    // Map discovery configuration endpoints
-    var discoveryGroup = app.MapGroup("/api/discovery")
-        .RequireAuthorization()
-        .WithTags("Discovery");
-
-    discoveryGroup.MapEndpoint<CreateDiscoveryConfigurationEndpoint>();
-    discoveryGroup.MapEndpoint<ListDiscoveryConfigurationsEndpoint>();
-    discoveryGroup.MapEndpoint<UpdateDiscoveryConfigurationEndpoint>();
-    discoveryGroup.MapEndpoint<DeleteDiscoveryConfigurationEndpoint>();
-    discoveryGroup.MapEndpoint<TriggerDiscoveryEndpoint>();
+    app.MapInventoryEndpoints();
 
     await app.RunAsync();
 }

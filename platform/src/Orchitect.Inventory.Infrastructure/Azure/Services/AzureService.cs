@@ -13,7 +13,12 @@ namespace Orchitect.Inventory.Infrastructure.Azure.Services;
 
 public sealed class AzureService : IAzureService
 {
-    private readonly ArmClient _client = new(new DefaultAzureCredential());
+    private readonly ArmClient _client;
+
+    public AzureService(IAzureConnectionService connectionService)
+    {
+        _client = connectionService.Client;
+    }
 
     public async Task<List<TenantResource>> GetTenantsAsync(CancellationToken cancellationToken)
     {

@@ -12,6 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Orchitect.Core.Persistence\Orchitect.Core.Persistence.csproj" />
         <ProjectReference Include="..\Orchitect.Inventory.Infrastructure\Orchitect.Inventory.Infrastructure.csproj" />
         <ProjectReference Include="..\Orchitect.Inventory.Persistence\Orchitect.Inventory.Persistence.csproj" />
         <ProjectReference Include="..\Orchitect.ServiceDefaults\Orchitect.ServiceDefaults.csproj" />
