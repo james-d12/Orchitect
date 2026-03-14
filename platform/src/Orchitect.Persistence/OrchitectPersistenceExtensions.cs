@@ -11,7 +11,6 @@ using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Persistence.Repositories.Core;
 using Orchitect.Persistence.Repositories.Engine;
 using Orchitect.Persistence.Repositories.Inventory;
-using Orchitect.Persistence.Services;
 
 namespace Orchitect.Persistence;
 
@@ -23,7 +22,6 @@ public static class OrchitectPersistenceExtensions
 
         services.TryAddScoped<IOrganisationRepository, OrganisationRepository>();
         services.TryAddScoped<ICredentialRepository, CredentialRepository>();
-        services.TryAddSingleton<IEncryptionService, AesEncryptionService>();
 
         services.TryAddScoped<IDiscoveryConfigurationRepository, DiscoveryConfigurationRepository>();
 

@@ -1,4 +1,4 @@
-namespace Orchitect.Persistence.Services;
+namespace Orchitect.Infrastructure.Core.Encryption;
 
 public sealed record EncryptionOptions
 {

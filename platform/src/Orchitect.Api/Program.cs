@@ -15,8 +15,8 @@ using Orchitect.Api.Jobs;
 using Orchitect.Api.Queue;
 using Orchitect.Api.Settings;
 using Orchitect.Infrastructure;
+using Orchitect.Infrastructure.Core.Encryption;
 using Orchitect.Persistence;
-using Orchitect.Persistence.Services;
 using Orchitect.ServiceDefaults;
 
 var applicationName = AppDomain.CurrentDomain.FriendlyName;
