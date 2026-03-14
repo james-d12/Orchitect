@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -25,7 +26,8 @@ public sealed class CreateCredentialEndpoint : IEndpoint
         CancellationToken cancellationToken)
     {
         var organisationId = new OrganisationId(request.OrganisationId);
-        var encryptedPayload = encryptionService.Encrypt(request.Payload);
+        var payloadJson = request.Payload.GetRawText();
+        var encryptedPayload = encryptionService.Encrypt(payloadJson);
 
         var credential = Domain.Core.Credential.Credential.Create(
             organisationId,

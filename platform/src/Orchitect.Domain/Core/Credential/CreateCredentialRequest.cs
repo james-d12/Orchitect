@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Orchitect.Domain.Core.Credential;
 
 public sealed record CreateCredentialRequest(
@@ -5,4 +7,4 @@ public sealed record CreateCredentialRequest(
     Guid OrganisationId,
     CredentialType Type,
     CredentialPlatform Platform,
-    string Payload);
+    JsonElement Payload);

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -18,7 +19,7 @@ public sealed class UpdateCredentialEndpoint : IEndpoint
         string Name,
         CredentialType Type,
         CredentialPlatform Platform,
-        string Payload);
+        JsonElement Payload);
 
     private static async Task<Results<Ok<CredentialResponse>, NotFound, InternalServerError>> HandleAsync(
         [FromRoute]
@@ -39,7 +40,8 @@ public sealed class UpdateCredentialEndpoint : IEndpoint
             return TypedResults.NotFound();
         }
 
-        var encryptedPayload = encryptionService.Encrypt(request.Payload);
+        var payloadJson = request.Payload.GetRawText();
+        var encryptedPayload = encryptionService.Encrypt(payloadJson);
         var updated = existing.Update(request.Name, request.Type, request.Platform, encryptedPayload);
         var result = await repository.UpdateAsync(updated, cancellationToken);
 

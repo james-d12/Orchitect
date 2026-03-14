@@ -5,10 +5,15 @@ namespace Orchitect.Domain.Core.Credential;
 
 public sealed class CredentialPayloadResolver(IEncryptionService encryptionService)
 {
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public T Resolve<T>(Credential credential) where T : class
     {
         var decryptedJson = encryptionService.Decrypt(credential.EncryptedPayload);
-        return JsonSerializer.Deserialize<T>(decryptedJson)
+        return JsonSerializer.Deserialize<T>(decryptedJson, Options)
             ?? throw new InvalidOperationException(
                 $"Failed to deserialize credential '{credential.Name}' payload as {typeof(T).Name}.");
     }
