@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using Orchitect.Api.Shared;
 using Orchitect.Domain.Engine.ResourceTemplate;
-using Orchitect.Shared;
 
 namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
 

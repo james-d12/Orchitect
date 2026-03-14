@@ -16,7 +16,6 @@
       <ProjectReference Include="..\Orchitect.Infrastructure\Orchitect.Infrastructure.csproj" />
       <ProjectReference Include="..\Orchitect.Persistence\Orchitect.Persistence.csproj" />
       <ProjectReference Include="..\Orchitect.ServiceDefaults\Orchitect.ServiceDefaults.csproj" />
-      <ProjectReference Include="..\Orchitect.Shared\Orchitect.Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>

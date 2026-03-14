@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Orchitect.Shared;
+using Orchitect.Api.Shared;
 
 namespace Orchitect.Api.Endpoints.Core.User;
 

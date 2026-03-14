@@ -1,4 +1,4 @@
-namespace Orchitect.Shared;
+namespace Orchitect.Api.Shared;
 
 public sealed record ErrorResponse
 {

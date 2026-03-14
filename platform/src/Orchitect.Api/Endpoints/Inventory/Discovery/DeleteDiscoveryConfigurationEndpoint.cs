@@ -5,8 +5,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Extensions;
+using Orchitect.Api.Shared;
 using Orchitect.Domain.Inventory.Discovery;
-using Orchitect.Shared;
 
 namespace Orchitect.Api.Endpoints.Inventory.Discovery;
 

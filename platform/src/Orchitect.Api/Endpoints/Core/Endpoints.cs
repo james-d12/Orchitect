@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Endpoints.Core.Credential;
 using Orchitect.Api.Endpoints.Core.Organisation;
 using Orchitect.Api.Endpoints.Core.User;
-using Orchitect.Shared;
+using Orchitect.Api.Shared;
 
 namespace Orchitect.Api.Endpoints.Core;
 

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Routing;
 
-namespace Orchitect.Shared;
+namespace Orchitect.Api.Shared;
 
 public static class EndpointExtensions
 {

@@ -5,7 +5,7 @@ using Orchitect.Api.Endpoints.Engine.Application;
 using Orchitect.Api.Endpoints.Engine.Deployment;
 using Orchitect.Api.Endpoints.Engine.Environment;
 using Orchitect.Api.Endpoints.Engine.ResourceTemplate;
-using Orchitect.Shared;
+using Orchitect.Api.Shared;
 
 namespace Orchitect.Api.Endpoints.Engine;
 

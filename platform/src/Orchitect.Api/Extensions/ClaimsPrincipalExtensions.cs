@@ -1,6 +1,6 @@
 using System.Security.Claims;
+using Orchitect.Api.Shared;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Shared;
 
 namespace Orchitect.Api.Extensions;
 

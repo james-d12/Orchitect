@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Orchitect.Api.Settings;
-using Orchitect.Shared;
+using Orchitect.Api.Shared;
 
 namespace Orchitect.Api.Endpoints.Core.User;
 

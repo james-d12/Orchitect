@@ -3,9 +3,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Orchitect.Api.Shared;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Shared;
 
 namespace Orchitect.Api.Endpoints.Core.Credential;
 

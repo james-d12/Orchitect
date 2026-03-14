@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Endpoints.Inventory.Discovery;
-using Orchitect.Shared;
+using Orchitect.Api.Shared;
 
 namespace Orchitect.Api.Endpoints.Inventory;
 

@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace Orchitect.Shared;
+namespace Orchitect.Api.Shared;
 
 public static class ClaimsPrincipalExtensions
 {

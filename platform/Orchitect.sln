@@ -6,8 +6,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.AppHost", "src\Or
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.ServiceDefaults", "src\Orchitect.ServiceDefaults\Orchitect.ServiceDefaults.csproj", "{DB8FEF55-ABEC-4C10-89D0-90AC4F13C721}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Shared", "src\Orchitect.Shared\Orchitect.Shared.csproj", "{2C184345-3F61-4604-94F8-903D312DF723}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Domain", "src\Orchitect.Domain\Orchitect.Domain.csproj", "{9DF8193C-F97C-4A72-83E1-23580A56708D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Persistence", "src\Orchitect.Persistence\Orchitect.Persistence.csproj", "{EA6C62AD-5B4C-4FA9-8DD7-D64CD76F937B}"
@@ -38,10 +36,6 @@ Global
 		{DB8FEF55-ABEC-4C10-89D0-90AC4F13C721}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DB8FEF55-ABEC-4C10-89D0-90AC4F13C721}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DB8FEF55-ABEC-4C10-89D0-90AC4F13C721}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2C184345-3F61-4604-94F8-903D312DF723}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2C184345-3F61-4604-94F8-903D312DF723}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2C184345-3F61-4604-94F8-903D312DF723}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2C184345-3F61-4604-94F8-903D312DF723}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9DF8193C-F97C-4A72-83E1-23580A56708D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{9DF8193C-F97C-4A72-83E1-23580A56708D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9DF8193C-F97C-4A72-83E1-23580A56708D}.Release|Any CPU.ActiveCfg = Release|Any CPU
