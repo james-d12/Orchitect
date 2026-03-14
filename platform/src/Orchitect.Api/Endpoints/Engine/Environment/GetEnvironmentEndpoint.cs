@@ -17,7 +17,7 @@ public sealed class GetEnvironmentEndpoint : IEndpoint
     public sealed record GetEnvironmentResponse(Guid Id, string Name);
 
     private static async Task<Results<Ok<GetEnvironmentResponse>, NotFound>> HandleAsync(
-        [FromQuery]
+        [FromRoute]
         Guid id,
         [FromServices]
         IEnvironmentRepository repository,

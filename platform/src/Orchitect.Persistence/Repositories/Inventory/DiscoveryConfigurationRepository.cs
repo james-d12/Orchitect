@@ -25,7 +25,7 @@ public sealed class DiscoveryConfigurationRepository : IDiscoveryConfigurationRe
         DiscoveryConfigurationId id,
         CancellationToken cancellationToken = default)
     {
-        return await _context.DiscoveryConfigurations
+        return await _context.DiscoveryConfigurations.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 

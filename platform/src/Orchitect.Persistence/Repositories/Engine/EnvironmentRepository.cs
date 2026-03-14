@@ -29,7 +29,8 @@ public sealed class EnvironmentRepository : IEnvironmentRepository
     public Task<Environment?> GetByIdAsync(EnvironmentId id,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.Environments.FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
+        return _dbContext.Environments.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
     }
 
     public async Task<Environment?> UpdateAsync(Environment environment,

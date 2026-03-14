@@ -28,7 +28,8 @@ public sealed class ResourceTemplateRepository : IResourceTemplateRepository
     public Task<ResourceTemplate?> GetByIdAsync(ResourceTemplateId id,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.ResourceTemplates.FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
+        return _dbContext.ResourceTemplates.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
     }
 
     public Task<ResourceTemplate?> GetByTypeAsync(string type, CancellationToken cancellationToken = default)

@@ -27,6 +27,7 @@ public sealed class DeploymentRepository : IDeploymentRepository
 
     public Task<Deployment?> GetByIdAsync(DeploymentId id, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Deployments.FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
+        return _dbContext.Deployments.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
     }
 }

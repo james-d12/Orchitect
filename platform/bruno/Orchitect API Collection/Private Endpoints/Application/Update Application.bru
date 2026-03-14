@@ -1,31 +1,24 @@
 meta {
-  name: Create Application
+  name: Update Application
   type: http
-  seq: 1
+  seq: 4
 }
 
-post {
-  url: {{API_BASE_URL}}/applications
+put {
+  url: {{API_BASE_URL}}/applications/{{APPLICATION_ID}}
   body: json
   auth: inherit
 }
 
 body:json {
   {
-    "name": "Test Payment API Application 2",
-    "organisationId": "{{ORGANISATION_ID}}",
+    "name": "Test Payment API Application (Updated))",
     "repository": {
       "name": "Test.Payment.Api",
       "url": "https://github.com/test/Test.Payment.Api",
       "provider": 1
     }
   }
-}
-
-script:post-response {
-  var id = res.body.id
-  
-  bru.setVar("APPLICATION_ID", id)
 }
 
 settings {

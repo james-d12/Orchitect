@@ -24,7 +24,7 @@ public sealed class GetApplicationEndpoint : IEndpoint
         DateTime UpdatedAt);
 
     private static async Task<Results<Ok<GetApplicationResponse>, NotFound>> HandleAsync(
-        [FromQuery]
+        [FromRoute]
         Guid id,
         [FromServices]
         IApplicationRepository repository,

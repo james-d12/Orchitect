@@ -1,11 +1,11 @@
 meta {
-  name: Get Applications
+  name: Get Application By Id
   type: http
-  seq: 3
+  seq: 2
 }
 
 get {
-  url: {{API_BASE_URL}}/applications
+  url: {{API_BASE_URL}}/applications/{{APPLICATION_ID}}
   body: none
   auth: inherit
 }

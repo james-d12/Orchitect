@@ -29,7 +29,8 @@ public sealed class ApplicationRepository : IApplicationRepository
     public Task<Application?> GetByIdAsync(ApplicationId id,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.Applications.FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
+        return _dbContext.Applications.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
     }
 
     public async Task<Application?> UpdateAsync(Application application,
