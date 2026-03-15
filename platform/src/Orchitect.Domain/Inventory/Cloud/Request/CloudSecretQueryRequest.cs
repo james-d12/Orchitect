@@ -1,9 +1,11 @@
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Shared;
 
 namespace Orchitect.Domain.Inventory.Cloud.Request;
 
 public sealed record CloudSecretQueryRequest(
-    string? Name,
-    string? Location,
-    string? Url,
-    CloudSecretPlatform? Platform) : BaseRequest;
+    OrganisationId OrganisationId,
+    string? Name = null,
+    string? Location = null,
+    string? Url = null,
+    CloudSecretPlatform? Platform = null) : BaseRequest(OrganisationId);

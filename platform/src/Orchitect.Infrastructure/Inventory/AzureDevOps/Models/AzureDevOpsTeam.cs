@@ -1,9 +1,5 @@
-﻿namespace Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
+﻿using Orchitect.Domain.Inventory.Shared;
 
-public sealed record AzureDevOpsTeam
-{
-    public required Guid Id { get; init; }
-    public required string Name { get; init; }
-    public required string Description { get; init; }
-    public required string Url { get; init; }
-}
+namespace Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
+
+public sealed record AzureDevOpsTeam : Team;

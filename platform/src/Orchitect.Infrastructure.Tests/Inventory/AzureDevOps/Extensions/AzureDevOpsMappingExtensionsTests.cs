@@ -122,10 +122,10 @@ public sealed class AzureDevOpsMappingExtensionsTests
         var to = from.MapToAzureDevOpsTeam();
 
         // Assert
-        Assert.Equal(from.Id, to.Id);
+        Assert.Equal(from.Id.ToString(), to.Id.Value);
         Assert.Equal(from.Name, to.Name);
         Assert.Equal(from.Description, to.Description);
-        Assert.Equal(from.Url, to.Url);
+        Assert.Equal(from.Url, to.Url.ToString());
     }
 
     [Fact]

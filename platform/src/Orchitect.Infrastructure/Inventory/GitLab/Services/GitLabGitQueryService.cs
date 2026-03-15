@@ -1,10 +1,7 @@
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Inventory.Git;
 using Orchitect.Domain.Inventory.Git.Request;
 using Orchitect.Domain.Inventory.Git.Service;
-using Orchitect.Infrastructure.Inventory.GitLab.Constants;
-using Orchitect.Infrastructure.Inventory.GitLab.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Extensions;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 using Orchitect.Infrastructure.Inventory.Shared.Query;
@@ -14,22 +11,32 @@ namespace Orchitect.Infrastructure.Inventory.GitLab.Services;
 public sealed class GitLabGitQueryService : IGitQueryService
 {
     private readonly ILogger<GitLabGitQueryService> _logger;
-    private readonly IMemoryCache _memoryCache;
+    private readonly IRepositoryRepository _repositoryRepository;
+    private readonly IPipelineRepository _pipelineRepository;
+    private readonly IPullRequestRepository _pullRequestRepository;
 
     public GitLabGitQueryService(
         ILogger<GitLabGitQueryService> logger,
-        IMemoryCache memoryCache)
+        IRepositoryRepository repositoryRepository,
+        IPipelineRepository pipelineRepository,
+        IPullRequestRepository pullRequestRepository)
     {
         _logger = logger;
-        _memoryCache = memoryCache;
+        _repositoryRepository = repositoryRepository;
+        _pipelineRepository = pipelineRepository;
+        _pullRequestRepository = pullRequestRepository;
     }
 
     public List<Pipeline> QueryPipelines(PipelineQueryRequest request)
     {
         using var activity = Tracing.StartActivity();
-        _logger.LogInformation("Querying pipelines from GitLab");
-        var gitLabPipelines = _memoryCache.Get<List<GitLabPipeline>>(GitLabCacheConstants.PipelineCacheKey) ?? [];
-        var pipelines = gitLabPipelines.ConvertAll<Pipeline>(p => p);
+        _logger.LogInformation("Querying pipelines from database for organisation {OrganisationId}", request.OrganisationId);
+
+        var pipelines = _pipelineRepository
+            .GetByPlatformAsync(request.OrganisationId, PipelinePlatform.GitLab)
+            .GetAwaiter()
+            .GetResult()
+            .ToList();
 
         return new QueryBuilder<Pipeline>(pipelines)
             .Where(request.Id, p => p.Id.Value.EqualsCaseInsensitive(request.Id))
@@ -43,10 +50,13 @@ public sealed class GitLabGitQueryService : IGitQueryService
     public List<Repository> QueryRepositories(RepositoryQueryRequest request)
     {
         using var activity = Tracing.StartActivity();
-        _logger.LogInformation("Querying repositories from GitLab");
-        var gitLabRepositories =
-            _memoryCache.Get<List<GitLabRepository>>(GitLabCacheConstants.RepositoryCacheKey) ?? [];
-        var repositories = gitLabRepositories.ConvertAll<Repository>(p => p);
+        _logger.LogInformation("Querying repositories from database for organisation {OrganisationId}", request.OrganisationId);
+
+        var repositories = _repositoryRepository
+            .GetByPlatformAsync(request.OrganisationId, RepositoryPlatform.GitLab)
+            .GetAwaiter()
+            .GetResult()
+            .ToList();
 
         return new QueryBuilder<Repository>(repositories)
             .Where(request.Id, p => p.Id.Value.EqualsCaseInsensitive(request.Id))
@@ -61,10 +71,14 @@ public sealed class GitLabGitQueryService : IGitQueryService
     public List<PullRequest> QueryPullRequests(PullRequestQueryRequest request)
     {
         using var activity = Tracing.StartActivity();
-        _logger.LogInformation("Querying pull requests from GitLab");
-        var gitLabPullRequests =
-            _memoryCache.Get<List<GitLabPullRequest>>(GitLabCacheConstants.PullRequestCacheKey) ?? [];
-        var pullRequests = gitLabPullRequests.ConvertAll<PullRequest>(p => p);
+        _logger.LogInformation("Querying pull requests from database for organisation {OrganisationId}", request.OrganisationId);
+
+        var pullRequests = _pullRequestRepository
+            .GetByOrganisationIdAsync(request.OrganisationId)
+            .GetAwaiter()
+            .GetResult()
+            .Where(pr => pr.Platform == PullRequestPlatform.GitLab)
+            .ToList();
 
         return new QueryBuilder<PullRequest>(pullRequests)
             .Where(request.Id, p => p.Id.Value.EqualsCaseInsensitive(request.Id))

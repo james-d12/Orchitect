@@ -1,8 +1,9 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
-using Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
+using Orchitect.Domain.Inventory.Git.Service;
+using Orchitect.Domain.Inventory.Shared.Service;
+using Orchitect.Domain.Inventory.Ticketing.Service;
 using Orchitect.Infrastructure.Inventory.Discovery;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
@@ -11,17 +12,29 @@ namespace Orchitect.Infrastructure.Inventory.AzureDevOps.Services;
 public sealed class AzureDevOpsDiscoveryService : DiscoveryService
 {
     private readonly ILogger<AzureDevOpsDiscoveryService> _logger;
-    private readonly IMemoryCache _memoryCache;
     private readonly CredentialPayloadResolver _payloadResolver;
+    private readonly IRepositoryRepository _repositoryRepository;
+    private readonly IPipelineRepository _pipelineRepository;
+    private readonly IPullRequestRepository _pullRequestRepository;
+    private readonly IWorkItemRepository _workItemRepository;
+    private readonly ITeamRepository _teamRepository;
 
     public AzureDevOpsDiscoveryService(
         ILogger<AzureDevOpsDiscoveryService> logger,
-        IMemoryCache memoryCache,
-        CredentialPayloadResolver payloadResolver) : base(logger)
+        CredentialPayloadResolver payloadResolver,
+        IRepositoryRepository repositoryRepository,
+        IPipelineRepository pipelineRepository,
+        IPullRequestRepository pullRequestRepository,
+        IWorkItemRepository workItemRepository,
+        ITeamRepository teamRepository) : base(logger)
     {
         _logger = logger;
-        _memoryCache = memoryCache;
         _payloadResolver = payloadResolver;
+        _repositoryRepository = repositoryRepository;
+        _pipelineRepository = pipelineRepository;
+        _pullRequestRepository = pullRequestRepository;
+        _workItemRepository = workItemRepository;
+        _teamRepository = teamRepository;
     }
 
     public override string Platform => "AzureDevOps";
@@ -54,10 +67,10 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
         _logger.LogInformation("Discovering Azure DevOps project resources...");
         var projects = await azureDevOpsService.GetProjectsAsync(organization, projectFilters, cancellationToken);
 
-        var pipelines = new List<AzureDevOpsPipeline>();
-        var repositories = new List<AzureDevOpsRepository>();
-        var pullRequests = new List<AzureDevOpsPullRequest>();
-        var workItems = new List<AzureDevOpsWorkItem>();
+        var pipelines = new List<Domain.Inventory.Git.Pipeline>();
+        var repositories = new List<Domain.Inventory.Git.Repository>();
+        var pullRequests = new List<Domain.Inventory.Git.PullRequest>();
+        var workItems = new List<Domain.Inventory.Ticketing.WorkItem>();
 
         foreach (var project in projects)
         {
@@ -82,13 +95,20 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
             workItems.AddRange(projectWorkItems);
         }
 
-        // Use org-specific cache keys
-        var orgId = configuration.OrganisationId.Value;
-        _memoryCache.Set($"AzureDevOps:Projects:{orgId}", projects);
-        _memoryCache.Set($"AzureDevOps:Teams:{orgId}", teams);
-        _memoryCache.Set($"AzureDevOps:Pipelines:{orgId}", pipelines);
-        _memoryCache.Set($"AzureDevOps:Repositories:{orgId}", repositories);
-        _memoryCache.Set($"AzureDevOps:PullRequests:{orgId}", pullRequests);
-        _memoryCache.Set($"AzureDevOps:WorkItems:{orgId}", workItems);
+        // Persist all discovered data to database
+        await _teamRepository.BulkUpsertAsync(teams, cancellationToken);
+        await _repositoryRepository.BulkUpsertAsync(repositories, cancellationToken);
+        await _pipelineRepository.BulkUpsertAsync(pipelines, cancellationToken);
+        await _pullRequestRepository.BulkUpsertAsync(pullRequests, cancellationToken);
+        await _workItemRepository.BulkUpsertAsync(workItems, cancellationToken);
+
+        _logger.LogInformation(
+            "Azure DevOps discovery completed for organisation {OrganisationId}: {TeamCount} teams, {RepositoryCount} repositories, {PipelineCount} pipelines, {PullRequestCount} pull requests, {WorkItemCount} work items",
+            configuration.OrganisationId.Value,
+            teams.Count,
+            repositories.Count,
+            pipelines.Count,
+            pullRequests.Count,
+            workItems.Count);
     }
 }

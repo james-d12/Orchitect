@@ -5,6 +5,7 @@ using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Inventory.Shared;
 using Orchitect.Domain.Inventory.Ticketing;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
@@ -100,10 +101,31 @@ public static class AzureDevOpsMappingExtensions
         using var activity = Tracing.StartActivity();
         return new AzureDevOpsTeam
         {
-            Id = webApiTeam.Id,
+            Id = new TeamId(webApiTeam.Id.ToString()),
             Name = webApiTeam.Name,
             Description = webApiTeam.Description,
-            Url = webApiTeam.Url
+            Url = new Uri(webApiTeam.Url),
+            OrganisationId = default,
+            Platform = TeamPlatform.AzureDevOps,
+            DiscoveredAt = default,
+            UpdatedAt = default
+        };
+    }
+
+    public static Team MapToDomainTeam(this WebApiTeam webApiTeam, OrganisationId organisationId)
+    {
+        using var activity = Tracing.StartActivity();
+        var now = DateTime.UtcNow;
+        return new Team
+        {
+            Id = new TeamId(webApiTeam.Id.ToString()),
+            OrganisationId = organisationId,
+            Name = webApiTeam.Name,
+            Description = webApiTeam.Description,
+            Url = new Uri(webApiTeam.Url),
+            Platform = TeamPlatform.AzureDevOps,
+            DiscoveredAt = now,
+            UpdatedAt = now
         };
     }
 

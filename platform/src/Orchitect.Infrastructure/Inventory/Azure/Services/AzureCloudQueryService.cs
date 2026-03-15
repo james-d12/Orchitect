@@ -4,7 +4,6 @@ using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Request;
 using Orchitect.Domain.Inventory.Cloud.Service;
 using Orchitect.Infrastructure.Inventory.Azure.Constants;
-using Orchitect.Infrastructure.Inventory.Azure.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Extensions;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 using Orchitect.Infrastructure.Inventory.Shared.Query;
@@ -14,25 +13,31 @@ namespace Orchitect.Infrastructure.Inventory.Azure.Services;
 public sealed class AzureCloudQueryService : ICloudQueryService
 {
     private readonly ILogger<AzureCloudQueryService> _logger;
+    private readonly ICloudResourceRepository _cloudResourceRepository;
     private readonly IMemoryCache _memoryCache;
 
     public AzureCloudQueryService(
         ILogger<AzureCloudQueryService> logger,
+        ICloudResourceRepository cloudResourceRepository,
         IMemoryCache memoryCache)
     {
         _logger = logger;
+        _cloudResourceRepository = cloudResourceRepository;
         _memoryCache = memoryCache;
     }
 
     public List<CloudResource> QueryCloudResources(CloudResourceQueryRequest request)
     {
         using var activity = Tracing.StartActivity();
-        _logger.LogInformation("Querying cloud resources from Azure");
-        var azureCloudResources =
-            _memoryCache.Get<List<AzureCloudResource>>(AzureCacheConstants.CloudResourceCacheKey) ?? [];
-        var cloudResources = azureCloudResources.ConvertAll<CloudResource>(p => p);
+        _logger.LogInformation("Querying cloud resources from database for organisation {OrganisationId}", request.OrganisationId);
 
-        if (azureCloudResources.Count <= 0)
+        var cloudResources = _cloudResourceRepository
+            .GetByPlatformAsync(request.OrganisationId, CloudPlatform.Azure)
+            .GetAwaiter()
+            .GetResult()
+            .ToList();
+
+        if (cloudResources.Count <= 0)
         {
             return [];
         }

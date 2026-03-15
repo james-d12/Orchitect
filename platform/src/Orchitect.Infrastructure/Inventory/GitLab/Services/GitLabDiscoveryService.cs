@@ -1,34 +1,41 @@
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
+using Orchitect.Domain.Inventory.Git.Service;
 using Orchitect.Infrastructure.Inventory.Discovery;
 using Orchitect.Infrastructure.Inventory.GitLab.Extensions;
-using Orchitect.Infrastructure.Inventory.GitLab.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Services;
 
 public sealed class GitLabDiscoveryService : DiscoveryService
 {
-    private readonly IMemoryCache _memoryCache;
+    private readonly ILogger<GitLabDiscoveryService> _logger;
     private readonly CredentialPayloadResolver _payloadResolver;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly IRepositoryRepository _repositoryRepository;
+    private readonly IPipelineRepository _pipelineRepository;
+    private readonly IPullRequestRepository _pullRequestRepository;
 
     public GitLabDiscoveryService(
         ILogger<GitLabDiscoveryService> logger,
-        IMemoryCache memoryCache,
         CredentialPayloadResolver payloadResolver,
-        ILoggerFactory loggerFactory) : base(logger)
+        ILoggerFactory loggerFactory,
+        IRepositoryRepository repositoryRepository,
+        IPipelineRepository pipelineRepository,
+        IPullRequestRepository pullRequestRepository) : base(logger)
     {
-        _memoryCache = memoryCache;
+        _logger = logger;
         _payloadResolver = payloadResolver;
         _loggerFactory = loggerFactory;
+        _repositoryRepository = repositoryRepository;
+        _pipelineRepository = pipelineRepository;
+        _pullRequestRepository = pullRequestRepository;
     }
 
     public override string Platform => "GitLab";
 
-    protected override Task StartAsync(
+    protected override async Task StartAsync(
         DiscoveryConfiguration configuration,
         Credential credential,
         CancellationToken cancellationToken)
@@ -50,19 +57,23 @@ public sealed class GitLabDiscoveryService : DiscoveryService
         var repositories = projects.Select(p => p.MapToGitLabRepository(configuration.OrganisationId)).ToList();
         var pullRequests = gitLabService.GetPullRequests(configuration.OrganisationId);
 
-        var pipelines = new List<GitLabPipeline>();
+        var pipelines = new List<Domain.Inventory.Git.Pipeline>();
         foreach (var project in projects)
         {
             var projectPipelines = gitLabService.GetPipelines(project, configuration.OrganisationId);
             pipelines.AddRange(projectPipelines);
         }
 
-        // Use org-specific cache keys
-        var orgId = configuration.OrganisationId.Value;
-        _memoryCache.Set($"GitLab:Pipelines:{orgId}", pipelines);
-        _memoryCache.Set($"GitLab:PullRequests:{orgId}", pullRequests);
-        _memoryCache.Set($"GitLab:Repositories:{orgId}", repositories);
+        // Persist all discovered data to database
+        await _repositoryRepository.BulkUpsertAsync(repositories, cancellationToken);
+        await _pipelineRepository.BulkUpsertAsync(pipelines, cancellationToken);
+        await _pullRequestRepository.BulkUpsertAsync(pullRequests, cancellationToken);
 
-        return Task.FromResult(true);
+        _logger.LogInformation(
+            "GitLab discovery completed for organisation {OrganisationId}: {RepositoryCount} repositories, {PipelineCount} pipelines, {PullRequestCount} pull requests",
+            configuration.OrganisationId.Value,
+            repositories.Count,
+            pipelines.Count,
+            pullRequests.Count);
     }
 }
