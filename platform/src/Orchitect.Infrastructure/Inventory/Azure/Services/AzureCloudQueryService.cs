@@ -1,9 +1,7 @@
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Request;
 using Orchitect.Domain.Inventory.Cloud.Service;
-using Orchitect.Infrastructure.Inventory.Azure.Constants;
 using Orchitect.Infrastructure.Inventory.Shared.Extensions;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 using Orchitect.Infrastructure.Inventory.Shared.Query;
@@ -14,16 +12,16 @@ public sealed class AzureCloudQueryService : ICloudQueryService
 {
     private readonly ILogger<AzureCloudQueryService> _logger;
     private readonly ICloudResourceRepository _cloudResourceRepository;
-    private readonly IMemoryCache _memoryCache;
+    private readonly ICloudSecretRepository _cloudSecretRepository;
 
     public AzureCloudQueryService(
         ILogger<AzureCloudQueryService> logger,
         ICloudResourceRepository cloudResourceRepository,
-        IMemoryCache memoryCache)
+        ICloudSecretRepository cloudSecretRepository)
     {
         _logger = logger;
         _cloudResourceRepository = cloudResourceRepository;
-        _memoryCache = memoryCache;
+        _cloudSecretRepository = cloudSecretRepository;
     }
 
     public List<CloudResource> QueryCloudResources(CloudResourceQueryRequest request)
@@ -55,12 +53,15 @@ public sealed class AzureCloudQueryService : ICloudQueryService
     public List<CloudSecret> QueryCloudSecrets(CloudSecretQueryRequest request)
     {
         using var activity = Tracing.StartActivity();
-        _logger.LogInformation("Querying cloud secrets from Azure");
-        var azureCloudSecrets =
-            _memoryCache.Get<List<CloudSecret>>(AzureCacheConstants.CloudSecretCacheKey) ?? [];
-        var cloudSecrets = azureCloudSecrets.ConvertAll<CloudSecret>(p => p);
+        _logger.LogInformation("Querying cloud secrets from database for organisation {OrganisationId}", request.OrganisationId);
 
-        if (azureCloudSecrets.Count <= 0)
+        var cloudSecrets = _cloudSecretRepository
+            .GetByPlatformAsync(request.OrganisationId, CloudSecretPlatform.Azure)
+            .GetAwaiter()
+            .GetResult()
+            .ToList();
+
+        if (cloudSecrets.Count <= 0)
         {
             return [];
         }

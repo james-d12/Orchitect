@@ -95,8 +95,12 @@ public sealed class AzureService : IAzureService
 
                 foreach (var secret in client.GetPropertiesOfSecrets())
                 {
+                    // Generate unique ID from vault URI + secret name
+                    var secretId = $"{secret.VaultUri}/{secret.Name}";
+
                     cloudSecrets.Add(new CloudSecret
                     {
+                        Id = new CloudSecretId(secretId),
                         OrganisationId = organisationId,
                         Name = secret.Name,
                         Location = vault.Name,

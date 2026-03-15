@@ -11,9 +11,14 @@ internal sealed class CloudSecretConfiguration : IEntityTypeConfiguration<CloudS
     {
         builder.ToTable("CloudSecrets", "inventory");
 
-        builder.HasKey(cs => new { cs.OrganisationId, cs.Name, cs.Location, cs.Platform });
+        builder.HasKey(cs => cs.Id);
 
-        // Organisation FK with cascade delete
+        builder.Property(cs => cs.Id)
+            .HasConversion(
+                id => id.Value,
+                value => new CloudSecretId(value)
+            );
+
         builder.Property(cs => cs.OrganisationId)
             .HasConversion(
                 id => id.Value,
@@ -36,8 +41,15 @@ internal sealed class CloudSecretConfiguration : IEntityTypeConfiguration<CloudS
         builder.Property(cs => cs.DiscoveredAt).IsRequired();
         builder.Property(cs => cs.UpdatedAt).IsRequired();
 
-        // Index on OrganisationId
+        // Indexes
         builder.HasIndex(cs => cs.OrganisationId)
             .HasDatabaseName("IX_CloudSecrets_OrganisationId");
+
+        builder.HasIndex(cs => new { cs.OrganisationId, cs.Platform })
+            .HasDatabaseName("IX_CloudSecrets_OrganisationId_Platform");
+
+        builder.HasIndex(cs => cs.Url)
+            .IsUnique()
+            .HasDatabaseName("IX_CloudSecrets_Url");
     }
 }

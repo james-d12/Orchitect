@@ -12,15 +12,18 @@ public sealed class AzureDiscoveryService : DiscoveryService
     private readonly ILogger<AzureDiscoveryService> _logger;
     private readonly CredentialPayloadResolver _payloadResolver;
     private readonly ICloudResourceRepository _cloudResourceRepository;
+    private readonly ICloudSecretRepository _cloudSecretRepository;
 
     public AzureDiscoveryService(
         ILogger<AzureDiscoveryService> logger,
         CredentialPayloadResolver payloadResolver,
-        ICloudResourceRepository cloudResourceRepository) : base(logger)
+        ICloudResourceRepository cloudResourceRepository,
+        ICloudSecretRepository cloudSecretRepository) : base(logger)
     {
         _logger = logger;
         _payloadResolver = payloadResolver;
         _cloudResourceRepository = cloudResourceRepository;
+        _cloudSecretRepository = cloudSecretRepository;
     }
 
     public override string Platform => "Azure";
@@ -54,7 +57,7 @@ public sealed class AzureDiscoveryService : DiscoveryService
         var subscriptions =
             await azureService.GetSubscriptionsAsync(subscriptionFilters, cancellationToken);
 
-        var cloudResources = new List<Domain.Inventory.Cloud.CloudResource>();
+        var azureCloudResources = new List<Infrastructure.Inventory.Azure.Models.AzureCloudResource>();
 
         foreach (var subscription in subscriptions)
         {
@@ -67,15 +70,25 @@ public sealed class AzureDiscoveryService : DiscoveryService
 
             var subscriptionResources =
                 await azureService.GetResourcesAsync(subscription, tenantResource, configuration.OrganisationId, cancellationToken);
-            cloudResources.AddRange(subscriptionResources);
+            azureCloudResources.AddRange(subscriptionResources);
         }
 
         // Persist all discovered cloud resources to database
-        await _cloudResourceRepository.BulkUpsertAsync(cloudResources, cancellationToken);
+        await _cloudResourceRepository.BulkUpsertAsync(azureCloudResources, cancellationToken);
+
+        // Discover and persist cloud secrets from Key Vaults
+        _logger.LogInformation("Discovering Azure Key Vault secrets...");
+        var cloudSecrets = await azureService.GetKeyVaultSecretsAsync(
+            azureCloudResources,
+            configuration.OrganisationId,
+            cancellationToken);
+
+        await _cloudSecretRepository.BulkUpsertAsync(cloudSecrets, cancellationToken);
 
         _logger.LogInformation(
-            "Azure discovery completed for organisation {OrganisationId}: {CloudResourceCount} cloud resources",
+            "Azure discovery completed for organisation {OrganisationId}: {CloudResourceCount} cloud resources, {CloudSecretCount} cloud secrets",
             configuration.OrganisationId.Value,
-            cloudResources.Count);
+            azureCloudResources.Count,
+            cloudSecrets.Count);
     }
 }

@@ -47,6 +47,7 @@ public static class OrchitectPersistenceExtensions
         services.TryAddScoped<IPullRequestRepository, PullRequestRepository>();
         services.TryAddScoped<IOwnerRepository, OwnerRepository>();
         services.TryAddScoped<ICloudResourceRepository, CloudResourceRepository>();
+        services.TryAddScoped<ICloudSecretRepository, CloudSecretRepository>();
         services.TryAddScoped<IWorkItemRepository, WorkItemRepository>();
         services.TryAddScoped<ITeamRepository, TeamRepository>();
 
