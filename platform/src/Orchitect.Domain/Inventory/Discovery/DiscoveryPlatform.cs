@@ -2,8 +2,8 @@ namespace Orchitect.Domain.Inventory.Discovery;
 
 public enum DiscoveryPlatform
 {
-    GitHub,
-    AzureDevOps,
-    GitLab,
-    Azure
+    AzureDevOps = 0,
+    GitHub = 1,
+    GitLab = 2,
+    Azure = 3
 }

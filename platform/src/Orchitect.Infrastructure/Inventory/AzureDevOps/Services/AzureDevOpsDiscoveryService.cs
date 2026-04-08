@@ -1,9 +1,13 @@
 ﻿using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
-using Orchitect.Domain.Inventory.Git.Service;
-using Orchitect.Domain.Inventory.Shared.Service;
-using Orchitect.Domain.Inventory.Ticketing.Service;
+using Orchitect.Domain.Inventory.Identity.Services;
+using Orchitect.Domain.Inventory.Issue;
+using Orchitect.Domain.Inventory.Issue.Services;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.Pipeline.Services;
+using Orchitect.Domain.Inventory.SourceControl;
+using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.Discovery;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
@@ -16,7 +20,7 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
     private readonly IRepositoryRepository _repositoryRepository;
     private readonly IPipelineRepository _pipelineRepository;
     private readonly IPullRequestRepository _pullRequestRepository;
-    private readonly IWorkItemRepository _workItemRepository;
+    private readonly IIssueRepository _issueRepository;
     private readonly ITeamRepository _teamRepository;
 
     public AzureDevOpsDiscoveryService(
@@ -25,7 +29,7 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
         IRepositoryRepository repositoryRepository,
         IPipelineRepository pipelineRepository,
         IPullRequestRepository pullRequestRepository,
-        IWorkItemRepository workItemRepository,
+        IIssueRepository issueRepository,
         ITeamRepository teamRepository) : base(logger)
     {
         _logger = logger;
@@ -33,7 +37,7 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
         _repositoryRepository = repositoryRepository;
         _pipelineRepository = pipelineRepository;
         _pullRequestRepository = pullRequestRepository;
-        _workItemRepository = workItemRepository;
+        _issueRepository = issueRepository;
         _teamRepository = teamRepository;
     }
 
@@ -67,10 +71,10 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
         _logger.LogInformation("Discovering Azure DevOps project resources...");
         var projects = await azureDevOpsService.GetProjectsAsync(organization, projectFilters, cancellationToken);
 
-        var pipelines = new List<Domain.Inventory.Git.Pipeline>();
-        var repositories = new List<Domain.Inventory.Git.Repository>();
-        var pullRequests = new List<Domain.Inventory.Git.PullRequest>();
-        var workItems = new List<Domain.Inventory.Ticketing.WorkItem>();
+        var pipelines = new List<Pipeline>();
+        var repositories = new List<Repository>();
+        var pullRequests = new List<PullRequest>();
+        var workItems = new List<Issue>();
 
         foreach (var project in projects)
         {
@@ -100,7 +104,7 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
         await _repositoryRepository.BulkUpsertAsync(repositories, cancellationToken);
         await _pipelineRepository.BulkUpsertAsync(pipelines, cancellationToken);
         await _pullRequestRepository.BulkUpsertAsync(pullRequests, cancellationToken);
-        await _workItemRepository.BulkUpsertAsync(workItems, cancellationToken);
+        await _issueRepository.BulkUpsertAsync(workItems, cancellationToken);
 
         _logger.LogInformation(
             "Azure DevOps discovery completed for organisation {OrganisationId}: {TeamCount} teams, {RepositoryCount} repositories, {PipelineCount} pipelines, {PullRequestCount} pull requests, {WorkItemCount} work items",

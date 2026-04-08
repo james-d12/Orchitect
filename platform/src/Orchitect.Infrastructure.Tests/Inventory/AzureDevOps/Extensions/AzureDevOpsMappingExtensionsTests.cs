@@ -5,8 +5,10 @@ using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.VisualStudio.Services.Identity;
 using Microsoft.VisualStudio.Services.WebApi;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
-using Orchitect.Domain.Inventory.Ticketing;
+using Orchitect.Domain.Inventory.Identity;
+using Orchitect.Domain.Inventory.Issue;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Extensions;
 using BuildDefinitionReference = Microsoft.TeamFoundation.Build.WebApi.BuildDefinitionReference;
 using WorkItem = Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models.WorkItem;
@@ -49,11 +51,11 @@ public sealed class AzureDevOpsMappingExtensionsTests
         Assert.Equal($"{projectUrl}/_build?definitionId={from.Id}", to.Url.ToString());
         Assert.Equal(from.Path, to.Path);
         Assert.Equal(PipelinePlatform.AzureDevOps, to.Platform);
-        Assert.Equal(from.Project.Id.ToString(), to.Owner.Id.Value);
-        Assert.Equal(from.Project.Name, to.Owner.Name);
-        Assert.Equal(from.Project.Description, to.Owner.Description);
-        Assert.Equal(from.Project.Url, to.Owner.Url.ToString());
-        Assert.Equal(OwnerPlatform.AzureDevOps, to.Owner.Platform);
+        Assert.Equal(from.Project.Id.ToString(), to.User.Id.Value);
+        Assert.Equal(from.Project.Name, to.User.Name);
+        Assert.Equal(from.Project.Description, to.User.Description);
+        Assert.Equal(from.Project.Url, to.User.Url.ToString());
+        Assert.Equal(UserPlatform.AzureDevOps, to.User.Platform);
     }
 
     [Fact]
@@ -102,10 +104,10 @@ public sealed class AzureDevOpsMappingExtensionsTests
         Assert.Equal(from.IsDisabled, to.IsDisabled);
         Assert.Equal(from.IsInMaintenance, to.IsInMaintenance);
         Assert.Equal(from.DefaultBranch, to.DefaultBranch);
-        Assert.Equal(from.ProjectReference.Id.ToString(), to.Owner.Id.Value);
-        Assert.Equal(from.ProjectReference.Name, to.Owner.Name);
-        Assert.Equal(from.ProjectReference.Url, to.Owner.Url.ToString());
-        Assert.Equal(OwnerPlatform.AzureDevOps, to.Owner.Platform);
+        Assert.Equal(from.ProjectReference.Id.ToString(), to.User.Id.Value);
+        Assert.Equal(from.ProjectReference.Name, to.User.Name);
+        Assert.Equal(from.ProjectReference.Url, to.User.Url.ToString());
+        Assert.Equal(UserPlatform.AzureDevOps, to.User.Platform);
     }
 
     [Fact]
@@ -208,6 +210,6 @@ public sealed class AzureDevOpsMappingExtensionsTests
         Assert.Equal(from.Fields, to.Fields);
         Assert.Equal(from.Relations.Select(r => r.Title).ToImmutableHashSet(), to.Relations);
         Assert.Equal(from.Rev, to.Revision);
-        Assert.Equal(WorkItemPlatform.AzureDevOps, to.Platform);
+        Assert.Equal(IssuePlatform.AzureDevOps, to.Platform);
     }
 }

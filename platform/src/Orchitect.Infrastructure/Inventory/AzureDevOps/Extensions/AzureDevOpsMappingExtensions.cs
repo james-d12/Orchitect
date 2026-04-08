@@ -4,9 +4,10 @@ using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
-using Orchitect.Domain.Inventory.Shared;
-using Orchitect.Domain.Inventory.Ticketing;
+using Orchitect.Domain.Inventory.Identity;
+using Orchitect.Domain.Inventory.Issue;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 using PullRequestStatus = Microsoft.TeamFoundation.SourceControl.WebApi.PullRequestStatus;
@@ -33,15 +34,15 @@ public static class AzureDevOpsMappingExtensions
             Url = url,
             Path = buildDefinitionReference.Path,
             Platform = PipelinePlatform.AzureDevOps,
-            Owner = new Owner
+            User = new User
             {
-                Id = new OwnerId(buildDefinitionReference.Project.Id.ToString()),
+                Id = new UserId(buildDefinitionReference.Project.Id.ToString()),
                 OrganisationId = organisationId,
                 Name = buildDefinitionReference.Project.Name,
                 Description = buildDefinitionReference.Project.Description,
                 Url = new Uri(buildDefinitionReference.Project.Url.Replace("_apis/", string.Empty)
                     .Replace("projects/", string.Empty)),
-                Platform = OwnerPlatform.AzureDevOps,
+                Platform = UserPlatform.AzureDevOps,
                 DiscoveredAt = now,
                 UpdatedAt = now
             },
@@ -79,15 +80,15 @@ public static class AzureDevOpsMappingExtensions
             IsDisabled = gitRepository.IsDisabled ?? false,
             IsInMaintenance = gitRepository.IsInMaintenance ?? false,
             Platform = RepositoryPlatform.AzureDevOps,
-            Owner = new Owner
+            User = new User
             {
-                Id = new OwnerId(gitRepository.ProjectReference.Id.ToString()),
+                Id = new UserId(gitRepository.ProjectReference.Id.ToString()),
                 OrganisationId = organisationId,
                 Name = gitRepository.ProjectReference.Name,
                 Description = gitRepository.ProjectReference.Description,
                 Url = new Uri(gitRepository.ProjectReference.Url.Replace("_apis/", string.Empty)
                     .Replace("projects/", string.Empty)),
-                Platform = OwnerPlatform.AzureDevOps,
+                Platform = UserPlatform.AzureDevOps,
                 DiscoveredAt = now,
                 UpdatedAt = now
             },
@@ -136,11 +137,11 @@ public static class AzureDevOpsMappingExtensions
         using var activity = Tracing.StartActivity();
         var status = gitPullRequest.Status switch
         {
-            PullRequestStatus.NotSet => Domain.Inventory.Git.PullRequestStatus.Draft,
-            PullRequestStatus.Active => Domain.Inventory.Git.PullRequestStatus.Active,
-            PullRequestStatus.Abandoned => Domain.Inventory.Git.PullRequestStatus.Abandoned,
-            PullRequestStatus.Completed => Domain.Inventory.Git.PullRequestStatus.Completed,
-            _ => Domain.Inventory.Git.PullRequestStatus.Unknown
+            PullRequestStatus.NotSet => Domain.Inventory.SourceControl.PullRequestStatus.Draft,
+            PullRequestStatus.Active => Domain.Inventory.SourceControl.PullRequestStatus.Active,
+            PullRequestStatus.Abandoned => Domain.Inventory.SourceControl.PullRequestStatus.Abandoned,
+            PullRequestStatus.Completed => Domain.Inventory.SourceControl.PullRequestStatus.Completed,
+            _ => Domain.Inventory.SourceControl.PullRequestStatus.Unknown
         };
 
         var url = $"{projectUri}/_git/{gitPullRequest.Repository.Name}/pullrequest/{gitPullRequest.PullRequestId}";
@@ -174,16 +175,16 @@ public static class AzureDevOpsMappingExtensions
         };
     }
 
-    public static AzureDevOpsWorkItem MapToAzureDevOpsWorkItem(this WorkItem workItem, Uri projectUri, OrganisationId organisationId)
+    public static AzureDevOpsIssue MapToAzureDevOpsWorkItem(this WorkItem workItem, Uri projectUri, OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
 
         var url = $"{projectUri}/_workitems/edit/{workItem.Id}";
         var now = DateTime.UtcNow;
 
-        return new AzureDevOpsWorkItem
+        return new AzureDevOpsIssue
         {
-            Id = new WorkItemId(workItem.Id?.ToString() ?? string.Empty),
+            Id = new IssueId(workItem.Id?.ToString() ?? string.Empty),
             OrganisationId = organisationId,
             Title = workItem.Fields["System.Title"]?.ToString() ?? string.Empty,
             Description = string.Empty,
@@ -195,7 +196,7 @@ public static class AzureDevOpsMappingExtensions
             Relations = workItem.Relations?.Select(r => r.Title)
                             .ToImmutableHashSet() ??
                         [],
-            Platform = WorkItemPlatform.AzureDevOps,
+            Platform = IssuePlatform.AzureDevOps,
             DiscoveredAt = now,
             UpdatedAt = now
         };

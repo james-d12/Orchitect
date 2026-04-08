@@ -1,0 +1,10 @@
+﻿namespace Orchitect.Domain.Inventory.SourceControl;
+
+public record Commit
+{
+    public required CommitId Id { get; init; }
+    public required Uri Url { get; init; }
+    public required string Committer { get; init; }
+    public required string? Comment { get; init; }
+    public required int? ChangeCount { get; init; }
+}

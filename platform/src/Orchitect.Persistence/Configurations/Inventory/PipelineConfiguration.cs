@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Inventory.Pipeline;
 
 namespace Orchitect.Persistence.Configurations.Inventory;
 
@@ -41,7 +41,7 @@ internal sealed class PipelineConfiguration : IEntityTypeConfiguration<Pipeline>
         builder.Property(p => p.DiscoveredAt).IsRequired();
         builder.Property(p => p.UpdatedAt).IsRequired();
 
-        builder.HasOne(p => p.Owner).WithMany().IsRequired();
+        builder.HasOne(p => p.User).WithMany().IsRequired();
 
         // Indexes
         builder.HasIndex(p => p.OrganisationId)

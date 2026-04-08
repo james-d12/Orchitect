@@ -2,15 +2,6 @@ using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Domain.Inventory.Cloud;
 
-public enum CloudSecretPlatform
-{
-    Azure,
-    Aws,
-    GoogleCloud,
-}
-
-public readonly record struct CloudSecretId(string Value);
-
 public sealed record CloudSecret
 {
     public required CloudSecretId Id { get; init; }

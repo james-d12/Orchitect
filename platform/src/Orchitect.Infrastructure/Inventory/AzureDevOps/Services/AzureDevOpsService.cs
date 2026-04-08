@@ -73,7 +73,7 @@ public sealed class AzureDevOpsService : IAzureDevOpsService
         return teams.Select(t => t.MapToAzureDevOpsTeam()).ToList();
     }
 
-    public async Task<List<AzureDevOpsWorkItem>> GetWorkItemsAsync(
+    public async Task<List<AzureDevOpsIssue>> GetWorkItemsAsync(
         string projectName,
         Uri projectUri,
         OrganisationId organisationId,

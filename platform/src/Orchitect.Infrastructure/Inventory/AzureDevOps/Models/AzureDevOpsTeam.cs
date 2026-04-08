@@ -1,4 +1,4 @@
-﻿using Orchitect.Domain.Inventory.Shared;
+﻿using Orchitect.Domain.Inventory.Identity;
 
 namespace Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
 

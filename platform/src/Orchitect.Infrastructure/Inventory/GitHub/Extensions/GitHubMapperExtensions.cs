@@ -1,9 +1,12 @@
 ﻿using System.Collections.Immutable;
 using Octokit;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Inventory.Identity;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Infrastructure.Inventory.GitHub.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
+using User = Orchitect.Domain.Inventory.Identity.User;
 
 namespace Orchitect.Infrastructure.Inventory.GitHub.Extensions;
 
@@ -20,14 +23,14 @@ public static class GitHubMapperExtensions
             Name = repository.Name,
             Url = new Uri(repository.HtmlUrl),
             DefaultBranch = repository.DefaultBranch,
-            Owner = new Owner
+            User = new User
             {
-                Id = new OwnerId(repository.Owner.Id.ToString()),
+                Id = new UserId(repository.Owner.Id.ToString()),
                 OrganisationId = organisationId,
                 Name = repository.Owner.Login,
                 Description = repository.Owner.Bio,
                 Url = new Uri(repository.Owner.HtmlUrl),
-                Platform = OwnerPlatform.GitHub,
+                Platform = UserPlatform.GitHub,
                 DiscoveredAt = now,
                 UpdatedAt = now
             },
@@ -50,7 +53,7 @@ public static class GitHubMapperExtensions
             OrganisationId = repository.OrganisationId,
             Name = $"{repository.Name}-{workflow.Name}",
             Url = new Uri(fullUrl),
-            Owner = repository.Owner,
+            User = repository.User,
             Platform = PipelinePlatform.GitHub,
             DiscoveredAt = now,
             UpdatedAt = now

@@ -1,7 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
-using Orchitect.Domain.Inventory.Git.Service;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.Pipeline.Services;
+using Orchitect.Domain.Inventory.SourceControl;
+using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.Discovery;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
@@ -53,8 +56,8 @@ public sealed class GitHubDiscoveryService : DiscoveryService
         // Persist repositories to database
         await _repositoryRepository.BulkUpsertAsync(repositories, cancellationToken);
 
-        var pullRequests = new List<Domain.Inventory.Git.PullRequest>();
-        var pipelines = new List<Domain.Inventory.Git.Pipeline>();
+        var pullRequests = new List<PullRequest>();
+        var pipelines = new List<Pipeline>();
 
         foreach (var repository in repositories)
         {

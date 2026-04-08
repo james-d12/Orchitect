@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Orchitect.Api.Shared;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
+using Orchitect.Domain.Inventory.Discovery.Services;
 
 namespace Orchitect.Api.Endpoints.Inventory.Discovery;
 
@@ -30,7 +32,7 @@ public sealed class TriggerDiscoveryEndpoint : IEndpoint
         [FromServices]
         ICredentialRepository credentialRepository,
         [FromServices]
-        IEnumerable<IDiscoveryService> discoveryServices,
+        IServiceProvider serviceProvider,
         CancellationToken cancellationToken)
     {
         var orgId = new OrganisationId(Guid.Parse(organisationId));
@@ -45,19 +47,28 @@ public sealed class TriggerDiscoveryEndpoint : IEndpoint
         if (credential == null)
             return TypedResults.BadRequest(CreateError("CREDENTIAL_NOT_FOUND", "Associated credential not found"));
 
-        // Find matching discovery service
-        var service = discoveryServices.FirstOrDefault(s =>
-            s.Platform.Equals(config.Platform.ToString(), StringComparison.OrdinalIgnoreCase));
-
-        if (service == null)
-            return TypedResults.BadRequest(
-                CreateError("SERVICE_NOT_FOUND", $"No discovery service available for platform {config.Platform}"));
-
-        // Trigger discovery (fire and forget - could use background queue)
+        // Trigger discovery in background with a new scope
         _ = Task.Run(async () =>
         {
+            // Create a new scope for the background task to avoid disposed context
+            using var scope = serviceProvider.CreateScope();
+            var scopedServices = scope.ServiceProvider;
+
             try
             {
+                // Get discovery services from the new scope
+                var discoveryServices = scopedServices.GetRequiredService<IEnumerable<IDiscoveryService>>();
+
+                // Find matching discovery service
+                var service = discoveryServices.FirstOrDefault(s =>
+                    s.Platform.Equals(config.Platform.ToString(), StringComparison.OrdinalIgnoreCase));
+
+                if (service == null)
+                {
+                    Console.WriteLine($"No discovery service available for platform {config.Platform}");
+                    return;
+                }
+
                 await service.DiscoverAsync(
                     config,
                     credential,
@@ -67,8 +78,9 @@ public sealed class TriggerDiscoveryEndpoint : IEndpoint
             {
                 // Log error (inject ILogger if needed)
                 Console.WriteLine($"Discovery failed: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
-        }, cancellationToken);
+        }, CancellationToken.None);
 
         return TypedResults.Accepted($"/api/discovery/{id}");
     }

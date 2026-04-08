@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
-using Orchitect.Domain.Inventory.Git.Service;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.Pipeline.Services;
+using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.Discovery;
 using Orchitect.Infrastructure.Inventory.GitLab.Extensions;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
@@ -57,7 +59,7 @@ public sealed class GitLabDiscoveryService : DiscoveryService
         var repositories = projects.Select(p => p.MapToGitLabRepository(configuration.OrganisationId)).ToList();
         var pullRequests = gitLabService.GetPullRequests(configuration.OrganisationId);
 
-        var pipelines = new List<Domain.Inventory.Git.Pipeline>();
+        var pipelines = new List<Pipeline>();
         foreach (var project in projects)
         {
             var projectPipelines = gitLabService.GetPipelines(project, configuration.OrganisationId);

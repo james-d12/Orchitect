@@ -1,13 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Inventory.Identity;
 
 namespace Orchitect.Persistence.Configurations.Inventory;
 
-internal sealed class OwnerConfiguration : IEntityTypeConfiguration<Owner>
+internal sealed class OwnerConfiguration : IEntityTypeConfiguration<User>
 {
-    public void Configure(EntityTypeBuilder<Owner> builder)
+    public void Configure(EntityTypeBuilder<User> builder)
     {
         builder.ToTable("Owners", "inventory");
 
@@ -16,7 +16,7 @@ internal sealed class OwnerConfiguration : IEntityTypeConfiguration<Owner>
         builder.Property(o => o.Id)
             .HasConversion(
                 id => id.Value,
-                value => new OwnerId(value)
+                value => new UserId(value)
             );
 
         // Organisation FK with cascade delete

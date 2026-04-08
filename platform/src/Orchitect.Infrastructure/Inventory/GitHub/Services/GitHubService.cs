@@ -26,7 +26,7 @@ public sealed class GitHubService : IGitHubService
     {
         using var activity = Tracing.StartActivity();
         var pipelines =
-            await _gitHubConnectionService.Client.Actions.Workflows.List(repository.Owner.Name, repository.Name);
+            await _gitHubConnectionService.Client.Actions.Workflows.List(repository.User.Name, repository.Name);
         return pipelines.Workflows.Select(w => w.MapToGitHubPipeline(repository)).ToList();
     }
 

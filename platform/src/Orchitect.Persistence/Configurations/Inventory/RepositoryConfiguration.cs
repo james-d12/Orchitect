@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Inventory.SourceControl;
 
 namespace Orchitect.Persistence.Configurations.Inventory;
 
@@ -42,7 +42,7 @@ internal sealed class RepositoryConfiguration : IEntityTypeConfiguration<Reposit
         builder.Property(r => r.DiscoveredAt).IsRequired();
         builder.Property(r => r.UpdatedAt).IsRequired();
 
-        builder.HasOne(r => r.Owner).WithMany().IsRequired();
+        builder.HasOne(r => r.User).WithMany().IsRequired();
 
         // Indexes
         builder.HasIndex(r => r.OrganisationId)

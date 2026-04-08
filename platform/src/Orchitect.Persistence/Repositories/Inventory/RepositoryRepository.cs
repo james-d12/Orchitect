@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
-using Orchitect.Domain.Inventory.Git.Service;
+using Orchitect.Domain.Inventory.SourceControl;
+using Orchitect.Domain.Inventory.SourceControl.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
 
@@ -17,7 +17,7 @@ public sealed class RepositoryRepository : IRepositoryRepository
     public IEnumerable<Repository> GetAll()
     {
         return _context.Repositories
-            .Include(r => r.Owner)
+            .Include(r => r.User)
             .OrderBy(r => r.OrganisationId)
             .ThenBy(r => r.Name)
             .ToList();
@@ -28,7 +28,7 @@ public sealed class RepositoryRepository : IRepositoryRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.Repositories
-            .Include(r => r.Owner)
+            .Include(r => r.User)
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
     }
@@ -38,7 +38,7 @@ public sealed class RepositoryRepository : IRepositoryRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.Repositories
-            .Include(r => r.Owner)
+            .Include(r => r.User)
             .Where(r => r.OrganisationId == organisationId)
             .OrderBy(r => r.Name)
             .ToListAsync(cancellationToken);
@@ -50,7 +50,7 @@ public sealed class RepositoryRepository : IRepositoryRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.Repositories
-            .Include(r => r.Owner)
+            .Include(r => r.User)
             .Where(r => r.OrganisationId == organisationId && r.Platform == platform)
             .OrderBy(r => r.Name)
             .ToListAsync(cancellationToken);
@@ -61,7 +61,7 @@ public sealed class RepositoryRepository : IRepositoryRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.Repositories
-            .Include(r => r.Owner)
+            .Include(r => r.User)
             .FirstOrDefaultAsync(r => r.Url.ToString() == url, cancellationToken);
     }
 
@@ -99,12 +99,51 @@ public sealed class RepositoryRepository : IRepositoryRepository
     {
         foreach (var repository in repositories)
         {
+            // Handle owner first to avoid tracking conflicts
+            var owner = repository.User;
+
+            // Check if owner is already tracked in the local context
+            var trackedOwner = _context.Owners.Local.FirstOrDefault(
+                o => o.OrganisationId == owner.OrganisationId &&
+                     o.Name == owner.Name &&
+                     o.Platform == owner.Platform);
+
+            if (trackedOwner == null)
+            {
+                // Not tracked locally, check database
+                trackedOwner = await _context.Owners.FirstOrDefaultAsync(
+                    o => o.OrganisationId == owner.OrganisationId &&
+                         o.Name == owner.Name &&
+                         o.Platform == owner.Platform,
+                    cancellationToken);
+
+                if (trackedOwner == null)
+                {
+                    // New owner, add to context
+                    _context.Owners.Add(owner);
+                    trackedOwner = owner;
+                }
+                else
+                {
+                    // Existing owner in DB, update and track it
+                    _context.Entry(trackedOwner).CurrentValues.SetValues(owner);
+                }
+            }
+            else if (trackedOwner != owner)
+            {
+                // Already tracked, just update its values
+                _context.Entry(trackedOwner).CurrentValues.SetValues(owner);
+            }
+
+            // Now handle repository with the properly tracked owner
             var existing = await _context.Repositories
                 .FirstOrDefaultAsync(r => r.Url == repository.Url, cancellationToken);
 
             if (existing is null)
             {
-                await _context.Repositories.AddAsync(repository, cancellationToken);
+                // Create new repository with tracked owner reference
+                var newRepo = repository with { User = trackedOwner };
+                await _context.Repositories.AddAsync(newRepo, cancellationToken);
             }
             else
             {

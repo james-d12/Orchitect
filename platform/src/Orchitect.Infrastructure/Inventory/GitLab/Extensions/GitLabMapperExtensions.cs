@@ -1,10 +1,13 @@
 using System.Collections.Immutable;
 using NGitLab.Models;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Inventory.Identity;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Infrastructure.Inventory.GitLab.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
-using Commit = Orchitect.Domain.Inventory.Git.Commit;
+using Commit = Orchitect.Domain.Inventory.SourceControl.Commit;
+using User = Orchitect.Domain.Inventory.Identity.User;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Extensions;
 
@@ -51,14 +54,14 @@ public static class GitLabMapperExtensions
             OrganisationId = organisationId,
             Name = pipeline.Name,
             Url = new Uri(pipeline.WebUrl),
-            Owner = new Owner
+            User = new User
             {
-                Id = new OwnerId(string.Empty),
+                Id = new UserId(string.Empty),
                 OrganisationId = organisationId,
                 Name = string.Empty,
                 Description = string.Empty,
                 Url = new Uri("https://gitlab.com"),
-                Platform = OwnerPlatform.GitLab,
+                Platform = UserPlatform.GitLab,
                 DiscoveredAt = now,
                 UpdatedAt = now
             },
@@ -79,14 +82,14 @@ public static class GitLabMapperExtensions
             Name = project.Name,
             Url = new Uri(project.WebUrl),
             DefaultBranch = project.DefaultBranch,
-            Owner = new Owner
+            User = new User
             {
-                Id = new OwnerId(project.Owner.Id.ToString()),
+                Id = new UserId(project.Owner.Id.ToString()),
                 OrganisationId = organisationId,
                 Name = project.Owner.Name,
                 Description = project.Owner.Bio,
                 Url = new Uri(project.Owner.WebURL),
-                Platform = OwnerPlatform.GitLab,
+                Platform = UserPlatform.GitLab,
                 DiscoveredAt = now,
                 UpdatedAt = now
             },

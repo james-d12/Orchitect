@@ -20,7 +20,7 @@ public interface IAzureDevOpsService
 
     Task<List<AzureDevOpsTeam>> GetTeamsAsync(CancellationToken cancellationToken);
 
-    Task<List<AzureDevOpsWorkItem>> GetWorkItemsAsync(
+    Task<List<AzureDevOpsIssue>> GetWorkItemsAsync(
         string projectName,
         Uri projectUri,
         OrganisationId organisationId,

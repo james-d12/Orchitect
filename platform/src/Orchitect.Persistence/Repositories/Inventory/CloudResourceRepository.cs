@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Cloud;
-using Orchitect.Domain.Inventory.Cloud.Service;
+using Orchitect.Domain.Inventory.Cloud.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
 

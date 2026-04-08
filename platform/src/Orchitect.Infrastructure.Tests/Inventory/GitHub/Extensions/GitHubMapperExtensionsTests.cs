@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using AutoFixture;
 using Octokit;
-using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Infrastructure.Inventory.GitHub.Extensions;
 using Orchitect.Infrastructure.Inventory.GitHub.Models;
 using PullRequest = Octokit.PullRequest;

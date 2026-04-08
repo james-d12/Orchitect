@@ -689,18 +689,69 @@ namespace Orchitect.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CredentialId");
+                    b.HasIndex("CredentialId")
+                        .HasDatabaseName("IX_DiscoveryConfigurations_CredentialId");
 
-                    b.HasIndex("IsEnabled");
+                    b.HasIndex("IsEnabled")
+                        .HasDatabaseName("IX_DiscoveryConfigurations_IsEnabled");
 
-                    b.HasIndex("OrganisationId");
+                    b.HasIndex("OrganisationId")
+                        .HasDatabaseName("IX_DiscoveryConfigurations_OrganisationId");
 
-                    b.HasIndex("OrganisationId", "Platform");
+                    b.HasIndex("OrganisationId", "Platform")
+                        .HasDatabaseName("IX_DiscoveryConfigurations_OrganisationId_Platform");
 
-                    b.ToTable("DiscoveryConfigurations", (string)null);
+                    b.ToTable("DiscoveryConfigurations", "inventory");
                 });
 
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Git.Owner", b =>
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Identity.Team", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("DiscoveredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId")
+                        .HasDatabaseName("IX_Teams_OrganisationId");
+
+                    b.HasIndex("Url")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Teams_Url");
+
+                    b.HasIndex("OrganisationId", "Platform")
+                        .HasDatabaseName("IX_Teams_OrganisationId_Platform");
+
+                    b.ToTable("Teams", "inventory");
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Identity.User", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text");
@@ -743,7 +794,58 @@ namespace Orchitect.Persistence.Migrations
                     b.ToTable("Owners", "inventory");
                 });
 
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Git.Pipeline", b =>
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Issue.Issue", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DiscoveredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("OrganisationId", "Platform");
+
+                    b.ToTable("Issues", "inventory");
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Pipeline.Pipeline", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text");
@@ -759,10 +861,6 @@ namespace Orchitect.Persistence.Migrations
                     b.Property<Guid>("OrganisationId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("OwnerId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Platform")
                         .IsRequired()
                         .HasColumnType("text");
@@ -775,12 +873,16 @@ namespace Orchitect.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrganisationId")
                         .HasDatabaseName("IX_Pipelines_OrganisationId");
 
-                    b.HasIndex("OwnerId");
+                    b.HasIndex("UserId");
 
                     b.HasIndex("OrganisationId", "Platform")
                         .HasDatabaseName("IX_Pipelines_OrganisationId_Platform");
@@ -788,7 +890,7 @@ namespace Orchitect.Persistence.Migrations
                     b.ToTable("Pipelines", "inventory");
                 });
 
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Git.PullRequest", b =>
+            modelBuilder.Entity("Orchitect.Domain.Inventory.SourceControl.PullRequest", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text");
@@ -860,7 +962,7 @@ namespace Orchitect.Persistence.Migrations
                     b.ToTable("PullRequests", "inventory");
                 });
 
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Git.Repository", b =>
+            modelBuilder.Entity("Orchitect.Domain.Inventory.SourceControl.Repository", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text");
@@ -881,10 +983,6 @@ namespace Orchitect.Persistence.Migrations
                     b.Property<Guid>("OrganisationId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("OwnerId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Platform")
                         .IsRequired()
                         .HasColumnType("text");
@@ -896,142 +994,26 @@ namespace Orchitect.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OrganisationId")
                         .HasDatabaseName("IX_Repositories_OrganisationId");
 
-                    b.HasIndex("OwnerId");
-
                     b.HasIndex("Url")
                         .IsUnique()
                         .HasDatabaseName("IX_Repositories_Url");
+
+                    b.HasIndex("UserId");
 
                     b.HasIndex("OrganisationId", "Platform")
                         .HasDatabaseName("IX_Repositories_OrganisationId_Platform");
 
                     b.ToTable("Repositories", "inventory");
-                });
-
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Shared.Team", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime>("DiscoveredAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<Guid>("OrganisationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Platform")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganisationId")
-                        .HasDatabaseName("IX_Teams_OrganisationId");
-
-                    b.HasIndex("Url")
-                        .IsUnique()
-                        .HasDatabaseName("IX_Teams_Url");
-
-                    b.HasIndex("OrganisationId", "Platform")
-                        .HasDatabaseName("IX_Teams_OrganisationId_Platform");
-
-                    b.ToTable("Teams", "inventory");
-                });
-
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Ticketing.User", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email");
-
-                    b.ToTable("TicketingUsers", (string)null);
-                });
-
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Ticketing.WorkItem", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("DiscoveredAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("OrganisationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Platform")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganisationId")
-                        .HasDatabaseName("IX_WorkItems_OrganisationId");
-
-                    b.HasIndex("OrganisationId", "Platform")
-                        .HasDatabaseName("IX_WorkItems_OrganisationId_Platform");
-
-                    b.ToTable("WorkItems", "inventory");
                 });
 
             modelBuilder.Entity("OrganisationTeamUsers", b =>
@@ -1271,7 +1253,34 @@ namespace Orchitect.Persistence.Migrations
                         .HasConstraintName("FK_CloudSecrets_Organisations");
                 });
 
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Git.Owner", b =>
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Discovery.DiscoveryConfiguration", b =>
+                {
+                    b.HasOne("Orchitect.Domain.Core.Credential.Credential", null)
+                        .WithMany()
+                        .HasForeignKey("CredentialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_DiscoveryConfigurations_Credentials");
+
+                    b.HasOne("Orchitect.Domain.Core.Organisation.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_DiscoveryConfigurations_Organisations");
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Identity.Team", b =>
+                {
+                    b.HasOne("Orchitect.Domain.Core.Organisation.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_Teams_Organisations");
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Identity.User", b =>
                 {
                     b.HasOne("Orchitect.Domain.Core.Organisation.Organisation", null)
                         .WithMany()
@@ -1281,7 +1290,17 @@ namespace Orchitect.Persistence.Migrations
                         .HasConstraintName("FK_Owners_Organisations");
                 });
 
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Git.Pipeline", b =>
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Issue.Issue", b =>
+                {
+                    b.HasOne("Orchitect.Domain.Core.Organisation.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_Issues_Organisations");
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Pipeline.Pipeline", b =>
                 {
                     b.HasOne("Orchitect.Domain.Core.Organisation.Organisation", null)
                         .WithMany()
@@ -1290,16 +1309,16 @@ namespace Orchitect.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Pipelines_Organisations");
 
-                    b.HasOne("Orchitect.Domain.Inventory.Git.Owner", "Owner")
+                    b.HasOne("Orchitect.Domain.Inventory.Identity.User", "User")
                         .WithMany()
-                        .HasForeignKey("OwnerId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Owner");
+                    b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Git.PullRequest", b =>
+            modelBuilder.Entity("Orchitect.Domain.Inventory.SourceControl.PullRequest", b =>
                 {
                     b.HasOne("Orchitect.Domain.Core.Organisation.Organisation", null)
                         .WithMany()
@@ -1308,7 +1327,7 @@ namespace Orchitect.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_PullRequests_Organisations");
 
-                    b.OwnsOne("Orchitect.Domain.Inventory.Git.Commit", "LastCommit", b1 =>
+                    b.OwnsOne("Orchitect.Domain.Inventory.SourceControl.Commit", "LastCommit", b1 =>
                         {
                             b1.Property<string>("PullRequestId")
                                 .HasColumnType("text");
@@ -1342,7 +1361,7 @@ namespace Orchitect.Persistence.Migrations
                     b.Navigation("LastCommit");
                 });
 
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Git.Repository", b =>
+            modelBuilder.Entity("Orchitect.Domain.Inventory.SourceControl.Repository", b =>
                 {
                     b.HasOne("Orchitect.Domain.Core.Organisation.Organisation", null)
                         .WithMany()
@@ -1351,33 +1370,13 @@ namespace Orchitect.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Repositories_Organisations");
 
-                    b.HasOne("Orchitect.Domain.Inventory.Git.Owner", "Owner")
+                    b.HasOne("Orchitect.Domain.Inventory.Identity.User", "User")
                         .WithMany()
-                        .HasForeignKey("OwnerId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Owner");
-                });
-
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Shared.Team", b =>
-                {
-                    b.HasOne("Orchitect.Domain.Core.Organisation.Organisation", null)
-                        .WithMany()
-                        .HasForeignKey("OrganisationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_Teams_Organisations");
-                });
-
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Ticketing.WorkItem", b =>
-                {
-                    b.HasOne("Orchitect.Domain.Core.Organisation.Organisation", null)
-                        .WithMany()
-                        .HasForeignKey("OrganisationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_WorkItems_Organisations");
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("OrganisationTeamUsers", b =>

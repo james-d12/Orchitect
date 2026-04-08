@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Core.Credential;
-using Orchitect.Domain.Inventory.Cloud.Service;
+using Orchitect.Domain.Inventory.Cloud.Services;
 using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Infrastructure.Inventory.Discovery;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Shared;
-using Orchitect.Domain.Inventory.Shared.Service;
+using Orchitect.Domain.Inventory.Identity;
+using Orchitect.Domain.Inventory.Identity.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
 

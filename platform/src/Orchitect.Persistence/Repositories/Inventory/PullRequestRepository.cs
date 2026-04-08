@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
-using Orchitect.Domain.Inventory.Git.Service;
+using Orchitect.Domain.Inventory.SourceControl;
+using Orchitect.Domain.Inventory.SourceControl.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
 

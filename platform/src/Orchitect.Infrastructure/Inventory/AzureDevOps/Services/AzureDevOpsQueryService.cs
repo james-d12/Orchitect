@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
-using Orchitect.Domain.Inventory.Git;
-using Orchitect.Domain.Inventory.Git.Service;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.Pipeline.Services;
+using Orchitect.Domain.Inventory.SourceControl;
+using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Extensions;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
@@ -42,7 +44,7 @@ public sealed class AzureDevOpsQueryService : IAzureDevOpsQueryService
             Name = repository.Name,
             Url = repository.Url,
             DefaultBranch = repository.DefaultBranch,
-            Owner = repository.Owner,
+            User = repository.User,
             Platform = repository.Platform,
             DiscoveredAt = repository.DiscoveredAt,
             UpdatedAt = repository.UpdatedAt,
@@ -69,7 +71,7 @@ public sealed class AzureDevOpsQueryService : IAzureDevOpsQueryService
             OrganisationId = pipeline.OrganisationId,
             Name = pipeline.Name,
             Url = pipeline.Url,
-            Owner = pipeline.Owner,
+            User = pipeline.User,
             Platform = pipeline.Platform,
             DiscoveredAt = pipeline.DiscoveredAt,
             UpdatedAt = pipeline.UpdatedAt,

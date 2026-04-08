@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Inventory.Cloud;
-using Orchitect.Domain.Inventory.Cloud.Request;
-using Orchitect.Domain.Inventory.Cloud.Service;
+using Orchitect.Domain.Inventory.Cloud.Requests;
+using Orchitect.Domain.Inventory.Cloud.Services;
 using Orchitect.Infrastructure.Inventory.Shared.Extensions;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 using Orchitect.Infrastructure.Inventory.Shared.Query;

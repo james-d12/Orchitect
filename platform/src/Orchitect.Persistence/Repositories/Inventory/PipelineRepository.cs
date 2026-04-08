@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Git;
-using Orchitect.Domain.Inventory.Git.Service;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.Pipeline.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
 
@@ -17,7 +17,7 @@ public sealed class PipelineRepository : IPipelineRepository
     public IEnumerable<Pipeline> GetAll()
     {
         return _context.Pipelines
-            .Include(p => p.Owner)
+            .Include(p => p.User)
             .OrderBy(p => p.OrganisationId)
             .ThenBy(p => p.Name)
             .ToList();
@@ -28,7 +28,7 @@ public sealed class PipelineRepository : IPipelineRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.Pipelines
-            .Include(p => p.Owner)
+            .Include(p => p.User)
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
@@ -38,7 +38,7 @@ public sealed class PipelineRepository : IPipelineRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.Pipelines
-            .Include(p => p.Owner)
+            .Include(p => p.User)
             .Where(p => p.OrganisationId == organisationId)
             .OrderBy(p => p.Name)
             .ToListAsync(cancellationToken);
@@ -50,7 +50,7 @@ public sealed class PipelineRepository : IPipelineRepository
         CancellationToken cancellationToken = default)
     {
         return await _context.Pipelines
-            .Include(p => p.Owner)
+            .Include(p => p.User)
             .Where(p => p.OrganisationId == organisationId && p.Platform == platform)
             .OrderBy(p => p.Name)
             .ToListAsync(cancellationToken);

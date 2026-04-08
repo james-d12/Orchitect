@@ -2,15 +2,6 @@
 
 namespace Orchitect.Domain.Inventory.Cloud;
 
-public enum CloudPlatform
-{
-    Azure,
-    Aws,
-    GoogleCloud
-}
-
-public readonly record struct CloudResourceId(string Value);
-
 public record CloudResource
 {
     public required CloudResourceId Id { get; init; }
