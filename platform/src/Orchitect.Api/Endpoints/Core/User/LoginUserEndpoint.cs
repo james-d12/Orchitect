@@ -20,9 +20,9 @@ public sealed class LoginUserEndpoint : IEndpoint
         .MapPost("/login", HandleAsync)
         .WithSummary("Login for a user.");
 
-    private sealed record LoginUserResponse(string AccessToken);
+    public sealed record LoginUserResponse(string AccessToken);
 
-    private sealed record LoginUserRequest(string Email, string Password);
+    public sealed record LoginUserRequest(string Email, string Password);
 
     private static async Task<Results<Ok<LoginUserResponse>, UnauthorizedHttpResult>> HandleAsync(
         [FromBody]

@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Infrastructure.Te
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Aspire", "Aspire", "{39DC69B3-EE8D-4C43-B6FA-B69DEF7B77F2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Api.Integration.Tests", "src\Orchitect.Api.Integration.Tests\Orchitect.Api.Integration.Tests.csproj", "{67F547C0-B70F-437B-98BA-2A51C39D6642}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,10 @@ Global
 		{08425FD5-B210-4332-9E50-A6E52E92E37A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{08425FD5-B210-4332-9E50-A6E52E92E37A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{08425FD5-B210-4332-9E50-A6E52E92E37A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{67F547C0-B70F-437B-98BA-2A51C39D6642}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{67F547C0-B70F-437B-98BA-2A51C39D6642}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{67F547C0-B70F-437B-98BA-2A51C39D6642}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{67F547C0-B70F-437B-98BA-2A51C39D6642}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{5AA7C306-0E96-4A54-A8DD-1A2F4CA2C0DC} = {39DC69B3-EE8D-4C43-B6FA-B69DEF7B77F2}
