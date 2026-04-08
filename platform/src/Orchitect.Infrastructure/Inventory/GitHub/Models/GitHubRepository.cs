@@ -1,4 +1,4 @@
-using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Inventory.SourceControl;
 
 namespace Orchitect.Infrastructure.Inventory.GitHub.Models;
 

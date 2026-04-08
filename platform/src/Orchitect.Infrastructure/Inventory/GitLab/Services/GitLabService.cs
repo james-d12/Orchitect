@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using NGitLab.Models;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Infrastructure.Inventory.GitLab.Extensions;
 using Orchitect.Infrastructure.Inventory.GitLab.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
@@ -28,7 +29,7 @@ public sealed class GitLabService : IGitLabService
         }).ToList();
     }
 
-    public List<GitLabPullRequest> GetPullRequests()
+    public List<GitLabPullRequest> GetPullRequests(OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
         _logger.LogInformation("Getting GitLab Pull Requests.");
@@ -36,16 +37,16 @@ public sealed class GitLabService : IGitLabService
         return _connectionService.Client.MergeRequests.Get(new MergeRequestQuery
         {
             PerPage = 100
-        }).Select(r => r.MapToGitLabPullRequest()).ToList();
+        }).Select(r => r.MapToGitLabPullRequest(organisationId)).ToList();
     }
 
-    public List<GitLabPipeline> GetPipelines(Project project)
+    public List<GitLabPipeline> GetPipelines(Project project, OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
         _logger.LogInformation("Getting GitLab Pipelines.");
 
         return _connectionService.Client
             .GetPipelines(new ProjectId(project.Id)).All
-            .Select(p => p.MapToGitLabPipeline()).ToList();
+            .Select(p => p.MapToGitLabPipeline(organisationId)).ToList();
     }
 }

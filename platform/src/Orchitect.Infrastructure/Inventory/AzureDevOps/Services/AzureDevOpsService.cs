@@ -3,6 +3,7 @@ using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Extensions;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
@@ -19,24 +20,26 @@ public sealed class AzureDevOpsService : IAzureDevOpsService
     }
 
     public async Task<List<AzureDevOpsRepository>> GetRepositoriesAsync(Guid projectId,
+        OrganisationId organisationId,
         CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
         var gitClient = await _azureDevOpsConnectionService.GetClientAsync<GitHttpClient>(cancellationToken);
         var repositories =
             await gitClient.GetRepositoriesAsync(projectId, cancellationToken: cancellationToken) ?? [];
-        return repositories.Select(r => r.MapToAzureDevOpsRepository()).ToList();
+        return repositories.Select(r => r.MapToAzureDevOpsRepository(organisationId)).ToList();
     }
 
     public async Task<List<AzureDevOpsPipeline>> GetPipelinesAsync(
         Guid projectId,
         Uri projectUri,
+        OrganisationId organisationId,
         CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
         var buildClient = await _azureDevOpsConnectionService.GetClientAsync<BuildHttpClient>(cancellationToken);
         var pipelines = await buildClient.GetDefinitionsAsync(projectId, cancellationToken: cancellationToken);
-        return pipelines.Select(p => p.MapToAzureDevOpsPipeline(projectUri)).ToList();
+        return pipelines.Select(p => p.MapToAzureDevOpsPipeline(projectUri, organisationId)).ToList();
     }
 
     public async Task<List<AzureDevOpsProject>> GetProjectsAsync(
@@ -70,9 +73,10 @@ public sealed class AzureDevOpsService : IAzureDevOpsService
         return teams.Select(t => t.MapToAzureDevOpsTeam()).ToList();
     }
 
-    public async Task<List<AzureDevOpsWorkItem>> GetWorkItemsAsync(
+    public async Task<List<AzureDevOpsIssue>> GetWorkItemsAsync(
         string projectName,
         Uri projectUri,
+        OrganisationId organisationId,
         CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
@@ -81,13 +85,13 @@ public sealed class AzureDevOpsService : IAzureDevOpsService
         var wiql = new Wiql
         {
             Query = $@"
-                    SELECT 
+                    SELECT
                         [System.Id],
                         [System.Title],
                         [System.State],
                         [System.WorkItemType]
                     FROM WorkItems
-                    WHERE 
+                    WHERE
                         [System.TeamProject] = '{projectName}' AND
                         [System.State] NOT IN ('Done', 'Completed', 'Closed', 'Resolved')"
         };
@@ -115,12 +119,13 @@ public sealed class AzureDevOpsService : IAzureDevOpsService
             workItems.AddRange(batchWorkItems);
         }
 
-        return workItems.Select(w => w.MapToAzureDevOpsWorkItem(projectUri)).ToList();
+        return workItems.Select(w => w.MapToAzureDevOpsWorkItem(projectUri, organisationId)).ToList();
     }
 
     public async Task<List<AzureDevOpsPullRequest>> GetPullRequestsAsync(
         Guid projectId,
         Uri projectUri,
+        OrganisationId organisationId,
         CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
@@ -128,6 +133,6 @@ public sealed class AzureDevOpsService : IAzureDevOpsService
         var criteria = new GitPullRequestSearchCriteria() { Status = PullRequestStatus.Active };
         var pullRequests = await gitHttpClient.GetPullRequestsByProjectAsync(projectId, criteria,
             cancellationToken: cancellationToken);
-        return pullRequests.Select(p => p.MapToAzureDevOpsPullRequest(projectUri)).ToList();
+        return pullRequests.Select(p => p.MapToAzureDevOpsPullRequest(projectUri, organisationId)).ToList();
     }
 }

@@ -1,16 +1,15 @@
-namespace Orchitect.Domain.Inventory.Cloud;
+using Orchitect.Domain.Core.Organisation;
 
-public enum CloudSecretPlatform
-{
-    Azure,
-    Aws,
-    GoogleCloud,
-}
+namespace Orchitect.Domain.Inventory.Cloud;
 
 public sealed record CloudSecret
 {
+    public required CloudSecretId Id { get; init; }
+    public required OrganisationId OrganisationId { get; init; }
     public required string Name { get; init; }
     public required string Location { get; init; }
     public required Uri Url { get; init; }
     public required CloudSecretPlatform Platform { get; init; }
+    public required DateTime DiscoveredAt { get; init; }
+    public required DateTime UpdatedAt { get; init; }
 }

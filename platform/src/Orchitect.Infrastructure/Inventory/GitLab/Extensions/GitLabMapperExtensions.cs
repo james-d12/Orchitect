@@ -1,20 +1,26 @@
 using System.Collections.Immutable;
 using NGitLab.Models;
-using Orchitect.Domain.Inventory.Git;
+using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Inventory.Identity;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Infrastructure.Inventory.GitLab.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
-using Commit = Orchitect.Domain.Inventory.Git.Commit;
+using Commit = Orchitect.Domain.Inventory.SourceControl.Commit;
+using User = Orchitect.Domain.Inventory.Identity.User;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Extensions;
 
 public static class GitLabMapperExtensions
 {
-    public static GitLabPullRequest MapToGitLabPullRequest(this MergeRequest mergeRequest)
+    public static GitLabPullRequest MapToGitLabPullRequest(this MergeRequest mergeRequest, OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
+        var now = DateTime.UtcNow;
         return new GitLabPullRequest
         {
             Id = new PullRequestId(mergeRequest.Id.ToString()),
+            OrganisationId = organisationId,
             Name = mergeRequest.Title,
             Description = mergeRequest.Description,
             Url = new Uri(mergeRequest.WebUrl),
@@ -32,48 +38,64 @@ public static class GitLabMapperExtensions
             },
             RepositoryUrl = new Uri(mergeRequest.WebUrl),
             RepositoryName = string.Empty,
-            CreatedOnDate = DateOnly.FromDateTime(mergeRequest.CreatedAt)
+            CreatedOnDate = DateOnly.FromDateTime(mergeRequest.CreatedAt),
+            DiscoveredAt = now,
+            UpdatedAt = now
         };
     }
 
-    public static GitLabPipeline MapToGitLabPipeline(this PipelineBasic pipeline)
+    public static GitLabPipeline MapToGitLabPipeline(this PipelineBasic pipeline, OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
+        var now = DateTime.UtcNow;
         return new GitLabPipeline
         {
             Id = new PipelineId(pipeline.Id.ToString()),
+            OrganisationId = organisationId,
             Name = pipeline.Name,
             Url = new Uri(pipeline.WebUrl),
-            Owner = new Owner
+            User = new User
             {
-                Id = new OwnerId(string.Empty),
+                Id = new UserId(string.Empty),
+                OrganisationId = organisationId,
                 Name = string.Empty,
                 Description = string.Empty,
                 Url = new Uri("https://gitlab.com"),
-                Platform = OwnerPlatform.GitLab
+                Platform = UserPlatform.GitLab,
+                DiscoveredAt = now,
+                UpdatedAt = now
             },
-            Platform = PipelinePlatform.GitLab
+            Platform = PipelinePlatform.GitLab,
+            DiscoveredAt = now,
+            UpdatedAt = now
         };
     }
 
-    public static GitLabRepository MapToGitLabRepository(this Project project)
+    public static GitLabRepository MapToGitLabRepository(this Project project, OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
+        var now = DateTime.UtcNow;
         return new GitLabRepository
         {
             Id = new RepositoryId(project.Id.ToString()),
+            OrganisationId = organisationId,
             Name = project.Name,
             Url = new Uri(project.WebUrl),
             DefaultBranch = project.DefaultBranch,
-            Owner = new Owner
+            User = new User
             {
-                Id = new OwnerId(project.Owner.Id.ToString()),
+                Id = new UserId(project.Owner.Id.ToString()),
+                OrganisationId = organisationId,
                 Name = project.Owner.Name,
                 Description = project.Owner.Bio,
                 Url = new Uri(project.Owner.WebURL),
-                Platform = OwnerPlatform.GitLab
+                Platform = UserPlatform.GitLab,
+                DiscoveredAt = now,
+                UpdatedAt = now
             },
-            Platform = RepositoryPlatform.GitLab
+            Platform = RepositoryPlatform.GitLab,
+            DiscoveredAt = now,
+            UpdatedAt = now
         };
     }
 }

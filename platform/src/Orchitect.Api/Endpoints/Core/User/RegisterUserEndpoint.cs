@@ -14,9 +14,9 @@ public sealed class RegisterUserEndpoint : IEndpoint
         .MapPost("/register", HandleAsync)
         .WithSummary("Registers a new user.");
 
-    private sealed record RegisterUserResponse(string Id, string Username, string Email);
+    public sealed record RegisterUserResponse(string Id, string Username, string Email);
 
-    private sealed record RegisterUserRequest(string Username, string Email, string Password);
+    public sealed record RegisterUserRequest(string Username, string Email, string Password);
 
     private static async Task<Results<Ok<RegisterUserResponse>, BadRequest<ErrorResponse>>> HandleAsync(
         [FromBody]

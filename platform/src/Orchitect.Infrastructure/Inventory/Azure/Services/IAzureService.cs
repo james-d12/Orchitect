@@ -1,4 +1,5 @@
 ﻿using Azure.ResourceManager.Resources;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Infrastructure.Inventory.Azure.Models;
 
@@ -11,6 +12,7 @@ public interface IAzureService
     Task<List<AzureCloudResource>> GetResourcesAsync(
         SubscriptionResource subscriptionResource,
         TenantResource tenantResource,
+        OrganisationId organisationId,
         CancellationToken cancellationToken);
 
     Task<List<SubscriptionResource>> GetSubscriptionsAsync(
@@ -18,5 +20,6 @@ public interface IAzureService
         CancellationToken cancellationToken);
 
     Task<List<CloudSecret>> GetKeyVaultSecretsAsync(List<AzureCloudResource> resources,
+        OrganisationId organisationId,
         CancellationToken cancellationToken);
 }

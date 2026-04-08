@@ -7,6 +7,7 @@ using Orchitect.Api.Shared;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
+using Orchitect.Domain.Inventory.Discovery.Services;
 
 namespace Orchitect.Api.Endpoints.Inventory.Discovery;
 

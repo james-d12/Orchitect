@@ -1,6 +1,8 @@
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Orchitect.Infrastructure.Inventory.AzureDevOps.Constants;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.Pipeline.Services;
+using Orchitect.Domain.Inventory.SourceControl;
+using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Extensions;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
@@ -9,33 +11,71 @@ namespace Orchitect.Infrastructure.Inventory.AzureDevOps.Services;
 
 public sealed class AzureDevOpsQueryService : IAzureDevOpsQueryService
 {
-    private readonly ILogger<AzureDevOpsGitQueryService> _logger;
-    private readonly IMemoryCache _memoryCache;
+    private readonly ILogger<AzureDevOpsQueryService> _logger;
+    private readonly IRepositoryRepository _repositoryRepository;
+    private readonly IPipelineRepository _pipelineRepository;
 
-    public AzureDevOpsQueryService(ILogger<AzureDevOpsGitQueryService> logger, IMemoryCache memoryCache)
+    public AzureDevOpsQueryService(
+        ILogger<AzureDevOpsQueryService> logger,
+        IRepositoryRepository repositoryRepository,
+        IPipelineRepository pipelineRepository)
     {
         _logger = logger;
-        _memoryCache = memoryCache;
+        _repositoryRepository = repositoryRepository;
+        _pipelineRepository = pipelineRepository;
     }
 
     public AzureDevOpsRepository? GetRepository(string repositoryName)
     {
         using var activity = Tracing.StartActivity();
         _logger.LogInformation("Getting Azure DevOps repository with {Name}", repositoryName);
-        var azureDevOpsRepositories =
-            _memoryCache.Get<List<AzureDevOpsRepository>>(AzureDevOpsCacheConstants.RepositoryCacheKey) ?? [];
-        return azureDevOpsRepositories
-            .FirstOrDefault(a => a.Name.EqualsCaseInsensitive(repositoryName));
+
+        var repositories = _repositoryRepository
+            .GetAll()
+            .Where(r => r.Platform == RepositoryPlatform.AzureDevOps)
+            .ToList();
+
+        var repository = repositories.FirstOrDefault(a => a.Name.EqualsCaseInsensitive(repositoryName));
+
+        return repository is not null ? new AzureDevOpsRepository
+        {
+            Id = repository.Id,
+            OrganisationId = repository.OrganisationId,
+            Name = repository.Name,
+            Url = repository.Url,
+            DefaultBranch = repository.DefaultBranch,
+            User = repository.User,
+            Platform = repository.Platform,
+            DiscoveredAt = repository.DiscoveredAt,
+            UpdatedAt = repository.UpdatedAt,
+            IsDisabled = false,
+            IsInMaintenance = false
+        } : null;
     }
 
     public AzureDevOpsPipeline? GetPipeline(string pipelineName)
     {
         using var activity = Tracing.StartActivity();
         _logger.LogInformation("Getting Azure DevOps Pipeline with {Name}", pipelineName);
-        var azureDevOpsPipelines =
-            _memoryCache.Get<List<AzureDevOpsPipeline>>(AzureDevOpsCacheConstants.PipelineCacheKey) ?? [];
 
-        return azureDevOpsPipelines
-            .FirstOrDefault(a => a.Name.EqualsCaseInsensitive(pipelineName));
+        var pipelines = _pipelineRepository
+            .GetAll()
+            .Where(p => p.Platform == PipelinePlatform.AzureDevOps)
+            .ToList();
+
+        var pipeline = pipelines.FirstOrDefault(a => a.Name.EqualsCaseInsensitive(pipelineName));
+
+        return pipeline is not null ? new AzureDevOpsPipeline
+        {
+            Id = pipeline.Id,
+            OrganisationId = pipeline.OrganisationId,
+            Name = pipeline.Name,
+            Url = pipeline.Url,
+            User = pipeline.User,
+            Platform = pipeline.Platform,
+            DiscoveredAt = pipeline.DiscoveredAt,
+            UpdatedAt = pipeline.UpdatedAt,
+            Path = string.Empty
+        } : null;
     }
 }

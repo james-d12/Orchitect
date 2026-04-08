@@ -1,25 +1,35 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.Pipeline.Services;
+using Orchitect.Domain.Inventory.SourceControl;
+using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.Discovery;
-using Orchitect.Infrastructure.Inventory.GitHub.Models;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
 namespace Orchitect.Infrastructure.Inventory.GitHub.Services;
 
 public sealed class GitHubDiscoveryService : DiscoveryService
 {
-    private readonly IMemoryCache _memoryCache;
+    private readonly ILogger<GitHubDiscoveryService> _logger;
     private readonly CredentialPayloadResolver _payloadResolver;
+    private readonly IRepositoryRepository _repositoryRepository;
+    private readonly IPipelineRepository _pipelineRepository;
+    private readonly IPullRequestRepository _pullRequestRepository;
 
     public GitHubDiscoveryService(
         ILogger<GitHubDiscoveryService> logger,
-        IMemoryCache memoryCache,
-        CredentialPayloadResolver payloadResolver) : base(logger)
+        CredentialPayloadResolver payloadResolver,
+        IRepositoryRepository repositoryRepository,
+        IPipelineRepository pipelineRepository,
+        IPullRequestRepository pullRequestRepository) : base(logger)
     {
-        _memoryCache = memoryCache;
+        _logger = logger;
         _payloadResolver = payloadResolver;
+        _repositoryRepository = repositoryRepository;
+        _pipelineRepository = pipelineRepository;
+        _pullRequestRepository = pullRequestRepository;
     }
 
     public override string Platform => "GitHub";
@@ -40,10 +50,14 @@ public sealed class GitHubDiscoveryService : DiscoveryService
         // Create GitHub service with this connection
         var gitHubService = new GitHubService(connectionService);
 
-        var repositories = await gitHubService.GetRepositoriesAsync();
+        // Discover repositories
+        var repositories = await gitHubService.GetRepositoriesAsync(configuration.OrganisationId);
 
-        var pullRequests = new List<GitHubPullRequest>();
-        var pipelines = new List<GitHubPipeline>();
+        // Persist repositories to database
+        await _repositoryRepository.BulkUpsertAsync(repositories, cancellationToken);
+
+        var pullRequests = new List<PullRequest>();
+        var pipelines = new List<Pipeline>();
 
         foreach (var repository in repositories)
         {
@@ -54,10 +68,15 @@ public sealed class GitHubDiscoveryService : DiscoveryService
             pipelines.AddRange(repositoryPipelines);
         }
 
-        // Use org-specific cache keys
-        var orgId = configuration.OrganisationId.Value;
-        _memoryCache.Set($"GitHub:Repositories:{orgId}", repositories);
-        _memoryCache.Set($"GitHub:Pipelines:{orgId}", pipelines);
-        _memoryCache.Set($"GitHub:PullRequests:{orgId}", pullRequests);
+        // Persist pipelines and pull requests to database
+        await _pipelineRepository.BulkUpsertAsync(pipelines, cancellationToken);
+        await _pullRequestRepository.BulkUpsertAsync(pullRequests, cancellationToken);
+
+        _logger.LogInformation(
+            "GitHub discovery completed for organisation {OrganisationId}: {RepositoryCount} repositories, {PipelineCount} pipelines, {PullRequestCount} pull requests",
+            configuration.OrganisationId.Value,
+            repositories.Count,
+            pipelines.Count,
+            pullRequests.Count);
     }
 }

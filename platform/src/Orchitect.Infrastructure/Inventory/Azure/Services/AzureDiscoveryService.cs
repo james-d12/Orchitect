@@ -1,8 +1,7 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Core.Credential;
+using Orchitect.Domain.Inventory.Cloud.Services;
 using Orchitect.Domain.Inventory.Discovery;
-using Orchitect.Infrastructure.Inventory.Azure.Models;
 using Orchitect.Infrastructure.Inventory.Discovery;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
@@ -11,17 +10,20 @@ namespace Orchitect.Infrastructure.Inventory.Azure.Services;
 public sealed class AzureDiscoveryService : DiscoveryService
 {
     private readonly ILogger<AzureDiscoveryService> _logger;
-    private readonly IMemoryCache _memoryCache;
     private readonly CredentialPayloadResolver _payloadResolver;
+    private readonly ICloudResourceRepository _cloudResourceRepository;
+    private readonly ICloudSecretRepository _cloudSecretRepository;
 
     public AzureDiscoveryService(
         ILogger<AzureDiscoveryService> logger,
-        IMemoryCache memoryCache,
-        CredentialPayloadResolver payloadResolver) : base(logger)
+        CredentialPayloadResolver payloadResolver,
+        ICloudResourceRepository cloudResourceRepository,
+        ICloudSecretRepository cloudSecretRepository) : base(logger)
     {
         _logger = logger;
-        _memoryCache = memoryCache;
         _payloadResolver = payloadResolver;
+        _cloudResourceRepository = cloudResourceRepository;
+        _cloudSecretRepository = cloudSecretRepository;
     }
 
     public override string Platform => "Azure";
@@ -55,7 +57,7 @@ public sealed class AzureDiscoveryService : DiscoveryService
         var subscriptions =
             await azureService.GetSubscriptionsAsync(subscriptionFilters, cancellationToken);
 
-        var cloudResources = new List<AzureCloudResource>();
+        var azureCloudResources = new List<Infrastructure.Inventory.Azure.Models.AzureCloudResource>();
 
         foreach (var subscription in subscriptions)
         {
@@ -67,12 +69,26 @@ public sealed class AzureDiscoveryService : DiscoveryService
             }
 
             var subscriptionResources =
-                await azureService.GetResourcesAsync(subscription, tenantResource, cancellationToken);
-            cloudResources.AddRange(subscriptionResources);
+                await azureService.GetResourcesAsync(subscription, tenantResource, configuration.OrganisationId, cancellationToken);
+            azureCloudResources.AddRange(subscriptionResources);
         }
 
-        // Use org-specific cache keys
-        var orgId = configuration.OrganisationId.Value;
-        _memoryCache.Set($"Azure:CloudResources:{orgId}", cloudResources);
+        // Persist all discovered cloud resources to database
+        await _cloudResourceRepository.BulkUpsertAsync(azureCloudResources, cancellationToken);
+
+        // Discover and persist cloud secrets from Key Vaults
+        _logger.LogInformation("Discovering Azure Key Vault secrets...");
+        var cloudSecrets = await azureService.GetKeyVaultSecretsAsync(
+            azureCloudResources,
+            configuration.OrganisationId,
+            cancellationToken);
+
+        await _cloudSecretRepository.BulkUpsertAsync(cloudSecrets, cancellationToken);
+
+        _logger.LogInformation(
+            "Azure discovery completed for organisation {OrganisationId}: {CloudResourceCount} cloud resources, {CloudSecretCount} cloud secrets",
+            configuration.OrganisationId.Value,
+            azureCloudResources.Count,
+            cloudSecrets.Count);
     }
 }

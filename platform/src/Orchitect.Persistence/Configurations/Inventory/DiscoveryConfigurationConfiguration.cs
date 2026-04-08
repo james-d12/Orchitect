@@ -6,11 +6,11 @@ using Orchitect.Domain.Inventory.Discovery;
 
 namespace Orchitect.Persistence.Configurations.Inventory;
 
-public class DiscoveryConfigurationConfiguration : IEntityTypeConfiguration<DiscoveryConfiguration>
+internal sealed class DiscoveryConfigurationConfiguration : IEntityTypeConfiguration<DiscoveryConfiguration>
 {
     public void Configure(EntityTypeBuilder<DiscoveryConfiguration> builder)
     {
-        builder.ToTable("DiscoveryConfigurations");
+        builder.ToTable("DiscoveryConfigurations", "inventory");
 
         builder.HasKey(x => x.Id);
 
@@ -25,11 +25,23 @@ public class DiscoveryConfigurationConfiguration : IEntityTypeConfiguration<Disc
                 value => new OrganisationId(value))
             .IsRequired();
 
+        builder.HasOne<Organisation>()
+            .WithMany()
+            .HasForeignKey(x => x.OrganisationId)
+            .HasConstraintName("FK_DiscoveryConfigurations_Organisations")
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.Property(x => x.CredentialId)
             .HasConversion(
                 id => id.Value,
                 value => new CredentialId(value))
             .IsRequired();
+
+        builder.HasOne<Credential>()
+            .WithMany()
+            .HasForeignKey(x => x.CredentialId)
+            .HasConstraintName("FK_DiscoveryConfigurations_Credentials")
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(x => x.Platform)
             .HasConversion<string>()
@@ -51,9 +63,13 @@ public class DiscoveryConfigurationConfiguration : IEntityTypeConfiguration<Disc
         builder.Property(x => x.UpdatedAt)
             .IsRequired();
 
-        builder.HasIndex(x => x.OrganisationId);
-        builder.HasIndex(x => x.CredentialId);
-        builder.HasIndex(x => new { x.OrganisationId, x.Platform });
-        builder.HasIndex(x => x.IsEnabled);
+        builder.HasIndex(x => x.OrganisationId)
+            .HasDatabaseName("IX_DiscoveryConfigurations_OrganisationId");
+        builder.HasIndex(x => x.CredentialId)
+            .HasDatabaseName("IX_DiscoveryConfigurations_CredentialId");
+        builder.HasIndex(x => new { x.OrganisationId, x.Platform })
+            .HasDatabaseName("IX_DiscoveryConfigurations_OrganisationId_Platform");
+        builder.HasIndex(x => x.IsEnabled)
+            .HasDatabaseName("IX_DiscoveryConfigurations_IsEnabled");
     }
 }

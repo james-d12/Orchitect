@@ -1,8 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orchitect.Domain.Core.Credential;
-using Orchitect.Domain.Inventory.Discovery;
-using Orchitect.Domain.Inventory.Git.Service;
+using Orchitect.Domain.Inventory.Discovery.Services;
+using Orchitect.Domain.Inventory.Pipeline.Services;
+using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.GitLab.Services;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
@@ -26,7 +27,8 @@ public static class GitLabExtensions
 
     private static void RegisterServices(this IServiceCollection services)
     {
-        services.AddScoped<IGitQueryService, GitLabGitQueryService>();
+        services.AddScoped<IPipelineQueryService, GitLabPipelineQueryService>();
+        services.AddScoped<ISourceControlQueryService, GitLabSourceControlQueryService>();
 
         // Discovery service as transient (created per discovery run with credential)
         services.AddTransient<IDiscoveryService, GitLabDiscoveryService>();

@@ -9,8 +9,10 @@ using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Discovery;
-using Orchitect.Domain.Inventory.Git;
-using Orchitect.Domain.Inventory.Ticketing;
+using Orchitect.Domain.Inventory.Identity;
+using Orchitect.Domain.Inventory.Issue;
+using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.SourceControl;
 
 namespace Orchitect.Persistence;
 
@@ -19,12 +21,12 @@ public sealed class OrchitectDbContext : IdentityDbContext
     public DbSet<CloudSecret> CloudSecrets { get; init; } = null!;
     public DbSet<CloudResource> CloudResources { get; init; } = null!;
     public DbSet<DiscoveryConfiguration> DiscoveryConfigurations { get; init; } = null!;
-    public DbSet<Owner> Owners { get; init; } = null!;
+    public DbSet<User> Owners { get; init; } = null!;
     public DbSet<Pipeline> Pipelines { get; init; } = null!;
     public DbSet<Repository> Repositories { get; init; } = null!;
     public DbSet<PullRequest> PullRequests { get; init; } = null!;
-    public DbSet<User> TicketingUsers { get; init; } = null!;
-    public DbSet<WorkItem> WorkItems { get; init; } = null!;
+    public DbSet<Team> Teams { get; init; } = null!;
+    public DbSet<Issue> Issues { get; init; } = null!;
 
     public DbSet<ResourceTemplate> ResourceTemplates { get; init; } = null!;
     public DbSet<Domain.Engine.Application.Application> Applications { get; init; } = null!;

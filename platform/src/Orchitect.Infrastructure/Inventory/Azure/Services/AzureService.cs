@@ -3,6 +3,7 @@ using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Azure.Security.KeyVault.Secrets;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Infrastructure.Inventory.Azure.Extensions;
 using Orchitect.Infrastructure.Inventory.Azure.Models;
@@ -57,6 +58,7 @@ public sealed class AzureService : IAzureService
     public async Task<List<AzureCloudResource>> GetResourcesAsync(
         SubscriptionResource subscriptionResource,
         TenantResource tenantResource,
+        OrganisationId organisationId,
         CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
@@ -67,7 +69,8 @@ public sealed class AzureService : IAzureService
         {
             var azureResource = resource.Data.MapToAzureResource(
                 tenantResource.Data.DisplayName,
-                subscriptionResource.Data.DisplayName);
+                subscriptionResource.Data.DisplayName,
+                organisationId);
             azureResources.Add(azureResource);
         }
 
@@ -75,11 +78,13 @@ public sealed class AzureService : IAzureService
     }
 
     public async Task<List<CloudSecret>> GetKeyVaultSecretsAsync(List<AzureCloudResource> resources,
+        OrganisationId organisationId,
         CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
         var cloudSecrets = new ConcurrentBag<CloudSecret>();
         var vaults = resources.Where(r => r.Type.EqualsCaseInsensitive("vaults")).ToList();
+        var now = DateTime.UtcNow;
 
         var tasks = vaults.Select(async vault =>
         {
@@ -90,12 +95,19 @@ public sealed class AzureService : IAzureService
 
                 foreach (var secret in client.GetPropertiesOfSecrets())
                 {
+                    // Generate unique ID from vault URI + secret name
+                    var secretId = $"{secret.VaultUri}/{secret.Name}";
+
                     cloudSecrets.Add(new CloudSecret
                     {
+                        Id = new CloudSecretId(secretId),
+                        OrganisationId = organisationId,
                         Name = secret.Name,
                         Location = vault.Name,
                         Url = secret.VaultUri,
-                        Platform = CloudSecretPlatform.Azure
+                        Platform = CloudSecretPlatform.Azure,
+                        DiscoveredAt = now,
+                        UpdatedAt = now
                     });
                 }
 
