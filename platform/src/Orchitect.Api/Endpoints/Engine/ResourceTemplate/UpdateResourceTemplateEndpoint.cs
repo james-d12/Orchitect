@@ -14,9 +14,9 @@ public sealed class UpdateResourceTemplateEndpoint : IEndpoint
         .MapPut("/{id:guid}", HandleAsync)
         .WithSummary("Updates an existing resource template.");
 
-    private sealed record UpdateResourceTemplateRequest(string Name, string Type, string Description, ResourceTemplateProvider Provider);
+    public sealed record UpdateResourceTemplateRequest(string Name, string Type, string Description, ResourceTemplateProvider Provider);
 
-    private sealed record UpdateResourceTemplateResponse(Guid Id, Guid OrganisationId, string Name, string Type, string Description, ResourceTemplateProvider Provider, DateTime CreatedAt, DateTime UpdatedAt);
+    public sealed record UpdateResourceTemplateResponse(Guid Id, Guid OrganisationId, string Name, string Type, string Description, ResourceTemplateProvider Provider, DateTime CreatedAt, DateTime UpdatedAt);
 
     private static async Task<Results<Ok<UpdateResourceTemplateResponse>, NotFound, InternalServerError>> HandleAsync(
         [FromRoute]

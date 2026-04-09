@@ -14,9 +14,9 @@ public sealed class UpdateOrganisationEndpoint : IEndpoint
         .MapPut("/{id:guid}", HandleAsync)
         .WithSummary("Updates an existing organisation.");
 
-    private sealed record UpdateOrganisationRequest(string Name);
+    public sealed record UpdateOrganisationRequest(string Name);
 
-    private sealed record UpdateOrganisationResponse(Guid Id, string Name, DateTime CreatedAt, DateTime UpdatedAt);
+    public sealed record UpdateOrganisationResponse(Guid Id, string Name, DateTime CreatedAt, DateTime UpdatedAt);
 
     private static async Task<Results<Ok<UpdateOrganisationResponse>, NotFound, InternalServerError>> HandleAsync(
         [FromRoute]

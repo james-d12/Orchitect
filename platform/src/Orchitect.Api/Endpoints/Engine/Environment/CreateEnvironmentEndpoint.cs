@@ -14,7 +14,7 @@ public sealed class CreateEnvironmentEndpoint : IEndpoint
         .MapPost("/", HandleAsync)
         .WithSummary("Creates a new environment.");
 
-    private sealed record CreateEnvironmentResponse(Guid Id);
+    public sealed record CreateEnvironmentResponse(Guid Id);
 
     private static async Task<Results<Ok<CreateEnvironmentResponse>, InternalServerError>> HandleAsync(
         [FromBody]

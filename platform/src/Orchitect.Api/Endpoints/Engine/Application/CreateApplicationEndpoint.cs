@@ -14,7 +14,7 @@ public sealed class CreateApplicationEndpoint : IEndpoint
         .MapPost("/", HandleAsync)
         .WithSummary("Creates a new application.");
 
-    private sealed record CreateApplicationResponse(Guid Id);
+    public sealed record CreateApplicationResponse(Guid Id);
 
     private static async Task<Results<Ok<CreateApplicationResponse>, InternalServerError>> HandleAsync(
         [FromBody]

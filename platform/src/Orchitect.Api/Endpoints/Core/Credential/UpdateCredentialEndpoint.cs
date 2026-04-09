@@ -15,7 +15,7 @@ public sealed class UpdateCredentialEndpoint : IEndpoint
         .MapPut("/{id:guid}", HandleAsync)
         .WithSummary("Updates an existing credential.");
 
-    private sealed record UpdateCredentialRequest(
+    public sealed record UpdateCredentialRequest(
         string Name,
         CredentialType Type,
         CredentialPlatform Platform,

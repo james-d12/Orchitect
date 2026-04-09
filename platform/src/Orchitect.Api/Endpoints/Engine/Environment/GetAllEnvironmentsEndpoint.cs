@@ -14,7 +14,7 @@ public sealed class GetAllEnvironmentsEndpoint : IEndpoint
         .MapGet("/", Handle)
         .WithSummary("Get All Environments.");
 
-    private sealed record GetAllEnvironmentsResponse(List<GetEnvironmentEndpoint.GetEnvironmentResponse> Environments);
+    public sealed record GetAllEnvironmentsResponse(List<GetEnvironmentEndpoint.GetEnvironmentResponse> Environments);
 
     private static Results<Ok<GetAllEnvironmentsResponse>, InternalServerError> Handle(
         [FromServices]

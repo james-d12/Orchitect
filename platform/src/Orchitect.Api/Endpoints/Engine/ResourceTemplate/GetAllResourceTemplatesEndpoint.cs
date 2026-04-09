@@ -15,7 +15,7 @@ public sealed class GetAllResourceTemplatesEndpoint : IEndpoint
         .MapGet("/", Handle)
         .WithSummary("Gets all resource templates.");
 
-    private sealed record GetAllResourceTemplatesResponse(
+    public sealed record GetAllResourceTemplatesResponse(
         List<GetResourceTemplateEndpoint.GetResourceTemplateResponse> ResourceTemplates);
 
     private static Results<Ok<GetAllResourceTemplatesResponse>, NotFound, InternalServerError> Handle(

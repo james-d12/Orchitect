@@ -14,7 +14,7 @@ public sealed class CreateResourceTemplateWithVersionEndpoint : IEndpoint
         .MapPost("/with-version", HandleAsync)
         .WithSummary("Creates a new resource template with the specified version");
 
-    private sealed record CreateResourceTemplateWithVersionResponse(Guid Id);
+    public sealed record CreateResourceTemplateWithVersionResponse(Guid Id);
 
     private static async Task<Results<Ok<CreateResourceTemplateWithVersionResponse>, InternalServerError>> HandleAsync(
         [FromBody]
