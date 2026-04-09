@@ -18,7 +18,8 @@ public sealed class WebApplicationFactoryWithPostgres : WebApplicationFactory<Pr
                 ["JwtOptions:Issuer"] = "orchitect-integration-tests",
                 ["JwtOptions:Audience"] = "orchitect-integration-tests",
                 ["JwtOptions:ExpirationInMinutes"] = "60",
-                ["JwtOptions:Secret"] = "integration-test-jwt-secret-key-orchitect-platform"
+                ["JwtOptions:Secret"] = "integration-test-jwt-secret-key-orchitect-platform",
+                ["EncryptionOptions:Key"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
             });
         });
     }
