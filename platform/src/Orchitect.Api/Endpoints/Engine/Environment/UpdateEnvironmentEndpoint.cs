@@ -14,9 +14,9 @@ public sealed class UpdateEnvironmentEndpoint : IEndpoint
         .MapPut("/{id:guid}", HandleAsync)
         .WithSummary("Updates an existing environment.");
 
-    private sealed record UpdateEnvironmentRequest(string Name, string Description);
+    public sealed record UpdateEnvironmentRequest(string Name, string Description);
 
-    private sealed record UpdateEnvironmentResponse(Guid Id, string Name, string Description, DateTime CreatedAt, DateTime UpdatedAt);
+    public sealed record UpdateEnvironmentResponse(Guid Id, string Name, string Description, DateTime CreatedAt, DateTime UpdatedAt);
 
     private static async Task<Results<Ok<UpdateEnvironmentResponse>, NotFound, InternalServerError>> HandleAsync(
         [FromRoute]
