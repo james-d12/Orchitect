@@ -14,7 +14,7 @@ public sealed class GetAllOrganisationsEndpoint : IEndpoint
         .MapGet("/", Handle)
         .WithSummary("Get All Organisations.");
 
-    private sealed record GetAllOrganisationsResponse(List<GetOrganisationEndpoint.GetOrganisationResponse> Organisations);
+    public sealed record GetAllOrganisationsResponse(List<GetOrganisationEndpoint.GetOrganisationResponse> Organisations);
 
     private static Results<Ok<GetAllOrganisationsResponse>, InternalServerError> Handle(
         [FromServices]

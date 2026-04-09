@@ -15,7 +15,7 @@ public sealed class GetAllCredentialsEndpoint : IEndpoint
         .MapGet("/", Handle)
         .WithSummary("Gets all credentials for an organisation.");
 
-    private sealed record GetAllCredentialsResponse(List<CredentialResponse> Credentials);
+    public sealed record GetAllCredentialsResponse(List<CredentialResponse> Credentials);
 
     private static Ok<GetAllCredentialsResponse> Handle(
         [FromQuery]
