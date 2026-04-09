@@ -14,7 +14,7 @@ public sealed class CreateResourceTemplateEndpoint : IEndpoint
         .MapPost("/", HandleAsync)
         .WithSummary("Creates a new resource template.");
 
-    private sealed record CreateResourceTemplateResponse(Guid Id);
+    public sealed record CreateResourceTemplateResponse(Guid Id);
 
     private static async Task<Results<Ok<CreateResourceTemplateResponse>, InternalServerError>> HandleAsync(
         [FromBody]
