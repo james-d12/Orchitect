@@ -14,11 +14,11 @@ public sealed class UpdateApplicationEndpoint : IEndpoint
         .MapPut("/{id:guid}", HandleAsync)
         .WithSummary("Updates an existing application.");
 
-    private sealed record UpdateApplicationRequest(string Name, UpdateRepositoryRequest Repository);
+    public sealed record UpdateApplicationRequest(string Name, UpdateRepositoryRequest Repository);
 
-    private sealed record UpdateRepositoryRequest(string Name, Uri Url, RepositoryProvider Provider);
+    public sealed record UpdateRepositoryRequest(string Name, Uri Url, RepositoryProvider Provider);
 
-    private sealed record UpdateApplicationResponse(
+    public sealed record UpdateApplicationResponse(
         Guid Id,
         string Name,
         Repository Repository,

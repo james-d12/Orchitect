@@ -14,7 +14,7 @@ public sealed class GetAllApplicationsEndpoint : IEndpoint
         .MapGet("/", Handle)
         .WithSummary("Get All Applications.");
 
-    private sealed record GetAllApplicationsResponse(List<GetApplicationEndpoint.GetApplicationResponse> Applications);
+    public sealed record GetAllApplicationsResponse(List<GetApplicationEndpoint.GetApplicationResponse> Applications);
 
     private static Results<Ok<GetAllApplicationsResponse>, InternalServerError> Handle(
         [FromServices]
