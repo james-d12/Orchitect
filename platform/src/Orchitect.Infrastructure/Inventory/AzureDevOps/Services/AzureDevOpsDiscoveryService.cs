@@ -41,7 +41,7 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
         _teamRepository = teamRepository;
     }
 
-    public override string Platform => "AzureDevOps";
+    public override DiscoveryPlatform Platform => DiscoveryPlatform.AzureDevOps;
 
     protected override async Task StartAsync(
         DiscoveryConfiguration configuration,
@@ -80,22 +80,26 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
         {
             _logger.LogInformation("Discovering Azure DevOps Repository resources for {ProjectName}", project.Name);
             var projectRepositories =
-                await azureDevOpsService.GetRepositoriesAsync(project.Id, configuration.OrganisationId, cancellationToken);
+                await azureDevOpsService.GetRepositoriesAsync(project.Id, configuration.OrganisationId,
+                    cancellationToken);
             repositories.AddRange(projectRepositories);
 
             _logger.LogInformation("Discovering Azure DevOps Pipeline resources for {ProjectName}", project.Name);
             var projectPipelines =
-                await azureDevOpsService.GetPipelinesAsync(project.Id, project.Url, configuration.OrganisationId, cancellationToken);
+                await azureDevOpsService.GetPipelinesAsync(project.Id, project.Url, configuration.OrganisationId,
+                    cancellationToken);
             pipelines.AddRange(projectPipelines);
 
             _logger.LogInformation("Discovering Azure DevOps Pull Request resources for {ProjectName}", project.Name);
             var projectPullRequests =
-                await azureDevOpsService.GetPullRequestsAsync(project.Id, project.Url, configuration.OrganisationId, cancellationToken);
+                await azureDevOpsService.GetPullRequestsAsync(project.Id, project.Url, configuration.OrganisationId,
+                    cancellationToken);
             pullRequests.AddRange(projectPullRequests);
 
             _logger.LogInformation("Discovering Azure DevOps Work Item resources for {ProjectName}", project.Name);
             var projectWorkItems =
-                await azureDevOpsService.GetWorkItemsAsync(project.Name, project.Url, configuration.OrganisationId, cancellationToken);
+                await azureDevOpsService.GetWorkItemsAsync(project.Name, project.Url, configuration.OrganisationId,
+                    cancellationToken);
             workItems.AddRange(projectWorkItems);
         }
 

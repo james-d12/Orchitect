@@ -16,7 +16,7 @@ public abstract class DiscoveryService : IDiscoveryService
         _logger = logger;
     }
 
-    public virtual string Platform => string.Empty;
+    public abstract DiscoveryPlatform Platform { get; }
 
     public async Task DiscoverAsync(
         DiscoveryConfiguration configuration,

@@ -32,7 +32,7 @@ public sealed class GitHubDiscoveryService : DiscoveryService
         _pullRequestRepository = pullRequestRepository;
     }
 
-    public override string Platform => "GitHub";
+    public override DiscoveryPlatform Platform => DiscoveryPlatform.GitHub;
 
     protected override async Task StartAsync(
         DiscoveryConfiguration configuration,

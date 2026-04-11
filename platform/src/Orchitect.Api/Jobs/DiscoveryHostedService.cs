@@ -161,8 +161,7 @@ public sealed class DiscoveryHostedService : BackgroundService
         }
 
         // Find matching discovery service
-        var service = discoveryServices.FirstOrDefault(s =>
-            s.Platform.Equals(config.Platform.ToString(), StringComparison.OrdinalIgnoreCase));
+        var service = discoveryServices.FirstOrDefault(s => s.Platform == config.Platform);
 
         if (service == null)
         {

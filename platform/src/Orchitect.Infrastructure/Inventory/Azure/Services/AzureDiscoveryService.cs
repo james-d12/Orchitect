@@ -26,7 +26,7 @@ public sealed class AzureDiscoveryService : DiscoveryService
         _cloudSecretRepository = cloudSecretRepository;
     }
 
-    public override string Platform => "Azure";
+    public override DiscoveryPlatform Platform => DiscoveryPlatform.Azure;
 
     protected override async Task StartAsync(
         DiscoveryConfiguration configuration,
@@ -69,7 +69,8 @@ public sealed class AzureDiscoveryService : DiscoveryService
             }
 
             var subscriptionResources =
-                await azureService.GetResourcesAsync(subscription, tenantResource, configuration.OrganisationId, cancellationToken);
+                await azureService.GetResourcesAsync(subscription, tenantResource, configuration.OrganisationId,
+                    cancellationToken);
             azureCloudResources.AddRange(subscriptionResources);
         }
 

@@ -35,7 +35,7 @@ public sealed class GitLabDiscoveryService : DiscoveryService
         _pullRequestRepository = pullRequestRepository;
     }
 
-    public override string Platform => "GitLab";
+    public override DiscoveryPlatform Platform => DiscoveryPlatform.GitLab;
 
     protected override async Task StartAsync(
         DiscoveryConfiguration configuration,

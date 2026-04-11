@@ -4,7 +4,7 @@ namespace Orchitect.Domain.Inventory.Discovery.Services;
 
 public interface IDiscoveryService
 {
-    string Platform { get; }
+    DiscoveryPlatform Platform { get; }
 
     Task DiscoverAsync(
         DiscoveryConfiguration configuration,
