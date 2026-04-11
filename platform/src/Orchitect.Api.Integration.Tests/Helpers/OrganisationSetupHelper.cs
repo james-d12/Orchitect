@@ -1,6 +1,5 @@
 using AutoFixture;
 using Orchitect.Api.Endpoints.Core.Organisation;
-using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Api.Integration.Tests.Helpers;
 
@@ -13,7 +12,7 @@ public static class OrganisationSetupHelper
         this HttpClient client)
     {
         var organisationName = Fixture.Create<string>();
-        var request = new CreateOrganisationRequest(organisationName);
+        var request = new CreateOrganisationEndpoint.CreateOrganisationRequest(organisationName);
         var createOrgResponse = await client.PostAsJsonAsync(OrganisationsUrl, request);
         var org = await createOrgResponse.ReadFromJsonAsync<CreateOrganisationEndpoint.CreateOrganisationResponse>();
         ArgumentNullException.ThrowIfNull(org);

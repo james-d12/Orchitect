@@ -14,6 +14,8 @@ public sealed class CreateOrganisationEndpoint : IEndpoint
         .MapPost("/", HandleAsync)
         .WithSummary("Creates a new organisation.");
 
+    public sealed record CreateOrganisationRequest(string Name);
+
     public sealed record CreateOrganisationResponse(Guid Id, string Name);
 
     private static async Task<Results<Ok<CreateOrganisationResponse>, InternalServerError>> HandleAsync(
