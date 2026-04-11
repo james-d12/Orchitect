@@ -13,7 +13,7 @@ using Orchitect.Infrastructure.Inventory.AzureDevOps.Extensions;
 using BuildDefinitionReference = Microsoft.TeamFoundation.Build.WebApi.BuildDefinitionReference;
 using WorkItem = Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models.WorkItem;
 
-namespace Orchitect.Infrastructure.Tests.Inventory.AzureDevOps.Extensions;
+namespace Orchitect.Infrastructure.Unit.Tests.Inventory.AzureDevOps.Extensions;
 
 public sealed class AzureDevOpsMappingExtensionsTests
 {

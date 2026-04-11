@@ -1,6 +1,4 @@
-﻿using Microsoft.TeamFoundation.Common;
-
-namespace Orchitect.Infrastructure.Inventory.Shared.Query;
+﻿namespace Orchitect.Common.Query;
 
 public sealed class QueryBuilder<T> : IQueryBuilder<T> where T : class
 {
@@ -23,7 +21,7 @@ public sealed class QueryBuilder<T> : IQueryBuilder<T> where T : class
 
     public QueryBuilder<T> Where(IEnumerable<string>? value, Func<T, bool> predicate)
     {
-        if (!value.IsNullOrEmpty())
+        if (value is not null && !value.Any(string.IsNullOrEmpty))
         {
             _query = _query.AsEnumerable().Where(predicate).AsQueryable();
         }

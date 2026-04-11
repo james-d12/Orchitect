@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Orchitect.Infrastructure.Tests.Inventory;
+namespace Orchitect.Infrastructure.Unit.Tests.Inventory;
 
 public sealed class NamespaceUsageTests
 {

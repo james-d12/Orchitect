@@ -6,7 +6,7 @@ using Orchitect.Infrastructure.Inventory.GitHub.Extensions;
 using Orchitect.Infrastructure.Inventory.GitHub.Models;
 using PullRequest = Octokit.PullRequest;
 
-namespace Orchitect.Infrastructure.Tests.Inventory.GitHub.Extensions;
+namespace Orchitect.Infrastructure.Unit.Tests.Inventory.GitHub.Extensions;
 
 public sealed class GitHubMapperExtensionsTests
 {

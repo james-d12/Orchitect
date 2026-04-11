@@ -1,4 +1,4 @@
-namespace Orchitect.Infrastructure.Inventory.Shared.Extensions;
+namespace Orchitect.Common.Extensions;
 
 public static class StringExtensions
 {

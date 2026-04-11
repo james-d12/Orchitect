@@ -1,4 +1,4 @@
-﻿namespace Orchitect.Infrastructure.Inventory.Shared.Query;
+﻿namespace Orchitect.Common.Query;
 
 public interface IQueryBuilder<T> where T : class
 {

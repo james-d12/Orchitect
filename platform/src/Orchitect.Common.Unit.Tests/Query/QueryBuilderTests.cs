@@ -1,16 +1,11 @@
 using AutoFixture;
-using Orchitect.Infrastructure.Inventory.Shared.Query;
+using Orchitect.Common.Query;
 
-namespace Orchitect.Infrastructure.Tests.Inventory.Shared.Query;
+namespace Orchitect.Common.Unit.Tests.Query;
 
 public sealed class QueryBuilderTests
 {
-    private readonly Fixture _fixture;
-
-    public QueryBuilderTests()
-    {
-        _fixture = new Fixture();
-    }
+    private readonly Fixture _fixture = new();
 
     [Fact]
     public void Where_StringValue_FiltersCorrectly()
