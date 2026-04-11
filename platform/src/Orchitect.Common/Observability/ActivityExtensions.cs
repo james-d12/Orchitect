@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Orchitect.Infrastructure.Inventory.Shared.Observability;
+namespace Orchitect.Common.Observability;
 
 public static class ActivityExtensions
 {

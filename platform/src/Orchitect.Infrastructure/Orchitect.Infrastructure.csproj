@@ -25,6 +25,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Orchitect.Common\Orchitect.Common.csproj" />
         <ProjectReference Include="..\Orchitect.Domain\Orchitect.Domain.csproj"/>
     </ItemGroup>
 </Project>

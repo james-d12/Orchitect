@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-namespace Orchitect.Infrastructure.Inventory.Shared.Observability;
+namespace Orchitect.Common.Observability;
 
 public readonly struct Tracing
 {

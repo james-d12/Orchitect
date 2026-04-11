@@ -1,7 +1,7 @@
-﻿using Orchitect.Domain.Core.Organisation;
+﻿using Orchitect.Common.Observability;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Infrastructure.Inventory.GitHub.Extensions;
 using Orchitect.Infrastructure.Inventory.GitHub.Models;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
 namespace Orchitect.Infrastructure.Inventory.GitHub.Services;
 

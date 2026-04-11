@@ -1,11 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery.Services;
-using Orchitect.Domain.Inventory.Pipeline.Services;
-using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.GitLab.Services;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Extensions;
 

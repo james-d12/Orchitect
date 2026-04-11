@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
 using NGitLab.Models;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Infrastructure.Inventory.GitLab.Extensions;
 using Orchitect.Infrastructure.Inventory.GitLab.Models;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Services;
 

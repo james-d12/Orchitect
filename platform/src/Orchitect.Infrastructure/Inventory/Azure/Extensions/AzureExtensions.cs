@@ -1,10 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
-using Orchitect.Domain.Inventory.Cloud.Services;
 using Orchitect.Domain.Inventory.Discovery.Services;
 using Orchitect.Infrastructure.Inventory.Azure.Services;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
 namespace Orchitect.Infrastructure.Inventory.Azure.Extensions;
 

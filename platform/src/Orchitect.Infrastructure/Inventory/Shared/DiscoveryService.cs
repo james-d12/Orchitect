@@ -1,11 +1,11 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Domain.Inventory.Discovery.Services;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
-namespace Orchitect.Infrastructure.Inventory.Discovery;
+namespace Orchitect.Infrastructure.Inventory.Shared;
 
 public abstract class DiscoveryService : IDiscoveryService
 {
