@@ -2,9 +2,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery.Services;
-using Orchitect.Domain.Inventory.Issue.Services;
-using Orchitect.Domain.Inventory.Pipeline.Services;
-using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Services;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
@@ -28,11 +25,6 @@ public static class AzureDevOpsExtensions
 
     private static void RegisterServices(this IServiceCollection services)
     {
-        services.AddScoped<IPipelineQueryService, AzureDevOpsPipelineQueryService>();
-        services.AddScoped<ISourceControlQueryService, AzureDevOpsSourceControlQueryService>();
-        services.AddScoped<IIssueQueryService, AzureDevOpsIssueQueryService>();
-        services.AddScoped<IAzureDevOpsQueryService, AzureDevOpsQueryService>();
-
         // Discovery service as transient (created per discovery run with credential)
         services.AddTransient<IDiscoveryService, AzureDevOpsDiscoveryService>();
 

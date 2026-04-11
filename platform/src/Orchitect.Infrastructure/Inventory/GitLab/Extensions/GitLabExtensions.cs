@@ -27,9 +27,6 @@ public static class GitLabExtensions
 
     private static void RegisterServices(this IServiceCollection services)
     {
-        services.AddScoped<IPipelineQueryService, GitLabPipelineQueryService>();
-        services.AddScoped<ISourceControlQueryService, GitLabSourceControlQueryService>();
-
         // Discovery service as transient (created per discovery run with credential)
         services.AddTransient<IDiscoveryService, GitLabDiscoveryService>();
 

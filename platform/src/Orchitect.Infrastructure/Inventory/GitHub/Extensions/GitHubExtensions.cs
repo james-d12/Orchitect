@@ -2,8 +2,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery.Services;
-using Orchitect.Domain.Inventory.Pipeline.Services;
-using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Infrastructure.Inventory.GitHub.Services;
 using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
@@ -27,9 +25,6 @@ public static class GitHubExtensions
 
     private static void RegisterServices(this IServiceCollection services)
     {
-        services.AddScoped<IPipelineQueryService, GitHubPipelineQueryService>();
-        services.AddScoped<ISourceControlQueryService, GitHubSourceControlQueryService>();
-
         // Discovery service as transient (created per discovery run with credential)
         services.AddTransient<IDiscoveryService, GitHubDiscoveryService>();
 

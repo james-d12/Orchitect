@@ -20,8 +20,6 @@ public static class AzureExtensions
 
     private static void RegisterServices(this IServiceCollection services)
     {
-        services.AddScoped<ICloudQueryService, AzureCloudQueryService>();
-
         // Discovery service as transient (created per discovery run with credential)
         services.AddTransient<IDiscoveryService, AzureDiscoveryService>();
 
