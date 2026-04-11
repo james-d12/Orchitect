@@ -42,11 +42,11 @@ public sealed class PullRequestRepository : IPullRequestRepository
     }
 
     public async Task<IReadOnlyList<PullRequest>> GetByRepositoryAsync(
-        string repositoryUrl,
+        Uri repositoryUrl,
         CancellationToken cancellationToken = default)
     {
         return await _context.PullRequests
-            .Where(pr => pr.RepositoryUrl.ToString() == repositoryUrl)
+            .Where(pr => pr.RepositoryUrl == repositoryUrl)
             .OrderByDescending(pr => pr.CreatedOnDate)
             .ToListAsync(cancellationToken);
     }
@@ -57,7 +57,7 @@ public sealed class PullRequestRepository : IPullRequestRepository
     {
         return await _context.PullRequests
             .Where(pr => pr.OrganisationId == organisationId &&
-                        (pr.Status == PullRequestStatus.Active || pr.Status == PullRequestStatus.Draft))
+                         (pr.Status == PullRequestStatus.Active || pr.Status == PullRequestStatus.Draft))
             .OrderByDescending(pr => pr.CreatedOnDate)
             .ToListAsync(cancellationToken);
     }

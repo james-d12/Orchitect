@@ -16,7 +16,7 @@ public sealed class CredentialIntegrationTests(WebApplicationFactoryWithPostgres
     private static readonly JsonElement SamplePayload =
         JsonDocument.Parse("""{"token":"test-token-value"}""").RootElement;
 
-    private CreateCredentialRequest BuildCreateRequest(Guid organisationId) =>
+    private CreateCredentialEndpoint.CreateCredentialRequest BuildCreateRequest(Guid organisationId) =>
         new(_fixture.Create<string>(), organisationId, _fixture.Create<CredentialType>(),
             _fixture.Create<CredentialPlatform>(), SamplePayload);
 

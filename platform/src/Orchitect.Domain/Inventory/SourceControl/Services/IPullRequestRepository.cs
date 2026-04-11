@@ -10,7 +10,7 @@ public interface IPullRequestRepository : IRepository<PullRequest, PullRequestId
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<PullRequest>> GetByRepositoryAsync(
-        string repositoryUrl,
+        Uri repositoryUrl,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<PullRequest>> GetActiveAsync(

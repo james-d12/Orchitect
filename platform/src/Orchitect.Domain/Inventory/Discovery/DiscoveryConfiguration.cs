@@ -11,7 +11,7 @@ public sealed record DiscoveryConfiguration
     public required DiscoveryPlatform Platform { get; init; }
     public bool IsEnabled { get; init; } = true;
     public string? Schedule { get; init; }
-    public Dictionary<string, string> PlatformConfig { get; init; } = new();
+    public Dictionary<string, string> PlatformConfig { get; init; } = [];
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
 
@@ -31,7 +31,7 @@ public sealed record DiscoveryConfiguration
             CredentialId = credentialId,
             Platform = platform,
             IsEnabled = isEnabled,
-            PlatformConfig = platformConfig ?? new(),
+            PlatformConfig = platformConfig ?? [],
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

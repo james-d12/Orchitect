@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -14,6 +15,13 @@ public sealed class CreateCredentialEndpoint : IEndpoint
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/", HandleAsync)
         .WithSummary("Creates a new credential.");
+
+    public sealed record CreateCredentialRequest(
+        string Name,
+        Guid OrganisationId,
+        CredentialType Type,
+        CredentialPlatform Platform,
+        JsonElement Payload);
 
     private static async Task<Results<Ok<CredentialResponse>, InternalServerError>> HandleAsync(
         [FromBody]

@@ -12,13 +12,13 @@ namespace Orchitect.Api.Endpoints.Inventory.Discovery;
 
 public sealed class UpdateDiscoveryConfigurationEndpoint : IEndpoint
 {
-    public record Request(
+    public record UpdateDiscoveryConfigurationRequest(
         string OrganisationId,
         bool IsEnabled,
         Dictionary<string, string>? PlatformConfig);
 
     public static void Map(IEndpointRouteBuilder builder) => builder
-        .MapPut("/{id}", HandleAsync)
+        .MapPut("/{id:guid}", HandleAsync)
         .WithName("UpdateDiscoveryConfiguration")
         .WithSummary("Update a discovery configuration")
         .Produces(StatusCodes.Status200OK)
@@ -28,19 +28,19 @@ public sealed class UpdateDiscoveryConfigurationEndpoint : IEndpoint
         [FromRoute]
         Guid id,
         [FromBody]
-        Request request,
+        UpdateDiscoveryConfigurationRequest updateDiscoveryConfigurationRequest,
         [FromServices]
         IDiscoveryConfigurationRepository repository,
         CancellationToken cancellationToken)
     {
-        var organisationId = new OrganisationId(Guid.Parse(request.OrganisationId));
+        var organisationId = new OrganisationId(Guid.Parse(updateDiscoveryConfigurationRequest.OrganisationId));
         var configId = new DiscoveryConfigurationId(id);
 
         var existing = await repository.GetByIdAsync(configId, cancellationToken);
         if (existing == null || existing.OrganisationId != organisationId)
             return TypedResults.NotFound(CreateError("CONFIG_NOT_FOUND", "Discovery configuration not found"));
 
-        var updated = existing.Update(request.IsEnabled, request.PlatformConfig);
+        var updated = existing.Update(updateDiscoveryConfigurationRequest.IsEnabled, updateDiscoveryConfigurationRequest.PlatformConfig);
         await repository.UpdateAsync(updated, cancellationToken);
 
         return TypedResults.Ok();
