@@ -34,7 +34,7 @@ public sealed class PullRequestRepository : IPullRequestRepository
 
     public IReadOnlyList<PullRequest> GetByQuery(PullRequestQuery query)
     {
-        var pullRequests = GetAll();
+        var pullRequests = GetAll().Where(pr => pr.OrganisationId == query.OrganisationId);
 
         return new QueryBuilder<PullRequest>(pullRequests)
             .Where(query.Id, p => p.Id.Value == query.Id)

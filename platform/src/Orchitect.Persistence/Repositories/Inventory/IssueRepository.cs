@@ -34,7 +34,7 @@ public sealed class IssueRepository : IIssueRepository
     
     public IReadOnlyList<Issue> GetByQuery(IssueQuery query)
     {
-        var issues = GetAll();
+        var issues = GetAll().Where(i => i.OrganisationId == query.OrganisationId);
 
         return new QueryBuilder<Issue>(issues)
             .Where(query.Id, p => p.Id.Value == query.Id)

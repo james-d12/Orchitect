@@ -26,7 +26,7 @@ public sealed class GetAllPullRequestsEndpoint : IEndpoint
         string? Name = null,
         string? Description = null,
         string? Url = null,
-        List<string>? Labels = null,
+        string[]? Labels = null,
         PullRequestPlatform? Platform = null);
 
     private static Results<Ok<GetAllPullRequestsResponse>, NotFound> Handle(
@@ -43,7 +43,7 @@ public sealed class GetAllPullRequestsEndpoint : IEndpoint
             Name: query.Name,
             Description: query.Description,
             Url: query.Url,
-            Labels: query.Labels,
+            Labels: query.Labels?.ToList(),
             Platform: query.Platform);
 
         var pullRequests = repository.GetByQuery(pullRequestQuery);

@@ -36,7 +36,7 @@ public sealed class RepositoryRepository : IRepositoryRepository
 
     public IReadOnlyList<Repository> GetByQuery(RepositoryQuery query)
     {
-        var repositories = GetAll();
+        var repositories = GetAll().Where(r => r.OrganisationId == query.OrganisationId);
 
         return new QueryBuilder<Repository>(repositories)
             .Where(query.Id, p => p.Id.Value == query.Id)

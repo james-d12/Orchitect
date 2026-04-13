@@ -35,7 +35,7 @@ public sealed class CloudResourceRepository : ICloudResourceRepository
 
     public IReadOnlyList<CloudResource> GetByQuery(CloudResourceQuery query)
     {
-        var cloudResources = GetAll();
+        var cloudResources = GetAll().Where(cr => cr.OrganisationId == query.OrganisationId);
 
         return new QueryBuilder<CloudResource>(cloudResources)
             .Where(query.Id, p => p.Id.Value == query.Id)

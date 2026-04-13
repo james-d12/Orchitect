@@ -34,10 +34,11 @@ public sealed class CloudSecretRepository : ICloudSecretRepository
 
     public IReadOnlyList<CloudSecret> GetByQuery(CloudSecretQuery query)
     {
-        var cloudSecrets = GetAll();
+        var cloudSecrets = GetAll().Where(cs => cs.OrganisationId == query.OrganisationId);
 
         return new QueryBuilder<CloudSecret>(cloudSecrets)
             .Where(query.Name, p => p.Name == query.Name)
+            .Where(query.Location, p => p.Location.Contains(query.Location ?? string.Empty))
             .Where(query.Url, p => p.Url.ToString().Contains(query.Url ?? string.Empty))
             .Where(query.Platform, p => p.Platform == query.Platform)
             .ToList();

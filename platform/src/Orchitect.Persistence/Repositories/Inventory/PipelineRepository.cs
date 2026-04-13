@@ -36,7 +36,7 @@ public sealed class PipelineRepository : IPipelineRepository
 
     public IReadOnlyList<Pipeline> GetByQuery(PipelineQuery query)
     {
-        var pipelines = GetAll();
+        var pipelines = GetAll().Where(p => p.OrganisationId == query.OrganisationId);
 
         return new QueryBuilder<Pipeline>(pipelines)
             .Where(query.Id, p => p.Id.Value == query.Id)
