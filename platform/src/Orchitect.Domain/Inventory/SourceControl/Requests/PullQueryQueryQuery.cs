@@ -3,11 +3,11 @@ using Orchitect.Domain.Inventory.Shared;
 
 namespace Orchitect.Domain.Inventory.SourceControl.Requests;
 
-public sealed record RepositoryQueryRequest(
+public sealed record PullQueryQueryQuery(
     OrganisationId OrganisationId,
     string? Id = null,
     string? Name = null,
+    string? Description = null,
     string? Url = null,
-    string? DefaultBranch = null,
-    string? OwnerName = null,
-    RepositoryPlatform? Platform = null) : BaseRequest(OrganisationId);
+    List<string>? Labels = null,
+    PullRequestPlatform? Platform = null) : BaseQuery(OrganisationId);

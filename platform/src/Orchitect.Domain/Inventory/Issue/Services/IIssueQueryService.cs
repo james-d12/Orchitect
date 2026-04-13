@@ -4,5 +4,5 @@ namespace Orchitect.Domain.Inventory.Issue.Services;
 
 public interface IIssueQueryService
 {
-    List<Issue> QueryWorkItems(IssueQueryRequest request);
+    List<Issue> QueryWorkItems(IssueQuery query);
 }

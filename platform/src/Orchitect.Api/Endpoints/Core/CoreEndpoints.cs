@@ -8,7 +8,7 @@ using Orchitect.Api.Shared;
 
 namespace Orchitect.Api.Endpoints.Core;
 
-public static class Endpoints
+public static class CoreEndpoints
 {
     public static void MapCoreEndpoints(this IEndpointRouteBuilder endpoints)
     {

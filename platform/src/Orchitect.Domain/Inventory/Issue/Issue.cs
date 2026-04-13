@@ -1,8 +1,9 @@
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Domain.Inventory.Issue;
 
-public record Issue
+public record Issue : IEntity
 {
     public required IssueId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }

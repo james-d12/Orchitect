@@ -1,19 +1,13 @@
 using Orchitect.Domain.Core;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Inventory.Issue.Requests;
+using Orchitect.Domain.Inventory.Shared;
 
 namespace Orchitect.Domain.Inventory.Issue.Services;
 
-public interface IIssueRepository : IRepository<Issue, IssueId>
+public interface IIssueRepository :
+    IRepository<Issue, IssueId>,
+    IQueryRepository<Issue, IssueQuery>
 {
-    Task<IReadOnlyList<Issue>> GetByOrganisationIdAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<Issue>> GetByPlatformAsync(
-        OrganisationId organisationId,
-        IssuePlatform platform,
-        CancellationToken cancellationToken = default);
-
     Task BulkUpsertAsync(
         IEnumerable<Issue> workItems,
         CancellationToken cancellationToken = default);

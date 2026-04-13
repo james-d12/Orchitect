@@ -1,14 +1,21 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Orchitect.Api.Endpoints.Inventory.Cloud;
 using Orchitect.Api.Endpoints.Inventory.Discovery;
 using Orchitect.Api.Shared;
 
 namespace Orchitect.Api.Endpoints.Inventory;
 
-public static class Endpoints
+public static class InventoryEndpoints
 {
     public static void MapInventoryEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapCloudEndpoints();
+        endpoints.MapDiscoveryConfigurationEndpoints();
+    }
+
+    private static void MapDiscoveryConfigurationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var discoveryGroup = endpoints.MapGroup("/discovery")
             .RequireAuthorization()
@@ -19,5 +26,15 @@ public static class Endpoints
         discoveryGroup.MapEndpoint<UpdateDiscoveryConfigurationEndpoint>();
         discoveryGroup.MapEndpoint<DeleteDiscoveryConfigurationEndpoint>();
         discoveryGroup.MapEndpoint<TriggerDiscoveryEndpoint>();
+    }
+
+    private static void MapCloudEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var discoveryGroup = endpoints.MapGroup("/cloud")
+            .RequireAuthorization()
+            .WithTags("Cloud");
+
+        discoveryGroup.MapEndpoint<GetAllCloudResourcesEndpoint>();
+        discoveryGroup.MapEndpoint<GetCloudResourceEndpoint>();
     }
 }

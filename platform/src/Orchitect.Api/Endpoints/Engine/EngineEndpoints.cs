@@ -9,7 +9,7 @@ using Orchitect.Api.Shared;
 
 namespace Orchitect.Api.Endpoints.Engine;
 
-public static class Endpoints
+public static class EngineEndpoints
 {
     public static void MapEngineEndpoints(this IEndpointRouteBuilder endpoints)
     {

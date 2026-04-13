@@ -3,7 +3,7 @@ using Orchitect.Domain.Inventory.Shared;
 
 namespace Orchitect.Domain.Inventory.Issue.Requests;
 
-public sealed record IssueQueryRequest(
+public sealed record IssueQuery(
     OrganisationId OrganisationId,
     string? Id = null,
-    string? Title = null) : BaseRequest(OrganisationId);
+    string? Title = null) : BaseQuery(OrganisationId);

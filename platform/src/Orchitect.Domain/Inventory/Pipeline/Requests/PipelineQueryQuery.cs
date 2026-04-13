@@ -3,10 +3,10 @@ using Orchitect.Domain.Inventory.Shared;
 
 namespace Orchitect.Domain.Inventory.Pipeline.Requests;
 
-public sealed record PipelineQueryRequest(
+public sealed record PipelineQueryQuery(
     OrganisationId OrganisationId,
     string? Id = null,
     string? Name = null,
     string? Url = null,
     string? OwnerName = null,
-    PipelinePlatform? Platform = null) : BaseRequest(OrganisationId);
+    PipelinePlatform? Platform = null) : BaseQuery(OrganisationId);

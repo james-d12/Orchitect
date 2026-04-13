@@ -1,8 +1,9 @@
-﻿using Orchitect.Domain.Core.Organisation;
+﻿using Orchitect.Domain.Core;
+using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Domain.Inventory.Cloud;
 
-public record CloudResource
+public record CloudResource : IEntity
 {
     public required CloudResourceId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }
