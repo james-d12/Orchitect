@@ -1,9 +1,9 @@
-﻿using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Shared;
 
 namespace Orchitect.Domain.Inventory.SourceControl.Requests;
 
-public sealed record RepositoryQueryQuery(
+public sealed record RepositoryQuery(
     OrganisationId OrganisationId,
     string? Id = null,
     string? Name = null,
