@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Common.Query;
 using Orchitect.Domain.Inventory.SourceControl;
+using Orchitect.Domain.Inventory.SourceControl.Requests;
 using Orchitect.Domain.Inventory.SourceControl.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
@@ -31,35 +32,18 @@ public sealed class PullRequestRepository : IPullRequestRepository
             .FirstOrDefaultAsync(pr => pr.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<PullRequest>> GetByOrganisationIdAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default)
+    public IReadOnlyList<PullRequest> GetByQuery(PullRequestQuery query)
     {
-        return await _context.PullRequests
-            .Where(pr => pr.OrganisationId == organisationId)
-            .OrderBy(pr => pr.Name)
-            .ToListAsync(cancellationToken);
-    }
+        var pullRequests = GetAll();
 
-    public async Task<IReadOnlyList<PullRequest>> GetByRepositoryAsync(
-        Uri repositoryUrl,
-        CancellationToken cancellationToken = default)
-    {
-        return await _context.PullRequests
-            .Where(pr => pr.RepositoryUrl == repositoryUrl)
-            .OrderByDescending(pr => pr.CreatedOnDate)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<PullRequest>> GetActiveAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default)
-    {
-        return await _context.PullRequests
-            .Where(pr => pr.OrganisationId == organisationId &&
-                         (pr.Status == PullRequestStatus.Active || pr.Status == PullRequestStatus.Draft))
-            .OrderByDescending(pr => pr.CreatedOnDate)
-            .ToListAsync(cancellationToken);
+        return new QueryBuilder<PullRequest>(pullRequests)
+            .Where(query.Id, p => p.Id.Value == query.Id)
+            .Where(query.Name, p => p.Name.Contains(query.Name ?? string.Empty))
+            .Where(query.Description, p => p.Description.Contains(query.Description ?? string.Empty))
+            .Where(query.Url, p => p.Url.ToString().Contains(query.Url ?? string.Empty))
+            .Where(query.Labels, p => query.Labels!.Any(l => p.Labels.Contains(l)))
+            .Where(query.Platform, p => p.Platform == query.Platform)
+            .ToList();
     }
 
     public async Task<PullRequest?> CreateAsync(

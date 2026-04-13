@@ -1,9 +1,10 @@
-﻿using Orchitect.Domain.Core.Organisation;
+﻿using Orchitect.Domain.Core;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Identity;
 
 namespace Orchitect.Domain.Inventory.Pipeline;
 
-public record Pipeline
+public record Pipeline : IEntity
 {
     public required PipelineId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }

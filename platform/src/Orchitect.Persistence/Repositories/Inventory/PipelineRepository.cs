@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Common.Query;
 using Orchitect.Domain.Inventory.Pipeline;
+using Orchitect.Domain.Inventory.Pipeline.Requests;
 using Orchitect.Domain.Inventory.Pipeline.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
@@ -33,27 +34,17 @@ public sealed class PipelineRepository : IPipelineRepository
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Pipeline>> GetByOrganisationIdAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default)
+    public IReadOnlyList<Pipeline> GetByQuery(PipelineQuery query)
     {
-        return await _context.Pipelines
-            .Include(p => p.User)
-            .Where(p => p.OrganisationId == organisationId)
-            .OrderBy(p => p.Name)
-            .ToListAsync(cancellationToken);
-    }
+        var pipelines = GetAll();
 
-    public async Task<IReadOnlyList<Pipeline>> GetByPlatformAsync(
-        OrganisationId organisationId,
-        PipelinePlatform platform,
-        CancellationToken cancellationToken = default)
-    {
-        return await _context.Pipelines
-            .Include(p => p.User)
-            .Where(p => p.OrganisationId == organisationId && p.Platform == platform)
-            .OrderBy(p => p.Name)
-            .ToListAsync(cancellationToken);
+        return new QueryBuilder<Pipeline>(pipelines)
+            .Where(query.Id, p => p.Id.Value == query.Id)
+            .Where(query.Name, p => p.Name.Contains(query.Name ?? string.Empty))
+            .Where(query.Url, p => p.Url.ToString().Contains(query.Url ?? string.Empty))
+            .Where(query.OwnerName, p => p.User.Name.Contains(query.OwnerName ?? string.Empty))
+            .Where(query.Platform, p => p.Platform == query.Platform)
+            .ToList();
     }
 
     public async Task<Pipeline?> CreateAsync(

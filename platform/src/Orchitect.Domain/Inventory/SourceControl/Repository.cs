@@ -1,9 +1,10 @@
-﻿using Orchitect.Domain.Core.Organisation;
+﻿using Orchitect.Domain.Core;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Identity;
 
 namespace Orchitect.Domain.Inventory.SourceControl;
 
-public record Repository
+public record Repository : IEntity
 {
     public required RepositoryId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }
