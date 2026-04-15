@@ -175,7 +175,8 @@ public static class InventorySeedHelper
         this WebApplicationFactoryWithPostgres factory,
         OrganisationId organisationId,
         Uri? repositoryUrl = null,
-        PullRequestPlatform? platform = null)
+        PullRequestPlatform? platform = null,
+        IEnumerable<string>? labels = null)
     {
         repositoryUrl ??= new Uri($"https://github.com/{Fixture.Create<string>()}");
 
@@ -186,7 +187,7 @@ public static class InventorySeedHelper
             Name = Fixture.Create<string>(),
             Description = Fixture.Create<string>(),
             Url = new Uri($"https://github.com/pulls/{Fixture.Create<string>()}"),
-            Labels = ImmutableHashSet<string>.Empty,
+            Labels = labels?.ToImmutableHashSet() ?? ImmutableHashSet<string>.Empty,
             Reviewers = ImmutableHashSet<string>.Empty,
             Status = PullRequestStatus.Active,
             Platform = platform ?? Fixture.Create<PullRequestPlatform>(),
