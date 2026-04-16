@@ -157,7 +157,7 @@ public static class InventorySeedHelper
             OrganisationId = organisationId,
             Name = Fixture.Create<string>(),
             Url = new Uri($"https://github.com/{Fixture.Create<string>()}"),
-            DefaultBranch = "main",
+            DefaultBranch = Fixture.Create<string>(),
             User = owner,
             Platform = platform ?? Fixture.Create<RepositoryPlatform>(),
             DiscoveredAt = DateTime.UtcNow,

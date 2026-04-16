@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
 using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Inventory.Issue;
 using Orchitect.Domain.Inventory.Issue.Requests;
 using Orchitect.Domain.Inventory.Issue.Services;
 
