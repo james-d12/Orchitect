@@ -108,8 +108,6 @@ public sealed class CloudResourceIntegrationTests(WebApplicationFactoryWithPostg
         Assert.All(body.CloudResources, r => Assert.Equal(CloudPlatform.Azure, r.Platform));
     }
 
-    // TODO: Re-enable this test once we add appropriate auth to endpoints per organisation based on the token.
-    /*
     [Fact]
     public async Task CloudResourceApi_WhenGettingAllCloudResources_ShouldNotReturnResourcesFromOtherOrganisations()
     {
@@ -131,5 +129,5 @@ public sealed class CloudResourceIntegrationTests(WebApplicationFactoryWithPostg
         Assert.Single(body.CloudResources);
         Assert.Contains(body.CloudResources, r => r.Id == seeded.Id.Value);
         Assert.DoesNotContain(body.CloudResources, r => r.Id != seeded.Id.Value);
-    }*/
+    }
 }

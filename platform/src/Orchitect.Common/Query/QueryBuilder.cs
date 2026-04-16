@@ -21,7 +21,9 @@ public sealed class QueryBuilder<T> : IQueryBuilder<T> where T : class
 
     public QueryBuilder<T> Where(IEnumerable<string>? value, Func<T, bool> predicate)
     {
-        if (value is not null && !value.Any(string.IsNullOrEmpty))
+        var list = value?.ToList() ?? [];
+
+        if (value is not null && !list.Any(string.IsNullOrEmpty) && list.Count != 0)
         {
             _query = _query.AsEnumerable().Where(predicate).AsQueryable();
         }
