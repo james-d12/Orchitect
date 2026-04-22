@@ -6,8 +6,8 @@ The Engine domain has four areas that partially model a platform orchestrator bu
 
 - `Resource` is a thin struct with no factory method, no OrganisationId, and no repository interface.
 - `ResourceInstance` has no lifecycle status enum — `ResourceInstanceState` is a sealed record holding `Location` and `Workspace`, not a state machine. There's no back-reference to `Resource`, no input parameters, and no OrganisationId.
-- `ResourceDependency` is disconnected from the domain — it uses a `string Identifier` instead of a real `ResourceId`, making the graph an orphaned in-memory algorithm with no persistence story.
-- `ResourceTemplateKind` is defined but never wired into `ResourceTemplate`.
+- `ResourceDependency` is disconnected from the domain — it uses a `string Identifier` instead of a real `ResourceId`, and the graph carries an unnecessary secondary ID type (`ResourceDependencyId`) that exists only as an internal key.
+- `ResourceTemplateKind` is defined but unused. It belongs on `Resource` (the declaration), not on `ResourceTemplate` (the blueprint) — the same Terraform module should be usable as `Direct` in dev and `Indirect` in prod without needing two separate templates.
 
 The goal is to make these models accurately reflect: declare a Resource → create it from a ResourceTemplate → deploy it as a ResourceInstance to an Environment → track provisioning order and removal safety via a scoped dependency DAG.
 
@@ -15,9 +15,12 @@ The goal is to make these models accurately reflect: declare a Resource → crea
 
 ## Changes
 
-### 1. `Engine/Resource/Resource.cs` — Add factory method + OrganisationId + Description
+### 1. `Engine/Resource/Resource.cs` — Add factory method + OrganisationId + Description + Kind
 
-Replace the bare record with a factory-method aggregate following the `Environment` pattern:
+Replace the bare record with a factory-method aggregate following the `Environment` pattern. Two key corrections from the original design:
+
+- `ApplicationId` is nullable — platform-level shared resources (VNet, Key Vault, ACR) are not owned by any single application. `null` means platform-owned.
+- `ResourceTemplateKind Kind` moves here from `ResourceTemplate` — ownership semantics belong on the declaration, not the blueprint.
 
 ```csharp
 public sealed record Resource
@@ -27,8 +30,9 @@ public sealed record Resource
     public string Name { get; private set; } = string.Empty;
     public string Description { get; private set; } = string.Empty;
     public ResourceTemplateId ResourceTemplateId { get; private init; }
-    public ApplicationId ApplicationId { get; private init; }
+    public ApplicationId? ApplicationId { get; private init; }   // null = platform-owned
     public EnvironmentId EnvironmentId { get; private init; }
+    public ResourceTemplateKind Kind { get; private init; }
     public DateTime CreatedAt { get; private init; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -46,6 +50,7 @@ public sealed record Resource
             ResourceTemplateId = request.ResourceTemplateId,
             ApplicationId = request.ApplicationId,
             EnvironmentId = request.EnvironmentId,
+            Kind = request.Kind,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -61,8 +66,9 @@ public sealed record CreateResourceRequest(
     string Name,
     string Description,
     ResourceTemplateId ResourceTemplateId,
-    ApplicationId ApplicationId,
-    EnvironmentId EnvironmentId);
+    EnvironmentId EnvironmentId,
+    ResourceTemplateKind Kind,
+    ApplicationId? ApplicationId = null);   // optional — omit for platform-owned resources
 ```
 
 ### 3. `Engine/Resource/IResourceRepository.cs` — New file
@@ -83,17 +89,18 @@ public interface IResourceRepository : IRepository<Resource, ResourceId>
 ```csharp
 public enum ResourceInstanceStatus
 {
-    Pending,       // Requested, not yet started
-    Provisioning,  // IaC apply in progress
-    Active,        // Live and healthy
-    Failed,        // Provisioning or update failed
+    Pending,        // Requested, not yet started
+    Provisioning,   // IaC apply in progress
+    Active,         // Live and healthy
+    Failed,         // Provisioning or update failed (retryable by re-entering Pending)
     PendingRemoval,
     Removing,
-    Removed
+    Removed,
+    RemovalFailed    // Teardown attempted but failed — distinct from Failed (provision failure)
 }
 ```
 
-`Pending`/`Provisioning` are separate to prevent double-dispatch. `PendingRemoval`/`Removing`/`Removed` enable safe DAG teardown. No `Updating` — an update re-enters `Provisioning` (consistent with Terraform apply semantics).
+`Pending`/`Provisioning` are separate to prevent double-dispatch. `PendingRemoval`/`Removing`/`Removed` enable safe DAG teardown. `RemovalFailed` is separate from `Failed` — a destroy that fails leaves the resource in a known-bad state that is different from a create that failed. No `Updating` — an update re-enters `Provisioning` (consistent with Terraform apply semantics). No `Drifted`/`Degraded` — those require a health-check reconciler loop that does not exist in this codebase yet.
 
 ### 5. `Engine/ResourceInstance/ResourceInstanceState.cs` — Rename type to `ResourceInstanceLocation`
 
@@ -113,8 +120,23 @@ Key changes:
 ```csharp
 public static ResourceInstance Create(CreateResourceInstanceRequest request) { ... }
 
+// Valid transitions only. Prevents nonsense like Removed → Active or Pending → Removed.
+private static readonly Dictionary<ResourceInstanceStatus, HashSet<ResourceInstanceStatus>> ValidTransitions = new()
+{
+    [ResourceInstanceStatus.Pending]        = [ResourceInstanceStatus.Provisioning],
+    [ResourceInstanceStatus.Provisioning]   = [ResourceInstanceStatus.Active, ResourceInstanceStatus.Failed],
+    [ResourceInstanceStatus.Active]         = [ResourceInstanceStatus.Provisioning, ResourceInstanceStatus.PendingRemoval],
+    [ResourceInstanceStatus.Failed]         = [ResourceInstanceStatus.Pending],
+    [ResourceInstanceStatus.PendingRemoval] = [ResourceInstanceStatus.Removing],
+    [ResourceInstanceStatus.Removing]       = [ResourceInstanceStatus.Removed, ResourceInstanceStatus.RemovalFailed],
+    [ResourceInstanceStatus.Removed]        = [],
+    [ResourceInstanceStatus.RemovalFailed]   = [ResourceInstanceStatus.PendingRemoval]
+};
+
 public void Transition(ResourceInstanceStatus newStatus, ResourceInstanceLocation? location = null)
 {
+    if (!ValidTransitions[Status].Contains(newStatus))
+        throw new InvalidOperationException($"Cannot transition from {Status} to {newStatus}.");
     if (newStatus == ResourceInstanceStatus.Active)
         ArgumentNullException.ThrowIfNull(location);
     Status = newStatus;
@@ -149,54 +171,79 @@ public interface IResourceInstanceRepository : IRepository<ResourceInstance, Res
 
 ---
 
-### 9. `Engine/ResourceDependency/ResourceDependency.cs` — Replace `string Identifier` with `ResourceId`
+### 9. `Engine/ResourceDependency/ResourceDependency.cs` and `ResourceDependencyId.cs` — Delete both
 
-The `ResourceDependencyId` struct is unchanged. `ResourceDependency` gets a `ResourceId ResourceId` property in place of `string Identifier`:
+`ResourceDependencyId` existed solely as the internal graph key. Now that the graph keys on `ResourceId` directly, neither type is needed. Delete both files.
+
+### 10. `Engine/ResourceDependency/ResourceDependencyNode.cs` — Key on `ResourceId`
+
+Replace `ResourceDependency Value` with `ResourceId ResourceId`, and change `HashSet<ResourceDependencyId>` to `HashSet<ResourceId>` on both In/Out:
 
 ```csharp
-public sealed record ResourceDependency
+public sealed record ResourceDependencyNode
 {
-    public ResourceDependencyId Id { get; init; }
-    public ResourceId ResourceId { get; init; }
-
-    public ResourceDependency(ResourceId resourceId)
-    {
-        Id = new ResourceDependencyId();
-        ResourceId = resourceId;
-    }
-
-    private ResourceDependency() { }  // for persistence
+    public required ResourceId ResourceId { get; init; }
+    public readonly HashSet<ResourceId> In = [];
+    public readonly HashSet<ResourceId> Out = [];
 }
 ```
 
-### 10. `Engine/ResourceDependency/ResourceDependencyGraphId.cs` — New file
+### 11. `Engine/ResourceDependency/ResourceDependencyGraphId.cs` — New file
 
-Standard strongly-typed ID struct (same pattern as all other ID types).
+Standard strongly-typed ID struct (graph aggregate still needs its own identity for persistence).
 
-### 11. `Engine/ResourceDependency/ResourceDependencyGraph.cs` — Add aggregate identity + secondary index
+### 12. `Engine/ResourceDependency/ResourceDependencyGraph.cs` — Key graph on `ResourceId`, add aggregate identity
 
-The Kahn's sort and cycle-detection algorithm bodies are **not touched**. Structural additions only:
+The Kahn's sort and cycle-detection logic are **not touched**. Changes:
 
+- Change `Dictionary<ResourceDependencyId, ResourceDependencyNode> _nodes` → `Dictionary<ResourceId, ResourceDependencyNode> _nodes`
+- All method signatures change `ResourceDependencyId` parameter → `ResourceId` (one type, no dual index)
 - Add `ResourceDependencyGraphId Id`, `OrganisationId OrganisationId`, `EnvironmentId EnvironmentId` (private init)
-- Add `private readonly Dictionary<ResourceId, ResourceDependencyId> _resourceIndex` secondary index
 - Add `private ResourceDependencyGraph() { }` + `static Create(OrganisationId, EnvironmentId)` factory
-- Override `AddResource` to also insert into `_resourceIndex`
-- Override `RemoveResource` to also remove from `_resourceIndex`
+- `ResolveOrder()` returns `IList<ResourceId>` directly
 
-The dual-index approach (internal `_nodes` keyed on `ResourceDependencyId`, secondary `_resourceIndex` keyed on `ResourceId`) lets callers look up by `ResourceId` without touching the algorithm.
+```csharp
+public sealed class ResourceDependencyGraph : IResourceDependencyGraph
+{
+    private readonly Dictionary<ResourceId, ResourceDependencyNode> _nodes = new();
 
-### 12. `Engine/ResourceDependency/IResourceDependencyGraph.cs` — Add aggregate properties + ResourceId lookups
+    public ResourceDependencyGraphId Id { get; private init; }
+    public OrganisationId OrganisationId { get; private init; }
+    public EnvironmentId EnvironmentId { get; private init; }
 
-Add to interface:
-- `ResourceDependencyGraphId Id { get; }`
-- `OrganisationId OrganisationId { get; }`
-- `EnvironmentId EnvironmentId { get; }`
-- `bool TryGetNodeId(ResourceId resourceId, out ResourceDependencyId nodeId)`
-- `bool ContainsResource(ResourceId resourceId)`
+    private ResourceDependencyGraph() { }
 
-All existing method signatures (`DependentCount`, `DependencyCount`, `AddResource`, `RemoveResource`, `AddDependency`, `RemoveDependency`, `HasDependencyPath`, `ResolveOrder`) are unchanged.
+    public static ResourceDependencyGraph Create(OrganisationId organisationId, EnvironmentId environmentId)
+        => new() { Id = new(), OrganisationId = organisationId, EnvironmentId = environmentId };
 
-### 13. `Engine/ResourceDependency/IResourceDependencyGraphRepository.cs` — New file
+    // All method bodies unchanged — only the key type changes from ResourceDependencyId to ResourceId.
+}
+```
+
+This eliminates the dual-index consistency risk entirely. `ContainsResource(ResourceId)` replaces `TryGetNodeId` — callers never need to resolve to a secondary ID.
+
+### 13. `Engine/ResourceDependency/IResourceDependencyGraph.cs` — Updated signatures
+
+```csharp
+public interface IResourceDependencyGraph
+{
+    ResourceDependencyGraphId Id { get; }
+    OrganisationId OrganisationId { get; }
+    EnvironmentId EnvironmentId { get; }
+
+    int DependentCount(ResourceId resourceId);
+    int DependencyCount(ResourceId resourceId);
+    void AddResource(ResourceId resourceId);
+    bool RemoveResource(ResourceId resourceId);
+    void AddDependency(ResourceId from, ResourceId to);
+    bool RemoveDependency(ResourceId from, ResourceId to);
+    bool HasDependencyPath(ResourceId startId, ResourceId targetId);
+    bool ContainsResource(ResourceId resourceId);
+    IList<ResourceId> ResolveOrder();
+}
+```
+
+### 14. `Engine/ResourceDependency/IResourceDependencyGraphRepository.cs` — New file
 
 ```csharp
 public interface IResourceDependencyGraphRepository
@@ -207,11 +254,9 @@ public interface IResourceDependencyGraphRepository
 }
 ```
 
-### 14. `Engine/ResourceTemplate/ResourceTemplate.cs` — Wire in `Kind`
+### 15. `Engine/ResourceTemplate/ResourceTemplate.cs` — No Kind change
 
-Add `ResourceTemplateKind Kind { get; private set; }` to the record body. Add `Kind` to `CreateResourceTemplateRequest` and `CreateResourceTemplateWithVersionRequest`, wire through `Create`/`CreateWithVersion` factories, and add `kind` parameter to the `Update` method.
-
-**Why Kind matters:** `Direct` = orchestrator fully owns the lifecycle; `Indirect` = externally managed, read-only to the orchestrator; `Implicit` = auto-resolved dependency. These distinctions control which nodes in `ResolveOrder()` trigger an actual IaC apply.
+`ResourceTemplateKind` moves to `Resource` (section 1 above). `ResourceTemplate` and its request types (`CreateResourceTemplateRequest`, `CreateResourceTemplateWithVersionRequest`) are **unchanged**.
 
 ---
 
@@ -219,31 +264,35 @@ Add `ResourceTemplateKind Kind { get; private set; }` to the record body. Add `K
 
 | File | Action |
 |---|---|
-| `Engine/Resource/Resource.cs` | Modify — add `OrganisationId`, `Description`, private constructor, `Create` factory |
+| `Engine/Resource/Resource.cs` | Modify — add `OrganisationId`, `Description`, `Kind`, nullable `ApplicationId?`, private constructor, `Create` factory |
 | `Engine/Resource/CreateResourceRequest.cs` | Create |
 | `Engine/Resource/IResourceRepository.cs` | Create |
-| `Engine/ResourceInstance/ResourceInstanceStatus.cs` | Create — 7-value lifecycle enum |
+| `Engine/ResourceInstance/ResourceInstanceStatus.cs` | Create — 8-value lifecycle enum (adds `RemovalFailed`) |
 | `Engine/ResourceInstance/ResourceInstanceState.cs` | Rename to `ResourceInstanceLocation.cs`, rename type |
-| `Engine/ResourceInstance/ResourceInstance.cs` | Modify — add `ResourceId`, `OrganisationId`, `Status`, `Location`, `InputParameters`; remove `State`/`ExistingResourceId`; add factory + `Transition` |
+| `Engine/ResourceInstance/ResourceInstance.cs` | Modify — add `ResourceId`, `OrganisationId`, `Status`, `Location`, `InputParameters`; remove `State`/`ExistingResourceId`; add factory + guarded `Transition` |
 | `Engine/ResourceInstance/CreateResourceInstanceRequest.cs` | Create |
 | `Engine/ResourceInstance/IResourceInstanceRepository.cs` | Create |
-| `Engine/ResourceDependency/ResourceDependency.cs` | Modify — replace `string Identifier` with `ResourceId ResourceId` |
+| `Engine/ResourceDependency/ResourceDependency.cs` | **Delete** — superseded by direct `ResourceId` graph keys |
+| `Engine/ResourceDependency/ResourceDependencyId.cs` | **Delete** — no longer needed |
 | `Engine/ResourceDependency/ResourceDependencyGraphId.cs` | Create |
-| `Engine/ResourceDependency/ResourceDependencyGraph.cs` | Modify — add `Id`, `OrganisationId`, `EnvironmentId`, `_resourceIndex`, `Create` factory; override `AddResource`/`RemoveResource` |
-| `Engine/ResourceDependency/IResourceDependencyGraph.cs` | Modify — add aggregate properties + `TryGetNodeId`, `ContainsResource` |
+| `Engine/ResourceDependency/ResourceDependencyGraph.cs` | Modify — rekey `_nodes` on `ResourceId`; add `Id`, `OrganisationId`, `EnvironmentId`, `Create` factory |
+| `Engine/ResourceDependency/IResourceDependencyGraph.cs` | Modify — all signatures use `ResourceId`; `ResolveOrder()` returns `IList<ResourceId>` |
+| `Engine/ResourceDependency/ResourceDependencyNode.cs` | Modify — `ResourceId ResourceId` replaces `ResourceDependency Value`; `HashSet<ResourceId>` In/Out |
 | `Engine/ResourceDependency/IResourceDependencyGraphRepository.cs` | Create |
-| `Engine/ResourceDependency/ResourceDependencyNode.cs` | No change |
-| `Engine/ResourceTemplate/ResourceTemplate.cs` | Modify — add `Kind` property, wire through factories and `Update` |
-| `Engine/ResourceTemplate/CreateResourceTemplateRequest.cs` | Modify — add `Kind` field |
-| `Engine/ResourceTemplate/CreateResourceTemplateWithVersionRequest.cs` | Modify — add `Kind` field |
+| `Engine/ResourceTemplate/ResourceTemplate.cs` | No change |
+| `Engine/ResourceTemplate/CreateResourceTemplateRequest.cs` | No change |
+| `Engine/ResourceTemplate/CreateResourceTemplateWithVersionRequest.cs` | No change |
 
 ---
 
 ## Known Breakages
 
 `src/Orchitect.Playground/Program.cs` (playground only, no production impact):
-- `new ResourceDependency(paymentApi.Name)` × 3 → `new ResourceDependency(resource.Id)`
+- `new ResourceDependency(paymentApi.Name)` × 3 → deleted; graph now uses `ResourceId` directly via `graph.AddResource(resource.Id)`
 - `new ResourceDependencyGraph()` → `ResourceDependencyGraph.Create(orgId, envId)`
+- `dependencies.AddDependency(resource2Dependency.Id, resource1Dependency.Id)` → `graph.AddDependency(resource2.Id, resource1.Id)`
+- `foreach (var item in order) Console.WriteLine(item.Identifier)` → `foreach (var id in order) Console.WriteLine(id.Value)`
+- `new Resource { ... }` object initializer × 2 → `Resource.Create(new CreateResourceRequest(...))`
 
 ---
 
@@ -253,21 +302,28 @@ Add `ResourceTemplateKind Kind { get; private set; }` to the record body. Add `K
 Organisation
   └── Environment
         ├── ResourceDependencyGraph  (scoped to Org + Env)
-        │     └── nodes: ResourceDependency { ResourceId }
+        │     └── _nodes: Dictionary<ResourceId, ResourceDependencyNode>
+        │           └── ResourceDependencyNode { ResourceId, HashSet<ResourceId> In, Out }
         │
         ├── Resource  (declared desired state)
-        │     ResourceTemplateId → ResourceTemplate { Kind }
-        │     ApplicationId, EnvironmentId, OrganisationId
+        │     OrganisationId, EnvironmentId
+        │     ApplicationId?          ← null for platform-owned shared resources
+        │     ResourceTemplateId → ResourceTemplate
+        │     Kind (Direct/Indirect/Implicit)  ← ownership semantics on the declaration
         │
         └── ResourceInstance  (actual provisioned deployment)
               ResourceId → Resource
-              Status (enum), Location? (only populated on Active)
-              InputParameters, Consumers
+              Status (ResourceInstanceStatus enum, 8 values, guarded transitions)
+              Location? (ResourceInstanceLocation — only populated on Active)
+              InputParameters (Dictionary<string, string>)
+              Consumers (List<ApplicationId>)
 ```
 
-**Provision flow:** Declare Resources → add to graph → `ResolveOrder()` gives provisioning sequence → for each node, `ResourceInstance.Create(...)` → `Transition(Provisioning)` → `Transition(Active, location)`.
+**Provision flow:** Declare Resources → `graph.AddResource(resource.Id)` → `graph.ResolveOrder()` returns `IList<ResourceId>` in safe order → for each, `ResourceInstance.Create(...)` → `Transition(Provisioning)` → `Transition(Active, location)`.
 
-**Removal safety:** `DependentCount(nodeId) == 0` → `Transition(PendingRemoval)` → teardown → `Transition(Removed)` → `RemoveResource(nodeId)`.
+**Removal safety:** `graph.DependentCount(resource.Id) == 0` → `Transition(PendingRemoval)` → teardown → `Transition(Removed)` or `Transition(RemovalFailed)` → `graph.RemoveResource(resource.Id)`.
+
+**Note on `InputParameters`:** `Dictionary<string, string>` is a deliberate V1 trade-off — Terraform variables are string-typed at the `.tfvars` level and this covers the majority of cases cleanly. Complex values (lists, objects) can be JSON-encoded as strings. Upgrade path: change to `Dictionary<string, JsonElement>` when multi-type parameter support is needed.
 
 ---
 
