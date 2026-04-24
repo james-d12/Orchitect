@@ -19,8 +19,10 @@ The goal is to make these models accurately reflect: declare a Resource → crea
 
 Replace the bare record with a factory-method aggregate following the `Environment` pattern. Two key corrections from the original design:
 
-- `ApplicationId` is nullable — platform-level shared resources (VNet, Key Vault, ACR) are not owned by any single application. `null` means platform-owned.
+- `ApplicationId` is nullable — platform-level shared resources (VNet, Key Vault, ACR) are not owned by any single application. `null` means platform-owned. Known V1 limitation: cannot express multi-app co-ownership or cost ownership. Full ResourceOwner/ResourceConsumer binding model is a future feature.
 - `ResourceTemplateKind Kind` moves here from `ResourceTemplate` — ownership semantics belong on the declaration, not the blueprint.
+- `Slug` is an immutable, kebab-normalised identifier set at creation. Used as the stable lookup key for `score.yaml id:` references instead of `Name` (which is mutable and typo-prone).
+- `Consumers`/`AddConsumer` moves here from `ResourceInstance` — an application's dependency on a logical resource survives instance replacement (re-provisioning, blue/green, migration).
 
 ```csharp
 public sealed record Resource
@@ -28,6 +30,7 @@ public sealed record Resource
     public ResourceId Id { get; private init; }
     public OrganisationId OrganisationId { get; private init; }
     public string Name { get; private set; } = string.Empty;
+    public string Slug { get; private init; } = string.Empty;    // immutable, used for score.yaml id: lookups
     public string Description { get; private set; } = string.Empty;
     public ResourceTemplateId ResourceTemplateId { get; private init; }
     public ApplicationId? ApplicationId { get; private init; }   // null = platform-owned
@@ -35,6 +38,9 @@ public sealed record Resource
     public ResourceTemplateKind Kind { get; private init; }
     public DateTime CreatedAt { get; private init; }
     public DateTime UpdatedAt { get; private set; }
+
+    private readonly List<ApplicationId> _consumers = [];
+    public IReadOnlyList<ApplicationId> Consumers => _consumers.AsReadOnly();
 
     private Resource() { }
 
@@ -46,6 +52,7 @@ public sealed record Resource
             Id = new ResourceId(),
             OrganisationId = request.OrganisationId,
             Name = request.Name,
+            Slug = request.Name.ToLowerInvariant().Replace(' ', '-'),
             Description = request.Description,
             ResourceTemplateId = request.ResourceTemplateId,
             ApplicationId = request.ApplicationId,
@@ -54,6 +61,12 @@ public sealed record Resource
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+    }
+
+    public void AddConsumer(ApplicationId appId)
+    {
+        if (!_consumers.Contains(appId))
+            _consumers.Add(appId);
     }
 }
 ```
@@ -102,20 +115,20 @@ public enum ResourceInstanceStatus
 
 `Pending`/`Provisioning` are separate to prevent double-dispatch. `PendingRemoval`/`Removing`/`Removed` enable safe DAG teardown. `RemovalFailed` is separate from `Failed` — a destroy that fails leaves the resource in a known-bad state that is different from a create that failed. No `Updating` — an update re-enters `Provisioning` (consistent with Terraform apply semantics). No `Drifted`/`Degraded` — those require a health-check reconciler loop that does not exist in this codebase yet.
 
-### 5. `Engine/ResourceInstance/ResourceInstanceState.cs` — Rename type to `ResourceInstanceLocation`
+### 5. `Engine/ResourceInstance/ResourceInstanceState.cs` — Rename type to `ResourceInstanceOutput`
 
-File renamed to `ResourceInstanceLocation.cs`. Same two properties (`Uri Location`, `string? Workspace`), new name only. The name `State` was misleading — this record holds location metadata, not a lifecycle state.
+File renamed to `ResourceInstanceOutput.cs`. Same two properties (`Uri Location`, `string? Workspace`), new name only. `State` was misleading (lifecycle state is now the enum); `Location` was also overloaded — this record holds the post-provision IaC outputs (reachable endpoint + workspace), not just a location URL.
 
 ### 6. `Engine/ResourceInstance/ResourceInstance.cs` — Full replacement
 
 Key changes:
 - Add `OrganisationId`, `ResourceId` (back-reference to declared Resource)
-- Replace `ResourceInstanceState State` with `ResourceInstanceStatus Status` + `ResourceInstanceLocation? Location` (nullable — only populated on `Active`)
+- Replace `ResourceInstanceState State` with `ResourceInstanceStatus Status` + `ResourceInstanceOutput? Output` (nullable — only populated on `Active`)
 - Remove `string? ExistingResourceId` (replaced by `ResourceId`)
-- Add `IReadOnlyDictionary<string, string> InputParameters` (Terraform/Helm variable values at provision time)
+- Remove `Consumers` / `AddConsumer` — moved to `Resource` where they belong semantically
+- Add `IReadOnlyDictionary<string, JsonElement> InputParameters` (Terraform/Helm variable values at provision time; `JsonElement` supports lists and objects, not just strings)
 - Add static `Create` factory
-- Add `Transition(ResourceInstanceStatus, ResourceInstanceLocation?)` — enforces that `Active` requires a location
-- Keep `Consumers` / `AddConsumer` unchanged
+- Add guarded `Transition(ResourceInstanceStatus, ResourceInstanceOutput?)` — enforces that `Active` requires an output
 
 ```csharp
 public static ResourceInstance Create(CreateResourceInstanceRequest request) { ... }
@@ -133,14 +146,14 @@ private static readonly Dictionary<ResourceInstanceStatus, HashSet<ResourceInsta
     [ResourceInstanceStatus.RemovalFailed]   = [ResourceInstanceStatus.PendingRemoval]
 };
 
-public void Transition(ResourceInstanceStatus newStatus, ResourceInstanceLocation? location = null)
+public void Transition(ResourceInstanceStatus newStatus, ResourceInstanceOutput? output = null)
 {
     if (!ValidTransitions[Status].Contains(newStatus))
         throw new InvalidOperationException($"Cannot transition from {Status} to {newStatus}.");
     if (newStatus == ResourceInstanceStatus.Active)
-        ArgumentNullException.ThrowIfNull(location);
+        ArgumentNullException.ThrowIfNull(output);
     Status = newStatus;
-    if (location is not null) Location = location;
+    if (output is not null) Output = output;
     UpdatedAt = DateTime.UtcNow;
 }
 ```
@@ -154,7 +167,7 @@ public sealed record CreateResourceInstanceRequest(
     string Name,
     ResourceTemplateVersionId TemplateVersionId,
     EnvironmentId EnvironmentId,
-    IReadOnlyDictionary<string, string>? InputParameters = null);
+    IReadOnlyDictionary<string, JsonElement>? InputParameters = null);
 ```
 
 ### 8. `Engine/ResourceInstance/IResourceInstanceRepository.cs` — New file
@@ -264,12 +277,12 @@ public interface IResourceDependencyGraphRepository
 
 | File | Action |
 |---|---|
-| `Engine/Resource/Resource.cs` | Modify — add `OrganisationId`, `Description`, `Kind`, nullable `ApplicationId?`, private constructor, `Create` factory |
+| `Engine/Resource/Resource.cs` | Modify — add `OrganisationId`, `Description`, `Kind`, `Slug`, nullable `ApplicationId?`, `Consumers`/`AddConsumer`; add private constructor + `Create` factory |
 | `Engine/Resource/CreateResourceRequest.cs` | Create |
 | `Engine/Resource/IResourceRepository.cs` | Create |
-| `Engine/ResourceInstance/ResourceInstanceStatus.cs` | Create — 8-value lifecycle enum (adds `RemovalFailed`) |
-| `Engine/ResourceInstance/ResourceInstanceState.cs` | Rename to `ResourceInstanceLocation.cs`, rename type |
-| `Engine/ResourceInstance/ResourceInstance.cs` | Modify — add `ResourceId`, `OrganisationId`, `Status`, `Location`, `InputParameters`; remove `State`/`ExistingResourceId`; add factory + guarded `Transition` |
+| `Engine/ResourceInstance/ResourceInstanceStatus.cs` | Create — 8-value lifecycle enum (includes `RemovalFailed`) |
+| `Engine/ResourceInstance/ResourceInstanceState.cs` | Rename to `ResourceInstanceOutput.cs`, rename type |
+| `Engine/ResourceInstance/ResourceInstance.cs` | Modify — add `ResourceId`, `OrganisationId`, `Status`, `Output`; remove `State`/`ExistingResourceId`/`Consumers`; `JsonElement` InputParameters; add factory + guarded `Transition` |
 | `Engine/ResourceInstance/CreateResourceInstanceRequest.cs` | Create |
 | `Engine/ResourceInstance/IResourceInstanceRepository.cs` | Create |
 | `Engine/ResourceDependency/ResourceDependency.cs` | **Delete** — superseded by direct `ResourceId` graph keys |
@@ -308,22 +321,23 @@ Organisation
         ├── Resource  (declared desired state)
         │     OrganisationId, EnvironmentId
         │     ApplicationId?          ← null for platform-owned shared resources
+        │     Slug                    ← immutable, used for score.yaml id: lookups
         │     ResourceTemplateId → ResourceTemplate
         │     Kind (Direct/Indirect/Implicit)  ← ownership semantics on the declaration
+        │     Consumers (List<ApplicationId>)  ← logical dependency, survives instance rotation
         │
         └── ResourceInstance  (actual provisioned deployment)
               ResourceId → Resource
               Status (ResourceInstanceStatus enum, 8 values, guarded transitions)
-              Location? (ResourceInstanceLocation — only populated on Active)
-              InputParameters (Dictionary<string, string>)
-              Consumers (List<ApplicationId>)
+              Output? (ResourceInstanceOutput — populated on Active: endpoint URI + workspace)
+              InputParameters (Dictionary<string, JsonElement>)
 ```
 
 **Provision flow:** Declare Resources → `graph.AddResource(resource.Id)` → `graph.ResolveOrder()` returns `IList<ResourceId>` in safe order → for each, `ResourceInstance.Create(...)` → `Transition(Provisioning)` → `Transition(Active, location)`.
 
 **Removal safety:** `graph.DependentCount(resource.Id) == 0` → `Transition(PendingRemoval)` → teardown → `Transition(Removed)` or `Transition(RemovalFailed)` → `graph.RemoveResource(resource.Id)`.
 
-**Note on `InputParameters`:** `Dictionary<string, string>` is a deliberate V1 trade-off — Terraform variables are string-typed at the `.tfvars` level and this covers the majority of cases cleanly. Complex values (lists, objects) can be JSON-encoded as strings. Upgrade path: change to `Dictionary<string, JsonElement>` when multi-type parameter support is needed.
+**Note on `InputParameters`:** `Dictionary<string, JsonElement>` supports strings, numbers, booleans, arrays, and objects — matching Terraform's actual variable type system. This avoids the schema-opacity and diff-unreadability of JSON-encoding complex values inside plain strings.
 
 ---
 
@@ -570,33 +584,41 @@ foreach (var (resourceKey, scoreResource) in scoreFile.Resources ?? [])
     var template = await resourceTemplateRepository.GetByTypeAsync(scoreResource.Type, ct);
     if (template is null) throw new InvalidOperationException($"No template registered for type '{scoreResource.Type}'");
 
-    // 2. If score.yaml provides an id, look up the existing shared Resource; else declare a new one.
+    // 2. If score.yaml provides an id, resolve by Slug (immutable) not Name (mutable/typo-prone).
     Resource resource;
     if (scoreResource.Id is not null)
     {
-        resource = existingResources.Single(r => r.Name == scoreResource.Id);
+        resource = existingResources.Single(r => r.Slug == scoreResource.Id);
     }
     else
     {
         resource = Resource.Create(new CreateResourceRequest(
-            organisation.Id, $"{application.Name}-{resourceKey}",
-            scoreResource.Metadata?.Annotations?["description"] ?? string.Empty,
-            template.Id, application.Id, environment.Id));
+            OrganisationId: organisation.Id,
+            Name: $"{application.Name}-{resourceKey}",
+            Description: scoreResource.Metadata?.Annotations?["description"] ?? string.Empty,
+            ResourceTemplateId: template.Id,
+            EnvironmentId: environment.Id,
+            Kind: Enum.Parse<ResourceTemplateKind>(scoreResource.Class ?? "Direct", ignoreCase: true),
+            ApplicationId: application.Id));
     }
+
+    // Register app as a consumer of the logical resource (survives instance rotation).
+    resource.AddConsumer(application.Id);
 
     // 3. Register the resource as a node in the environment's dependency graph.
     if (!graph.ContainsResource(resource.Id))
-        graph.AddResource(new ResourceDependency(resource.Id));
+        graph.AddResource(resource.Id);
 
     // 4. Create a ResourceInstance with the score.yaml parameters as InputParameters.
     var version = template.GetLatestVersion()!;
     var instance = ResourceInstance.Create(new CreateResourceInstanceRequest(
-        resource.Id, organisation.Id,
-        $"{resource.Name}-instance",
-        version.Id, environment.Id,
-        scoreResource.Parameters?.AsReadOnly()));
-
-    instance.AddConsumer(application.Id);
+        ResourceId: resource.Id,
+        OrganisationId: organisation.Id,
+        Name: $"{resource.Slug}-instance",
+        TemplateVersionId: version.Id,
+        EnvironmentId: environment.Id,
+        InputParameters: scoreResource.Parameters?
+            .ToDictionary(k => k.Key, v => JsonSerializer.SerializeToElement(v.Value))));
 }
 ```
 
@@ -1081,13 +1103,13 @@ var cosmosInstance = ResourceInstance.Create(new CreateResourceInstanceRequest(
         ["connection_string_key_vault_secret"]= "$(ref:ecommerce-keyvault-prod.vault_uri)/secrets/cosmos-orders-connstr"
     }));
 
-// Register all consumers on the AKS instance so the graph knows which apps depend on it.
-aksInstance.AddConsumer(orderService.Id);
-aksInstance.AddConsumer(paymentService.Id);
-aksInstance.AddConsumer(notifService.Id);
-aksInstance.AddConsumer(catalogService.Id);
+// Consumers belong on the logical Resource, not the instance — they survive re-provisioning.
+aksResource.AddConsumer(orderService.Id);
+aksResource.AddConsumer(paymentService.Id);
+aksResource.AddConsumer(notifService.Id);
+aksResource.AddConsumer(catalogService.Id);
 
-cosmosInstance.AddConsumer(orderService.Id);
+cosmosOrdersResource.AddConsumer(orderService.Id);
 ```
 
 ---
@@ -1098,7 +1120,7 @@ cosmosInstance.AddConsumer(orderService.Id);
 // Provisioner begins applying Terraform for each instance in ResolveOrder() sequence.
 aksSubnetInstance.Transition(ResourceInstanceStatus.Provisioning);
 // ... Terraform apply completes ...
-aksSubnetInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstanceLocation
+aksSubnetInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstanceOutput
 {
     Location = new Uri("https://portal.azure.com/#resource/subscriptions/xxxxxxxx/resourceGroups/rg-ecommerce-networking-prod/providers/Microsoft.Network/virtualNetworks/vnet-ecommerce-hub-prod/subnets/snet-aks"),
     Workspace = "ecommerce-prod"   // Terraform workspace used for state isolation
@@ -1107,9 +1129,10 @@ aksSubnetInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstance
 // A failed provision: KV firewall misconfigured — private endpoint rejected.
 kvInstance.Transition(ResourceInstanceStatus.Provisioning);
 kvInstance.Transition(ResourceInstanceStatus.Failed);
-// Operator fixes firewall rule, retries — creates a new Provisioning transition, not an amend.
+// Operator fixes firewall rule, retries — re-enters Pending then Provisioning (not an amend).
+kvInstance.Transition(ResourceInstanceStatus.Pending);
 kvInstance.Transition(ResourceInstanceStatus.Provisioning);
-kvInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstanceLocation
+kvInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstanceOutput
 {
     Location = new Uri("https://ecommerce-keyvault-prod.vault.azure.net"),
     Workspace = "ecommerce-prod"
@@ -1136,13 +1159,13 @@ else
     cosmosInstance.Transition(ResourceInstanceStatus.PendingRemoval);
     // ... IaC destroy runs ...
     cosmosInstance.Transition(ResourceInstanceStatus.Removed);
-    graph.RemoveResource(cosmosOrdersDep.Id);
+    graph.RemoveResource(cosmosOrdersResource.Id);
 
     // Now the data subnet check passes — provision again if needed, or fully remove.
 }
 
 // Check whether a direct path exists between two resources — used to explain why
 // you cannot update the VNet without also re-creating all subnets downstream.
-bool aksBlockedByVnet = graph.HasDependencyPath(aksDep.Id, vnetDep.Id);  // true
+bool aksBlockedByVnet = graph.HasDependencyPath(aksResource.Id, vnetResource.Id);  // true
 Console.WriteLine($"AKS transitively blocked by VNet change: {aksBlockedByVnet}");
 ```
