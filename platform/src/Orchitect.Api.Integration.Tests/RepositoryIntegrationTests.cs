@@ -90,7 +90,7 @@ public sealed class RepositoryIntegrationTests(WebApplicationFactoryWithPostgres
         Assert.Equal(seeded.DefaultBranch, body.Repositories[0].DefaultBranch);
         Assert.Equal(seeded.Platform, body.Repositories[0].Platform);
     }
-    
+
     [Fact]
     public async Task RepositoryApi_WhenGettingAllRepositories_ShouldFilterByUrl()
     {
@@ -114,7 +114,7 @@ public sealed class RepositoryIntegrationTests(WebApplicationFactoryWithPostgres
         Assert.Equal(seeded.DefaultBranch, body.Repositories[0].DefaultBranch);
         Assert.Equal(seeded.Platform, body.Repositories[0].Platform);
     }
-    
+
     [Fact]
     public async Task RepositoryApi_WhenGettingAllRepositories_ShouldFilterByDefaultBranch()
     {
@@ -138,7 +138,7 @@ public sealed class RepositoryIntegrationTests(WebApplicationFactoryWithPostgres
         Assert.Equal(seeded.DefaultBranch, body.Repositories[0].DefaultBranch);
         Assert.Equal(seeded.Platform, body.Repositories[0].Platform);
     }
-    
+
     [Fact]
     public async Task RepositoryApi_WhenGettingAllRepositories_ShouldFilterByPlatform()
     {

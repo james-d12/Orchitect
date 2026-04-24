@@ -31,7 +31,7 @@ public sealed class IssueRepository : IIssueRepository
             .AsNoTracking()
             .FirstOrDefaultAsync(wi => wi.Id == id, cancellationToken);
     }
-    
+
     public IReadOnlyList<Issue> GetByQuery(IssueQuery query)
     {
         var issues = GetAll().Where(i => i.OrganisationId == query.OrganisationId);

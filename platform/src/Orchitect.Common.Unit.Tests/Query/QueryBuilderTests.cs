@@ -138,11 +138,11 @@ public sealed class QueryBuilderTests
             .Build<TestEntity>()
             .With(t => t.NamesList, [])
             .Create();
-        
+
         var nameList = new List<string>() { "Random" };
         var items = _fixture.CreateMany<TestEntity>(5).ToList();
         items.Add(_fixture.Build<TestEntity>().With(t => t.NamesList, nameList).Create());
-            
+
         // Act 
         var result = new QueryBuilder<TestEntity>(items)
             .Where(queryFilter.NamesList, x => x.NamesList.Contains("Random", StringComparer.OrdinalIgnoreCase))
@@ -151,8 +151,8 @@ public sealed class QueryBuilderTests
         // Assert
         Assert.Equal(items.Count, result.Count);
     }
-    
-    
+
+
     private sealed class TestEntity
     {
         public Guid Id { get; set; }
