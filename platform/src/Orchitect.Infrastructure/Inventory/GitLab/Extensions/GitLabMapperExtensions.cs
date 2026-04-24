@@ -1,11 +1,11 @@
 using System.Collections.Immutable;
 using NGitLab.Models;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Identity;
 using Orchitect.Domain.Inventory.Pipeline;
 using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Infrastructure.Inventory.GitLab.Models;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 using Commit = Orchitect.Domain.Inventory.SourceControl.Commit;
 using User = Orchitect.Domain.Inventory.Identity.User;
 

@@ -1,11 +1,11 @@
 ﻿using System.Collections.Immutable;
 using Octokit;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Identity;
 using Orchitect.Domain.Inventory.Pipeline;
 using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Infrastructure.Inventory.GitHub.Models;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 using User = Orchitect.Domain.Inventory.Identity.User;
 
 namespace Orchitect.Infrastructure.Inventory.GitHub.Extensions;

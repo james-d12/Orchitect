@@ -2,7 +2,6 @@ using System.Net;
 using AutoFixture;
 using Orchitect.Api.Endpoints.Core.Organisation;
 using Orchitect.Api.Integration.Tests.Helpers;
-using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Api.Integration.Tests;
 
@@ -17,7 +16,7 @@ public sealed class OrganisationIntegrationTests(WebApplicationFactoryWithPostgr
     {
         // Arrange
         var client = await factory.CreateClient().AddAuthorisationHeader();
-        var request = _fixture.Create<CreateOrganisationRequest>();
+        var request = _fixture.Create<CreateOrganisationEndpoint.CreateOrganisationRequest>();
 
         // Act
         var response = await client.PostAsJsonAsync(OrganisationsUrl, request);
@@ -35,7 +34,7 @@ public sealed class OrganisationIntegrationTests(WebApplicationFactoryWithPostgr
     {
         // Arrange
         var client = await factory.CreateClient().AddAuthorisationHeader();
-        var createRequest = _fixture.Create<CreateOrganisationRequest>();
+        var createRequest = _fixture.Create<CreateOrganisationEndpoint.CreateOrganisationRequest>();
         var createResponse = await client.PostAsJsonAsync(OrganisationsUrl, createRequest);
         var created = await createResponse.ReadFromJsonAsync<CreateOrganisationEndpoint.CreateOrganisationResponse>();
         Assert.NotNull(created);
@@ -69,7 +68,7 @@ public sealed class OrganisationIntegrationTests(WebApplicationFactoryWithPostgr
     {
         // Arrange
         var client = await factory.CreateClient().AddAuthorisationHeader();
-        var createRequest = _fixture.Create<CreateOrganisationRequest>();
+        var createRequest = _fixture.Create<CreateOrganisationEndpoint.CreateOrganisationRequest>();
         await client.PostAsJsonAsync(OrganisationsUrl, createRequest);
 
         // Act
@@ -87,7 +86,7 @@ public sealed class OrganisationIntegrationTests(WebApplicationFactoryWithPostgr
     {
         // Arrange
         var client = await factory.CreateClient().AddAuthorisationHeader();
-        var createRequest = _fixture.Create<CreateOrganisationRequest>();
+        var createRequest = _fixture.Create<CreateOrganisationEndpoint.CreateOrganisationRequest>();
         var createResponse = await client.PostAsJsonAsync(OrganisationsUrl, createRequest);
         var created = await createResponse.ReadFromJsonAsync<CreateOrganisationEndpoint.CreateOrganisationResponse>();
         Assert.NotNull(created);
@@ -123,7 +122,7 @@ public sealed class OrganisationIntegrationTests(WebApplicationFactoryWithPostgr
     {
         // Arrange
         var client = await factory.CreateClient().AddAuthorisationHeader();
-        var createRequest = _fixture.Create<CreateOrganisationRequest>();
+        var createRequest = _fixture.Create<CreateOrganisationEndpoint.CreateOrganisationRequest>();
         var createResponse = await client.PostAsJsonAsync(OrganisationsUrl, createRequest);
         var created = await createResponse.ReadFromJsonAsync<CreateOrganisationEndpoint.CreateOrganisationResponse>();
         Assert.NotNull(created);
@@ -153,7 +152,7 @@ public sealed class OrganisationIntegrationTests(WebApplicationFactoryWithPostgr
     {
         // Arrange
         var client = await factory.CreateClient().AddAuthorisationHeader();
-        var createRequest = _fixture.Create<CreateOrganisationRequest>();
+        var createRequest = _fixture.Create<CreateOrganisationEndpoint.CreateOrganisationRequest>();
         var createResponse = await client.PostAsJsonAsync(OrganisationsUrl, createRequest);
         var created = await createResponse.ReadFromJsonAsync<CreateOrganisationEndpoint.CreateOrganisationResponse>();
         Assert.NotNull(created);

@@ -60,8 +60,7 @@ public sealed class TriggerDiscoveryEndpoint : IEndpoint
                 var discoveryServices = scopedServices.GetRequiredService<IEnumerable<IDiscoveryService>>();
 
                 // Find matching discovery service
-                var service = discoveryServices.FirstOrDefault(s =>
-                    s.Platform.Equals(config.Platform.ToString(), StringComparison.OrdinalIgnoreCase));
+                var service = discoveryServices.FirstOrDefault(s => s.Platform == config.Platform);
 
                 if (service == null)
                 {

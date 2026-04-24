@@ -3,12 +3,12 @@ using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Azure.Security.KeyVault.Secrets;
+using Orchitect.Common.Extensions;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Infrastructure.Inventory.Azure.Extensions;
 using Orchitect.Infrastructure.Inventory.Azure.Models;
-using Orchitect.Infrastructure.Inventory.Shared.Extensions;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
 namespace Orchitect.Infrastructure.Inventory.Azure.Services;
 

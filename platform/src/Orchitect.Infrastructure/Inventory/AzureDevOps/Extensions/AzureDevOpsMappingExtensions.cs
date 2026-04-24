@@ -3,13 +3,13 @@ using System.Collections.Immutable;
 using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Identity;
 using Orchitect.Domain.Inventory.Issue;
 using Orchitect.Domain.Inventory.Pipeline;
 using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 using PullRequestStatus = Microsoft.TeamFoundation.SourceControl.WebApi.PullRequestStatus;
 using WorkItem = Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models.WorkItem;
 
@@ -66,7 +66,8 @@ public static class AzureDevOpsMappingExtensions
         };
     }
 
-    public static AzureDevOpsRepository MapToAzureDevOpsRepository(this GitRepository gitRepository, OrganisationId organisationId)
+    public static AzureDevOpsRepository MapToAzureDevOpsRepository(this GitRepository gitRepository,
+        OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
         var now = DateTime.UtcNow;
@@ -175,7 +176,8 @@ public static class AzureDevOpsMappingExtensions
         };
     }
 
-    public static AzureDevOpsIssue MapToAzureDevOpsWorkItem(this WorkItem workItem, Uri projectUri, OrganisationId organisationId)
+    public static AzureDevOpsIssue MapToAzureDevOpsWorkItem(this WorkItem workItem, Uri projectUri,
+        OrganisationId organisationId)
     {
         using var activity = Tracing.StartActivity();
 

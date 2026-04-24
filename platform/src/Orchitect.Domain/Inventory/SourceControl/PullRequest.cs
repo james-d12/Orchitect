@@ -1,9 +1,10 @@
 ﻿using System.Collections.Immutable;
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Domain.Inventory.SourceControl;
 
-public record PullRequest
+public record PullRequest : IEntity
 {
     public required PullRequestId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }

@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Logging;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Domain.Inventory.Pipeline;
 using Orchitect.Domain.Inventory.Pipeline.Services;
 using Orchitect.Domain.Inventory.SourceControl.Services;
-using Orchitect.Infrastructure.Inventory.Discovery;
 using Orchitect.Infrastructure.Inventory.GitLab.Extensions;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
+using Orchitect.Infrastructure.Inventory.Shared;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Services;
 
@@ -35,7 +35,7 @@ public sealed class GitLabDiscoveryService : DiscoveryService
         _pullRequestRepository = pullRequestRepository;
     }
 
-    public override string Platform => "GitLab";
+    public override DiscoveryPlatform Platform => DiscoveryPlatform.GitLab;
 
     protected override async Task StartAsync(
         DiscoveryConfiguration configuration,

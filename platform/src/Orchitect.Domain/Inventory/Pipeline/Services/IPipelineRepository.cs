@@ -1,19 +1,13 @@
 using Orchitect.Domain.Core;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Inventory.Pipeline.Requests;
+using Orchitect.Domain.Inventory.Shared;
 
 namespace Orchitect.Domain.Inventory.Pipeline.Services;
 
-public interface IPipelineRepository : IRepository<Pipeline, PipelineId>
+public interface IPipelineRepository :
+    IRepository<Pipeline, PipelineId>,
+    IQueryRepository<Pipeline, PipelineQuery>
 {
-    Task<IReadOnlyList<Pipeline>> GetByOrganisationIdAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<Pipeline>> GetByPlatformAsync(
-        OrganisationId organisationId,
-        PipelinePlatform platform,
-        CancellationToken cancellationToken = default);
-
     Task BulkUpsertAsync(
         IEnumerable<Pipeline> pipelines,
         CancellationToken cancellationToken = default);

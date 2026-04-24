@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Common.Query;
 using Orchitect.Domain.Inventory.Issue;
+using Orchitect.Domain.Inventory.Issue.Requests;
 using Orchitect.Domain.Inventory.Issue.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
@@ -31,25 +32,14 @@ public sealed class IssueRepository : IIssueRepository
             .FirstOrDefaultAsync(wi => wi.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Issue>> GetByOrganisationIdAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default)
+    public IReadOnlyList<Issue> GetByQuery(IssueQuery query)
     {
-        return await _context.Issues
-            .Where(wi => wi.OrganisationId == organisationId)
-            .OrderBy(wi => wi.Title)
-            .ToListAsync(cancellationToken);
-    }
+        var issues = GetAll().Where(i => i.OrganisationId == query.OrganisationId);
 
-    public async Task<IReadOnlyList<Issue>> GetByPlatformAsync(
-        OrganisationId organisationId,
-        IssuePlatform platform,
-        CancellationToken cancellationToken = default)
-    {
-        return await _context.Issues
-            .Where(wi => wi.OrganisationId == organisationId && wi.Platform == platform)
-            .OrderBy(wi => wi.Title)
-            .ToListAsync(cancellationToken);
+        return new QueryBuilder<Issue>(issues)
+            .Where(query.Id, p => p.Id.Value == query.Id)
+            .Where(query.Title, p => p.Title.Contains(query.Title ?? string.Empty))
+            .ToList();
     }
 
     public async Task<Issue?> CreateAsync(

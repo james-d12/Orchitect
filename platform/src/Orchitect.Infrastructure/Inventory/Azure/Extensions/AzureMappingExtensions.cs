@@ -1,8 +1,8 @@
 ﻿using Azure.ResourceManager.Resources;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Infrastructure.Inventory.Azure.Models;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
 
 namespace Orchitect.Infrastructure.Inventory.Azure.Extensions;
 

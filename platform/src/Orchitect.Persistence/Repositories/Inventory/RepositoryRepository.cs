@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Common.Query;
 using Orchitect.Domain.Inventory.SourceControl;
+using Orchitect.Domain.Inventory.SourceControl.Requests;
 using Orchitect.Domain.Inventory.SourceControl.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
@@ -33,36 +34,18 @@ public sealed class RepositoryRepository : IRepositoryRepository
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Repository>> GetByOrganisationIdAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default)
+    public IReadOnlyList<Repository> GetByQuery(RepositoryQuery query)
     {
-        return await _context.Repositories
-            .Include(r => r.User)
-            .Where(r => r.OrganisationId == organisationId)
-            .OrderBy(r => r.Name)
-            .ToListAsync(cancellationToken);
-    }
+        var repositories = GetAll().Where(r => r.OrganisationId == query.OrganisationId);
 
-    public async Task<IReadOnlyList<Repository>> GetByPlatformAsync(
-        OrganisationId organisationId,
-        RepositoryPlatform platform,
-        CancellationToken cancellationToken = default)
-    {
-        return await _context.Repositories
-            .Include(r => r.User)
-            .Where(r => r.OrganisationId == organisationId && r.Platform == platform)
-            .OrderBy(r => r.Name)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<Repository?> GetByUrlAsync(
-        string url,
-        CancellationToken cancellationToken = default)
-    {
-        return await _context.Repositories
-            .Include(r => r.User)
-            .FirstOrDefaultAsync(r => r.Url.ToString() == url, cancellationToken);
+        return new QueryBuilder<Repository>(repositories)
+            .Where(query.Id, p => p.Id.Value == query.Id)
+            .Where(query.Name, p => p.Name.Contains(query.Name ?? string.Empty))
+            .Where(query.Url, p => p.Url.ToString().Contains(query.Url ?? string.Empty))
+            .Where(query.DefaultBranch, p => p.DefaultBranch.Contains(query.DefaultBranch ?? string.Empty))
+            .Where(query.OwnerName, p => p.User.Name.Contains(query.OwnerName ?? string.Empty))
+            .Where(query.Platform, p => p.Platform == query.Platform)
+            .ToList();
     }
 
     public async Task<Repository?> CreateAsync(
@@ -72,25 +55,6 @@ public sealed class RepositoryRepository : IRepositoryRepository
         await _context.Repositories.AddAsync(repository, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
         return repository;
-    }
-
-    public async Task UpsertAsync(
-        Repository repository,
-        CancellationToken cancellationToken = default)
-    {
-        var existing = await _context.Repositories
-            .FirstOrDefaultAsync(r => r.Url == repository.Url, cancellationToken);
-
-        if (existing is null)
-        {
-            await _context.Repositories.AddAsync(repository, cancellationToken);
-        }
-        else
-        {
-            _context.Entry(existing).CurrentValues.SetValues(repository);
-        }
-
-        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task BulkUpsertAsync(

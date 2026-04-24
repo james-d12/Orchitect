@@ -8,8 +8,7 @@ public sealed class AzureDevOpsConnectionService : IAzureDevOpsConnectionService
 {
     private readonly VssConnection _connection;
 
-    // Constructor for credential-based approach
-    public AzureDevOpsConnectionService(string organization, string personalAccessToken)
+    private AzureDevOpsConnectionService(string organization, string personalAccessToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(organization);
         ArgumentException.ThrowIfNullOrWhiteSpace(personalAccessToken);
@@ -24,9 +23,6 @@ public sealed class AzureDevOpsConnectionService : IAzureDevOpsConnectionService
         return _connection.GetClientAsync<T>(cancellationToken);
     }
 
-    /// <summary>
-    /// Factory method for creating connection from Core credential
-    /// </summary>
     public static AzureDevOpsConnectionService FromCredential(
         Credential credential,
         CredentialPayloadResolver resolver,
@@ -38,7 +34,8 @@ public sealed class AzureDevOpsConnectionService : IAzureDevOpsConnectionService
 
         var payload = resolver.ResolvePersonalAccessToken(credential);
 
-        if (platformConfig == null || !platformConfig.TryGetValue("organization", out var organization) || string.IsNullOrWhiteSpace(organization))
+        if (platformConfig == null || !platformConfig.TryGetValue("organization", out var organization) ||
+            string.IsNullOrWhiteSpace(organization))
         {
             throw new InvalidOperationException("AzureDevOps requires 'organization' in platformConfig");
         }

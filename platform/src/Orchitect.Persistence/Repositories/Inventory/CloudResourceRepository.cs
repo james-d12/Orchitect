@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Common.Extensions;
+using Orchitect.Common.Query;
 using Orchitect.Domain.Inventory.Cloud;
+using Orchitect.Domain.Inventory.Cloud.Requests;
 using Orchitect.Domain.Inventory.Cloud.Services;
 
 namespace Orchitect.Persistence.Repositories.Inventory;
@@ -31,25 +33,18 @@ public sealed class CloudResourceRepository : ICloudResourceRepository
             .FirstOrDefaultAsync(cr => cr.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<CloudResource>> GetByOrganisationIdAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default)
+    public IReadOnlyList<CloudResource> GetByQuery(CloudResourceQuery query)
     {
-        return await _context.CloudResources
-            .Where(cr => cr.OrganisationId == organisationId)
-            .OrderBy(cr => cr.Name)
-            .ToListAsync(cancellationToken);
-    }
+        var cloudResources = GetAll().Where(cr => cr.OrganisationId == query.OrganisationId);
 
-    public async Task<IReadOnlyList<CloudResource>> GetByPlatformAsync(
-        OrganisationId organisationId,
-        CloudPlatform platform,
-        CancellationToken cancellationToken = default)
-    {
-        return await _context.CloudResources
-            .Where(cr => cr.OrganisationId == organisationId && cr.Platform == platform)
-            .OrderBy(cr => cr.Name)
-            .ToListAsync(cancellationToken);
+        return new QueryBuilder<CloudResource>(cloudResources)
+            .Where(query.Id, p => p.Id.Value == query.Id)
+            .Where(query.Name, p => p.Name.Contains(query.Name ?? string.Empty))
+            .Where(query.Description, p => p.Description.Contains(query.Description ?? string.Empty))
+            .Where(query.Url, p => p.Url.ToString().Contains(query.Url ?? string.Empty))
+            .Where(query.Type, p => p.Type.EqualsCaseInsensitive(query.Type))
+            .Where(query.Platform, p => p.Platform == query.Platform)
+            .ToList();
     }
 
     public async Task<CloudResource?> CreateAsync(

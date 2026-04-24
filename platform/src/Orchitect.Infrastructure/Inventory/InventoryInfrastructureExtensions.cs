@@ -6,7 +6,7 @@ using Orchitect.Infrastructure.Inventory.GitLab.Extensions;
 
 namespace Orchitect.Infrastructure.Inventory;
 
-public static class InventoryInfrastructureExtensions
+internal static class InventoryInfrastructureExtensions
 {
     internal static void AddInventoryInfrastructureServices(this IServiceCollection services)
     {

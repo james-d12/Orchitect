@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Cloud.Services;
 using Orchitect.Domain.Inventory.Discovery;
-using Orchitect.Infrastructure.Inventory.Discovery;
-using Orchitect.Infrastructure.Inventory.Shared.Observability;
+using Orchitect.Infrastructure.Inventory.Shared;
 
 namespace Orchitect.Infrastructure.Inventory.Azure.Services;
 
@@ -26,7 +26,7 @@ public sealed class AzureDiscoveryService : DiscoveryService
         _cloudSecretRepository = cloudSecretRepository;
     }
 
-    public override string Platform => "Azure";
+    public override DiscoveryPlatform Platform => DiscoveryPlatform.Azure;
 
     protected override async Task StartAsync(
         DiscoveryConfiguration configuration,
@@ -69,7 +69,8 @@ public sealed class AzureDiscoveryService : DiscoveryService
             }
 
             var subscriptionResources =
-                await azureService.GetResourcesAsync(subscription, tenantResource, configuration.OrganisationId, cancellationToken);
+                await azureService.GetResourcesAsync(subscription, tenantResource, configuration.OrganisationId,
+                    cancellationToken);
             azureCloudResources.AddRange(subscriptionResources);
         }
 

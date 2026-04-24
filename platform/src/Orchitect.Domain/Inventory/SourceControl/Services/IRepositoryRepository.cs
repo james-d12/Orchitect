@@ -1,27 +1,13 @@
 using Orchitect.Domain.Core;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Inventory.SourceControl.Requests;
+using Orchitect.Domain.Inventory.Shared;
 
 namespace Orchitect.Domain.Inventory.SourceControl.Services;
 
-public interface IRepositoryRepository : IRepository<Repository, RepositoryId>
+public interface IRepositoryRepository :
+    IRepository<Repository, RepositoryId>,
+    IQueryRepository<Repository, RepositoryQuery>
 {
-    Task<IReadOnlyList<Repository>> GetByOrganisationIdAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<Repository>> GetByPlatformAsync(
-        OrganisationId organisationId,
-        RepositoryPlatform platform,
-        CancellationToken cancellationToken = default);
-
-    Task<Repository?> GetByUrlAsync(
-        string url,
-        CancellationToken cancellationToken = default);
-
-    Task UpsertAsync(
-        Repository repository,
-        CancellationToken cancellationToken = default);
-
     Task BulkUpsertAsync(
         IEnumerable<Repository> repositories,
         CancellationToken cancellationToken = default);

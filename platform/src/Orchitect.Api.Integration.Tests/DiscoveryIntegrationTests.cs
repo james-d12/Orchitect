@@ -19,7 +19,7 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
     private static readonly JsonElement SamplePayload =
         JsonDocument.Parse("""{"token":"test-token-value"}""").RootElement;
 
-    private CreateCredentialRequest BuildCredentialRequest(Guid organisationId, CredentialPlatform platform) =>
+    private CreateCredentialEndpoint.CreateCredentialRequest BuildCredentialRequest(Guid organisationId, CredentialPlatform platform) =>
         new(_fixture.Create<string>(), organisationId, _fixture.Create<CredentialType>(), platform, SamplePayload);
 
     private CreateDiscoveryConfigurationEndpoint.CreateDiscoveryConfigurationRequest BuildDiscoveryRequest(
@@ -155,7 +155,7 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
         var created = await createResponse.ReadFromJsonAsync<CreateDiscoveryConfigurationEndpoint.CreateDiscoveryConfigurationResponse>();
         Assert.NotNull(created);
 
-        var updateRequest = new UpdateDiscoveryConfigurationEndpoint.Request(organisation.Id.ToString(), false, null);
+        var updateRequest = new UpdateDiscoveryConfigurationEndpoint.UpdateDiscoveryConfigurationRequest(organisation.Id.ToString(), false, null);
 
         // Act
         var response = await client.PutAsJsonAsync($"{DiscoveryUrl}/{created.Id.Value}", updateRequest);
@@ -170,7 +170,7 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
         // Arrange
         var client = await factory.CreateClient().AddAuthorisationHeader();
         var organisation = await client.CreateOrganisationAsync();
-        var updateRequest = new UpdateDiscoveryConfigurationEndpoint.Request(organisation.Id.ToString(), false, null);
+        var updateRequest = new UpdateDiscoveryConfigurationEndpoint.UpdateDiscoveryConfigurationRequest(organisation.Id.ToString(), false, null);
 
         // Act
         var response = await client.PutAsJsonAsync($"{DiscoveryUrl}/{Guid.NewGuid()}", updateRequest);

@@ -1,8 +1,9 @@
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Domain.Inventory.Cloud;
 
-public sealed record CloudSecret
+public sealed record CloudSecret : IEntity
 {
     public required CloudSecretId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }

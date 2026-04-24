@@ -1,23 +1,13 @@
 using Orchitect.Domain.Core;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Inventory.Cloud.Requests;
+using Orchitect.Domain.Inventory.Shared;
 
 namespace Orchitect.Domain.Inventory.Cloud.Services;
 
-public interface ICloudSecretRepository : IRepository<CloudSecret, CloudSecretId>
+public interface ICloudSecretRepository :
+    IRepository<CloudSecret, CloudSecretId>,
+    IQueryRepository<CloudSecret, CloudSecretQuery>
 {
-    Task<IReadOnlyList<CloudSecret>> GetByOrganisationIdAsync(
-        OrganisationId organisationId,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<CloudSecret>> GetByPlatformAsync(
-        OrganisationId organisationId,
-        CloudSecretPlatform platform,
-        CancellationToken cancellationToken = default);
-
-    Task<CloudSecret?> GetByUrlAsync(
-        string url,
-        CancellationToken cancellationToken = default);
-
     Task BulkUpsertAsync(
         IEnumerable<CloudSecret> cloudSecrets,
         CancellationToken cancellationToken = default);
