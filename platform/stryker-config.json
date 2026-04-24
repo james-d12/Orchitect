@@ -5,7 +5,7 @@
     "language-version": "latest",
     "additional-timeout": 5000,
     "mutate": [
-      "**/*"
+      "**/*.Unit.Tests"
     ],
     "solution": "Orchitect.sln",
     "coverage-analysis": "perTest",
