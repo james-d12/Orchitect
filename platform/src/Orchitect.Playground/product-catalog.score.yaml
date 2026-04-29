@@ -1,0 +1,36 @@
+apiVersion: score.dev/v1b1
+metadata:
+  name: product-catalog
+resources:
+  cosmos-products:
+    type: azure.cosmosdb
+    class: direct
+    metadata:
+      annotations:
+        owner: catalog-team
+        data-classification: internal
+    parameters:
+      consistency_level: BoundedStaleness
+      max_throughput: "8000"
+      public_network_access_enabled: "false"
+      private_endpoint_subnet_id: $(ref:ecommerce-subnet-data.subnet_id)
+
+  redis-catalog:
+    type: azure.redis-cache
+    class: direct
+    parameters:
+      sku: Standard
+      capacity: "2"
+      enable_non_ssl_port: "false"
+      redis_version: "7.2"
+      private_endpoint_subnet_id: $(ref:ecommerce-subnet-data.subnet_id)
+
+  aks:
+    type: azure.aks
+    class: direct
+    id: ecommerce-aks-prod
+    parameters:
+      namespace: product-catalog
+      service_account: product-catalog-sa
+      min_replicas: "1"
+      max_replicas: "10"

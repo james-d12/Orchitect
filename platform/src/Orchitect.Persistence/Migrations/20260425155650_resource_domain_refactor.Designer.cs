@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Orchitect.Persistence;
@@ -12,9 +13,11 @@ using Orchitect.Persistence;
 namespace Orchitect.Persistence.Migrations
 {
     [DbContext(typeof(OrchitectDbContext))]
-    partial class OrchitectDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260425155650_resource_domain_refactor")]
+    partial class resource_domain_refactor
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -500,76 +503,6 @@ namespace Orchitect.Persistence.Migrations
                     b.HasIndex("EnvironmentId", "ResourceTemplateId");
 
                     b.ToTable("Resources", (string)null);
-                });
-
-            modelBuilder.Entity("Orchitect.Domain.Engine.ResourceDependency.ResourceDependencyGraph", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("EnvironmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("OrganisationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("_nodes")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("Nodes");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganisationId", "EnvironmentId")
-                        .IsUnique();
-
-                    b.ToTable("ResourceDependencyGraphs", (string)null);
-                });
-
-            modelBuilder.Entity("Orchitect.Domain.Engine.ResourceInstance.ResourceInstance", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("timezone('utc', now())");
-
-                    b.Property<Guid>("EnvironmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("InputParameters")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("OrganisationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ResourceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("TemplateVersionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("timezone('utc', now())");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ResourceId", "EnvironmentId");
-
-                    b.ToTable("ResourceInstances", (string)null);
                 });
 
             modelBuilder.Entity("Orchitect.Domain.Engine.ResourceTemplate.ResourceTemplate", b =>
@@ -1248,33 +1181,6 @@ namespace Orchitect.Persistence.Migrations
                         .HasForeignKey("EnvironmentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Orchitect.Domain.Engine.ResourceInstance.ResourceInstance", b =>
-                {
-                    b.OwnsOne("Orchitect.Domain.Engine.ResourceInstance.ResourceInstanceOutput", "Output", b1 =>
-                        {
-                            b1.Property<Guid>("ResourceInstanceId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<string>("Location")
-                                .IsRequired()
-                                .HasColumnType("text")
-                                .HasColumnName("OutputLocation");
-
-                            b1.Property<string>("Workspace")
-                                .HasColumnType("text")
-                                .HasColumnName("OutputWorkspace");
-
-                            b1.HasKey("ResourceInstanceId");
-
-                            b1.ToTable("ResourceInstances");
-
-                            b1.WithOwner()
-                                .HasForeignKey("ResourceInstanceId");
-                        });
-
-                    b.Navigation("Output");
                 });
 
             modelBuilder.Entity("Orchitect.Domain.Engine.ResourceTemplate.ResourceTemplate", b =>

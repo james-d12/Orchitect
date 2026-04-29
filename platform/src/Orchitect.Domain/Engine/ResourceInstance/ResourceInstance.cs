@@ -1,30 +1,66 @@
+using System.Text.Json;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Environment;
+using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Domain.Engine.ResourceInstance;
 
 public sealed record ResourceInstance
 {
-    public required ResourceInstanceId Id { get; init; }
-    public required string Name { get; init; }
-    public required ResourceTemplateVersionId TemplateVersionId { get; init; }
+    public ResourceInstanceId Id { get; private init; }
+    public OrganisationId OrganisationId { get; private init; }
+    public ResourceId ResourceId { get; private init; }
+    public string Name { get; private set; } = string.Empty;
+    public ResourceTemplateVersionId TemplateVersionId { get; private init; }
+    public EnvironmentId EnvironmentId { get; private init; }
+    public ResourceInstanceStatus Status { get; private set; }
+    public ResourceInstanceOutput? Output { get; private set; }
+    public IReadOnlyDictionary<string, JsonElement> InputParameters { get; private init; } = new Dictionary<string, JsonElement>();
+    public DateTime CreatedAt { get; private init; }
+    public DateTime UpdatedAt { get; private set; }
 
-    public string? ExistingResourceId { get; init; }
+    private ResourceInstance() { }
 
-    public required ResourceInstanceState State { get; init; }
-
-    private readonly List<ApplicationId> _consumers = [];
-    public IReadOnlyList<ApplicationId> Consumers => _consumers.AsReadOnly();
-
-    public required EnvironmentId EnvironmentId { get; init; }
-    public required DateTime CreatedAt { get; init; }
-    public required DateTime UpdatedAt { get; init; }
-
-    public void AddConsumer(ApplicationId appId)
+    private static readonly Dictionary<ResourceInstanceStatus, HashSet<ResourceInstanceStatus>> ValidTransitions = new()
     {
-        if (!_consumers.Contains(appId))
+        [ResourceInstanceStatus.Pending] = [ResourceInstanceStatus.Provisioning],
+        [ResourceInstanceStatus.Provisioning] = [ResourceInstanceStatus.Active, ResourceInstanceStatus.Failed],
+        [ResourceInstanceStatus.Active] = [ResourceInstanceStatus.Provisioning, ResourceInstanceStatus.PendingRemoval],
+        [ResourceInstanceStatus.Failed] = [ResourceInstanceStatus.Pending],
+        [ResourceInstanceStatus.PendingRemoval] = [ResourceInstanceStatus.Removing],
+        [ResourceInstanceStatus.Removing] = [ResourceInstanceStatus.Removed, ResourceInstanceStatus.RemovalFailed],
+        [ResourceInstanceStatus.Removed] = [],
+        [ResourceInstanceStatus.RemovalFailed] = [ResourceInstanceStatus.PendingRemoval]
+    };
+
+    public static ResourceInstance Create(CreateResourceInstanceRequest request)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(request.Name);
+        return new ResourceInstance
         {
-            _consumers.Add(appId);
-        }
+            Id = new ResourceInstanceId(),
+            OrganisationId = request.OrganisationId,
+            ResourceId = request.ResourceId,
+            Name = request.Name,
+            TemplateVersionId = request.TemplateVersionId,
+            EnvironmentId = request.EnvironmentId,
+            Status = ResourceInstanceStatus.Pending,
+            Output = null,
+            InputParameters = request.InputParameters ?? new Dictionary<string, JsonElement>(),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    public void Transition(ResourceInstanceStatus newStatus, ResourceInstanceOutput? output = null)
+    {
+        if (!ValidTransitions[Status].Contains(newStatus))
+            throw new InvalidOperationException($"Cannot transition from {Status} to {newStatus}.");
+        if (newStatus == ResourceInstanceStatus.Active)
+            ArgumentNullException.ThrowIfNull(output);
+        Status = newStatus;
+        if (output is not null) Output = output;
+        UpdatedAt = DateTime.UtcNow;
     }
 }
