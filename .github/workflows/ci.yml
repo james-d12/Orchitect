@@ -174,7 +174,7 @@ jobs:
             /n:"Orchitect Platform" \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.qualitygate.wait=false \
-            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Orchitect.Persistence/Migrations/**"
+            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Orchitect.Persistence/Migrations/**,src/Orchitect.Playground/**"
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
