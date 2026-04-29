@@ -217,12 +217,12 @@ await resourceTemplateRepository.CreateAsync(redisCacheTemplate);
 
 var production = Environment.Create("production", "Live customer-facing environment. PCI-DSS scope.", organisation.Id);
 
-var orderService   = Application.Create("order-service",         new Repository { Name = "order-service",         Url = new Uri("https://github.com/acme/order-service.git"),         Provider = RepositoryProvider.GitHub }, organisation.Id);
-var paymentService = Application.Create("payment-service",        new Repository { Name = "payment-service",       Url = new Uri("https://github.com/acme/payment-service.git"),       Provider = RepositoryProvider.GitHub }, organisation.Id);
-var notifService   = Application.Create("notification-service",   new Repository { Name = "notification-service",  Url = new Uri("https://github.com/acme/notification-service.git"),  Provider = RepositoryProvider.GitHub }, organisation.Id);
-var catalogService = Application.Create("product-catalog",        new Repository { Name = "product-catalog",       Url = new Uri("https://github.com/acme/product-catalog.git"),       Provider = RepositoryProvider.GitHub }, organisation.Id);
+var orderService = Application.Create("order-service", new Repository { Name = "order-service", Url = new Uri("https://github.com/acme/order-service.git"), Provider = RepositoryProvider.GitHub }, organisation.Id);
+var paymentService = Application.Create("payment-service", new Repository { Name = "payment-service", Url = new Uri("https://github.com/acme/payment-service.git"), Provider = RepositoryProvider.GitHub }, organisation.Id);
+var notifService = Application.Create("notification-service", new Repository { Name = "notification-service", Url = new Uri("https://github.com/acme/notification-service.git"), Provider = RepositoryProvider.GitHub }, organisation.Id);
+var catalogService = Application.Create("product-catalog", new Repository { Name = "product-catalog", Url = new Uri("https://github.com/acme/product-catalog.git"), Provider = RepositoryProvider.GitHub }, organisation.Id);
 
-var commitId   = new CommitId("7b926d5c23d0e806c62d4c86e25fc73564efb8a1");
+var commitId = new CommitId("7b926d5c23d0e806c62d4c86e25fc73564efb8a1");
 var deployment = Deployment.Create(orderService.Id, production.Id, commitId);
 
 // =============================================================================
@@ -231,80 +231,80 @@ var deployment = Deployment.Create(orderService.Id, production.Id, commitId);
 
 // Indirect: pre-existing VNet — orchestrator never provisions or destroys it.
 var vnetResource = Resource.Create(new CreateResourceRequest(
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-hub-vnet",
-    Description:       "Shared hub VNet /16 in East US. Contains all AKS, data, and management subnets.",
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-hub-vnet",
+    Description: "Shared hub VNet /16 in East US. Contains all AKS, data, and management subnets.",
     ResourceTemplateId: vnetTemplate.Id,
-    EnvironmentId:     production.Id,
-    Kind:              ResourceKind.Indirect));
+    EnvironmentId: production.Id,
+    Kind: ResourceKind.Indirect));
 
 var aksSubnetResource = Resource.Create(new CreateResourceRequest(
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-subnet-aks",
-    Description:       "/22 address space 10.240.0.0/22 for AKS node pools.",
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-subnet-aks",
+    Description: "/22 address space 10.240.0.0/22 for AKS node pools.",
     ResourceTemplateId: aksSubnetTemplate.Id,
-    EnvironmentId:     production.Id,
-    Kind:              ResourceKind.Direct));
+    EnvironmentId: production.Id,
+    Kind: ResourceKind.Direct));
 
 var dataSubnetResource = Resource.Create(new CreateResourceRequest(
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-subnet-data",
-    Description:       "/24 address space 10.240.8.0/24 for private endpoints only.",
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-subnet-data",
+    Description: "/24 address space 10.240.8.0/24 for private endpoints only.",
     ResourceTemplateId: dataSubnetTemplate.Id,
-    EnvironmentId:     production.Id,
-    Kind:              ResourceKind.Direct));
+    EnvironmentId: production.Id,
+    Kind: ResourceKind.Direct));
 
 var keyVaultResource = Resource.Create(new CreateResourceRequest(
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-keyvault-prod",
-    Description:       "Production Key Vault. Holds all service connection strings, ACR admin creds, and TLS certs.",
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-keyvault-prod",
+    Description: "Production Key Vault. Holds all service connection strings, ACR admin creds, and TLS certs.",
     ResourceTemplateId: keyVaultTemplate.Id,
-    EnvironmentId:     production.Id,
-    Kind:              ResourceKind.Direct));
+    EnvironmentId: production.Id,
+    Kind: ResourceKind.Direct));
 
 var acrResource = Resource.Create(new CreateResourceRequest(
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-acr-prod",
-    Description:       "Container registry serving all four microservice images. Geo-replicated to West Europe.",
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-acr-prod",
+    Description: "Container registry serving all four microservice images. Geo-replicated to West Europe.",
     ResourceTemplateId: acrTemplate.Id,
-    EnvironmentId:     production.Id,
-    Kind:              ResourceKind.Direct));
+    EnvironmentId: production.Id,
+    Kind: ResourceKind.Direct));
 
 var aksResource = Resource.Create(new CreateResourceRequest(
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-aks-prod",
-    Description:       "Production AKS cluster. System pool: 3×Standard_D4s_v5 zone-redundant. User pool: 2–10×Standard_D8s_v5 autoscaled.",
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-aks-prod",
+    Description: "Production AKS cluster. System pool: 3×Standard_D4s_v5 zone-redundant. User pool: 2–10×Standard_D8s_v5 autoscaled.",
     ResourceTemplateId: aksTemplate.Id,
-    EnvironmentId:     production.Id,
-    Kind:              ResourceKind.Direct));
+    EnvironmentId: production.Id,
+    Kind: ResourceKind.Direct));
 
 // ApplicationId set — order-service is the sole writer/owner of this CosmosDB account.
 var cosmosOrdersResource = Resource.Create(new CreateResourceRequest(
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-cosmos-orders",
-    Description:       "CosmosDB account for order documents. 4000 RU/s autoscale. Session consistency.",
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-cosmos-orders",
+    Description: "CosmosDB account for order documents. 4000 RU/s autoscale. Session consistency.",
     ResourceTemplateId: cosmosOrdersTemplate.Id,
-    EnvironmentId:     production.Id,
-    Kind:              ResourceKind.Direct,
-    ApplicationId:     orderService.Id));
+    EnvironmentId: production.Id,
+    Kind: ResourceKind.Direct,
+    ApplicationId: orderService.Id));
 
 var serviceBusResource = Resource.Create(new CreateResourceRequest(
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-servicebus-prod",
-    Description:       "Service Bus namespace. Topics: order-placed, payment-processed, notification-requested.",
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-servicebus-prod",
+    Description: "Service Bus namespace. Topics: order-placed, payment-processed, notification-requested.",
     ResourceTemplateId: serviceBusTemplate.Id,
-    EnvironmentId:     production.Id,
-    Kind:              ResourceKind.Direct));
+    EnvironmentId: production.Id,
+    Kind: ResourceKind.Direct));
 
 // ApplicationId set — product-catalog is the sole consumer of this Redis instance.
 var redisCacheResource = Resource.Create(new CreateResourceRequest(
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-redis-catalog",
-    Description:       "Redis cache for product catalog. TTL 300s on hot paths.",
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-redis-catalog",
+    Description: "Redis cache for product catalog. TTL 300s on hot paths.",
     ResourceTemplateId: redisCacheTemplate.Id,
-    EnvironmentId:     production.Id,
-    Kind:              ResourceKind.Direct,
-    ApplicationId:     catalogService.Id));
+    EnvironmentId: production.Id,
+    Kind: ResourceKind.Direct,
+    ApplicationId: catalogService.Id));
 
 // =============================================================================
 // Step 4 — Build the Dependency Graph
@@ -324,24 +324,24 @@ graph.AddResource(serviceBusResource.Id);
 graph.AddResource(redisCacheResource.Id);
 
 // Subnets depend on the VNet existing first.
-graph.AddDependency(aksSubnetResource.Id,    vnetResource.Id);
-graph.AddDependency(dataSubnetResource.Id,   vnetResource.Id);
+graph.AddDependency(aksSubnetResource.Id, vnetResource.Id);
+graph.AddDependency(dataSubnetResource.Id, vnetResource.Id);
 
 // Key Vault private endpoint lands in the data subnet.
-graph.AddDependency(keyVaultResource.Id,     dataSubnetResource.Id);
+graph.AddDependency(keyVaultResource.Id, dataSubnetResource.Id);
 
 // ACR needs Key Vault to write admin credentials to on creation.
-graph.AddDependency(acrResource.Id,          keyVaultResource.Id);
+graph.AddDependency(acrResource.Id, keyVaultResource.Id);
 
 // AKS needs: its subnet, ACR to pull images, and Key Vault for the CSI driver.
-graph.AddDependency(aksResource.Id,          aksSubnetResource.Id);
-graph.AddDependency(aksResource.Id,          acrResource.Id);
-graph.AddDependency(aksResource.Id,          keyVaultResource.Id);
+graph.AddDependency(aksResource.Id, aksSubnetResource.Id);
+graph.AddDependency(aksResource.Id, acrResource.Id);
+graph.AddDependency(aksResource.Id, keyVaultResource.Id);
 
 // Data-tier resources need the data subnet for their private endpoints.
 graph.AddDependency(cosmosOrdersResource.Id, dataSubnetResource.Id);
-graph.AddDependency(serviceBusResource.Id,   dataSubnetResource.Id);
-graph.AddDependency(redisCacheResource.Id,   dataSubnetResource.Id);
+graph.AddDependency(serviceBusResource.Id, dataSubnetResource.Id);
+graph.AddDependency(redisCacheResource.Id, dataSubnetResource.Id);
 
 // Kahn's topological sort — Indirect nodes (VNet) appear first but the provisioner
 // skips IaC apply for them based on the Kind check.
@@ -367,113 +367,113 @@ foreach (var id in provisionOrder)
 // Step 5 — Provision via ResourceInstances with Real Parameters
 // =============================================================================
 
-var aksSubnetVersion  = aksSubnetTemplate.GetLatestVersion()!;
+var aksSubnetVersion = aksSubnetTemplate.GetLatestVersion()!;
 var aksSubnetInstance = ResourceInstance.Create(new CreateResourceInstanceRequest(
-    ResourceId:        aksSubnetResource.Id,
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-subnet-aks-prod-instance",
+    ResourceId: aksSubnetResource.Id,
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-subnet-aks-prod-instance",
     TemplateVersionId: aksSubnetVersion.Id,
-    EnvironmentId:     production.Id,
+    EnvironmentId: production.Id,
     InputParameters: new Dictionary<string, JsonElement>
     {
-        ["resource_group_name"]  = JsonSerializer.SerializeToElement("rg-ecommerce-networking-prod"),
+        ["resource_group_name"] = JsonSerializer.SerializeToElement("rg-ecommerce-networking-prod"),
         ["virtual_network_name"] = JsonSerializer.SerializeToElement("vnet-ecommerce-hub-prod"),
-        ["address_prefixes"]     = JsonSerializer.SerializeToElement("10.240.0.0/22"),
-        ["service_endpoints"]    = JsonSerializer.SerializeToElement("Microsoft.ContainerService,Microsoft.KeyVault"),
+        ["address_prefixes"] = JsonSerializer.SerializeToElement("10.240.0.0/22"),
+        ["service_endpoints"] = JsonSerializer.SerializeToElement("Microsoft.ContainerService,Microsoft.KeyVault"),
         // Disabling network policies is required for private endpoints to attach.
         ["private_endpoint_network_policies"] = JsonSerializer.SerializeToElement("Disabled")
     }));
 
-var kvVersion  = keyVaultTemplate.GetLatestVersion()!;
+var kvVersion = keyVaultTemplate.GetLatestVersion()!;
 var kvInstance = ResourceInstance.Create(new CreateResourceInstanceRequest(
-    ResourceId:        keyVaultResource.Id,
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-keyvault-prod-instance",
+    ResourceId: keyVaultResource.Id,
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-keyvault-prod-instance",
     TemplateVersionId: kvVersion.Id,
-    EnvironmentId:     production.Id,
+    EnvironmentId: production.Id,
     InputParameters: new Dictionary<string, JsonElement>
     {
-        ["resource_group_name"]           = JsonSerializer.SerializeToElement("rg-ecommerce-secrets-prod"),
-        ["location"]                      = JsonSerializer.SerializeToElement("eastus"),
-        ["sku_name"]                      = JsonSerializer.SerializeToElement("standard"),
+        ["resource_group_name"] = JsonSerializer.SerializeToElement("rg-ecommerce-secrets-prod"),
+        ["location"] = JsonSerializer.SerializeToElement("eastus"),
+        ["sku_name"] = JsonSerializer.SerializeToElement("standard"),
         // Required for PCI-DSS: once enabled, a vault cannot be immediately purged.
-        ["soft_delete_retention_days"]    = JsonSerializer.SerializeToElement("90"),
-        ["purge_protection_enabled"]      = JsonSerializer.SerializeToElement("true"),
+        ["soft_delete_retention_days"] = JsonSerializer.SerializeToElement("90"),
+        ["purge_protection_enabled"] = JsonSerializer.SerializeToElement("true"),
         // RBAC model only — no legacy access policies.
-        ["enable_rbac_authorization"]     = JsonSerializer.SerializeToElement("true"),
+        ["enable_rbac_authorization"] = JsonSerializer.SerializeToElement("true"),
         ["public_network_access_enabled"] = JsonSerializer.SerializeToElement("false"),
-        ["private_endpoint_subnet_id"]    = JsonSerializer.SerializeToElement("$(ref:ecommerce-subnet-data.subnet_id)")
+        ["private_endpoint_subnet_id"] = JsonSerializer.SerializeToElement("$(ref:ecommerce-subnet-data.subnet_id)")
     }));
 
-var acrVersion  = acrTemplate.GetLatestVersion()!;
+var acrVersion = acrTemplate.GetLatestVersion()!;
 var acrInstance = ResourceInstance.Create(new CreateResourceInstanceRequest(
-    ResourceId:        acrResource.Id,
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-acr-prod-instance",
+    ResourceId: acrResource.Id,
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-acr-prod-instance",
     TemplateVersionId: acrVersion.Id,
-    EnvironmentId:     production.Id,
+    EnvironmentId: production.Id,
     InputParameters: new Dictionary<string, JsonElement>
     {
-        ["resource_group_name"]                = JsonSerializer.SerializeToElement("rg-ecommerce-containers-prod"),
-        ["location"]                           = JsonSerializer.SerializeToElement("eastus"),
-        ["sku"]                                = JsonSerializer.SerializeToElement("Premium"),
+        ["resource_group_name"] = JsonSerializer.SerializeToElement("rg-ecommerce-containers-prod"),
+        ["location"] = JsonSerializer.SerializeToElement("eastus"),
+        ["sku"] = JsonSerializer.SerializeToElement("Premium"),
         // Content trust ensures only signed images can be deployed.
-        ["content_trust_enabled"]              = JsonSerializer.SerializeToElement("true"),
-        ["public_network_access_enabled"]      = JsonSerializer.SerializeToElement("false"),
+        ["content_trust_enabled"] = JsonSerializer.SerializeToElement("true"),
+        ["public_network_access_enabled"] = JsonSerializer.SerializeToElement("false"),
         // Geo-replication to West Europe for DR.
-        ["georeplications"]                    = JsonSerializer.SerializeToElement("westeurope"),
+        ["georeplications"] = JsonSerializer.SerializeToElement("westeurope"),
         ["admin_credentials_key_vault_secret"] = JsonSerializer.SerializeToElement("$(ref:ecommerce-keyvault-prod.vault_uri)/secrets/acr-admin-password")
     }));
 
-var aksVersion  = aksTemplate.GetLatestVersion()!;
+var aksVersion = aksTemplate.GetLatestVersion()!;
 var aksInstance = ResourceInstance.Create(new CreateResourceInstanceRequest(
-    ResourceId:        aksResource.Id,
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-aks-prod-instance",
+    ResourceId: aksResource.Id,
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-aks-prod-instance",
     TemplateVersionId: aksVersion.Id,
-    EnvironmentId:     production.Id,
+    EnvironmentId: production.Id,
     InputParameters: new Dictionary<string, JsonElement>
     {
-        ["resource_group_name"]        = JsonSerializer.SerializeToElement("rg-ecommerce-compute-prod"),
-        ["location"]                   = JsonSerializer.SerializeToElement("eastus"),
-        ["kubernetes_version"]         = JsonSerializer.SerializeToElement("1.30.3"),
-        ["network_plugin"]             = JsonSerializer.SerializeToElement("azure"),
-        ["network_plugin_mode"]        = JsonSerializer.SerializeToElement("overlay"),
+        ["resource_group_name"] = JsonSerializer.SerializeToElement("rg-ecommerce-compute-prod"),
+        ["location"] = JsonSerializer.SerializeToElement("eastus"),
+        ["kubernetes_version"] = JsonSerializer.SerializeToElement("1.30.3"),
+        ["network_plugin"] = JsonSerializer.SerializeToElement("azure"),
+        ["network_plugin_mode"] = JsonSerializer.SerializeToElement("overlay"),
         // System pool: fixed size, zone-redundant, cordoned from workloads.
-        ["system_node_count"]          = JsonSerializer.SerializeToElement("3"),
-        ["system_vm_size"]             = JsonSerializer.SerializeToElement("Standard_D4s_v5"),
-        ["system_availability_zones"]  = JsonSerializer.SerializeToElement("1,2,3"),
+        ["system_node_count"] = JsonSerializer.SerializeToElement("3"),
+        ["system_vm_size"] = JsonSerializer.SerializeToElement("Standard_D4s_v5"),
+        ["system_availability_zones"] = JsonSerializer.SerializeToElement("1,2,3"),
         // User pool: autoscaled, spot-tolerant for batch jobs.
-        ["user_node_min_count"]        = JsonSerializer.SerializeToElement("2"),
-        ["user_node_max_count"]        = JsonSerializer.SerializeToElement("10"),
-        ["user_vm_size"]               = JsonSerializer.SerializeToElement("Standard_D8s_v5"),
-        ["oidc_issuer_enabled"]        = JsonSerializer.SerializeToElement("true"),
-        ["workload_identity_enabled"]  = JsonSerializer.SerializeToElement("true"),
+        ["user_node_min_count"] = JsonSerializer.SerializeToElement("2"),
+        ["user_node_max_count"] = JsonSerializer.SerializeToElement("10"),
+        ["user_vm_size"] = JsonSerializer.SerializeToElement("Standard_D8s_v5"),
+        ["oidc_issuer_enabled"] = JsonSerializer.SerializeToElement("true"),
+        ["workload_identity_enabled"] = JsonSerializer.SerializeToElement("true"),
         // CSI driver mounts Key Vault secrets as volumes on pod startup.
         ["key_vault_secrets_provider"] = JsonSerializer.SerializeToElement("true"),
-        ["acr_id"]                     = JsonSerializer.SerializeToElement("$(ref:ecommerce-acr-prod.registry_id)"),
-        ["vnet_subnet_id"]             = JsonSerializer.SerializeToElement("$(ref:ecommerce-subnet-aks.subnet_id)")
+        ["acr_id"] = JsonSerializer.SerializeToElement("$(ref:ecommerce-acr-prod.registry_id)"),
+        ["vnet_subnet_id"] = JsonSerializer.SerializeToElement("$(ref:ecommerce-subnet-aks.subnet_id)")
     }));
 
-var cosmosVersion  = cosmosOrdersTemplate.GetLatestVersion()!;
+var cosmosVersion = cosmosOrdersTemplate.GetLatestVersion()!;
 var cosmosInstance = ResourceInstance.Create(new CreateResourceInstanceRequest(
-    ResourceId:        cosmosOrdersResource.Id,
-    OrganisationId:    organisation.Id,
-    Name:              "ecommerce-cosmos-orders-prod-instance",
+    ResourceId: cosmosOrdersResource.Id,
+    OrganisationId: organisation.Id,
+    Name: "ecommerce-cosmos-orders-prod-instance",
     TemplateVersionId: cosmosVersion.Id,
-    EnvironmentId:     production.Id,
+    EnvironmentId: production.Id,
     InputParameters: new Dictionary<string, JsonElement>
     {
-        ["resource_group_name"]                = JsonSerializer.SerializeToElement("rg-ecommerce-data-prod"),
-        ["location"]                           = JsonSerializer.SerializeToElement("eastus"),
-        ["offer_type"]                         = JsonSerializer.SerializeToElement("Standard"),
+        ["resource_group_name"] = JsonSerializer.SerializeToElement("rg-ecommerce-data-prod"),
+        ["location"] = JsonSerializer.SerializeToElement("eastus"),
+        ["offer_type"] = JsonSerializer.SerializeToElement("Standard"),
         // Session consistency: strong enough for order workflows, avoids cross-region write latency.
-        ["consistency_level"]                  = JsonSerializer.SerializeToElement("Session"),
-        ["enable_automatic_failover"]          = JsonSerializer.SerializeToElement("true"),
+        ["consistency_level"] = JsonSerializer.SerializeToElement("Session"),
+        ["enable_automatic_failover"] = JsonSerializer.SerializeToElement("true"),
         // 4000 RU/s autoscale handles order spikes without manual intervention.
-        ["max_throughput"]                     = JsonSerializer.SerializeToElement("4000"),
-        ["public_network_access_enabled"]      = JsonSerializer.SerializeToElement("false"),
-        ["private_endpoint_subnet_id"]         = JsonSerializer.SerializeToElement("$(ref:ecommerce-subnet-data.subnet_id)"),
+        ["max_throughput"] = JsonSerializer.SerializeToElement("4000"),
+        ["public_network_access_enabled"] = JsonSerializer.SerializeToElement("false"),
+        ["private_endpoint_subnet_id"] = JsonSerializer.SerializeToElement("$(ref:ecommerce-subnet-data.subnet_id)"),
         // Connection string written here so AKS workloads retrieve it via KV CSI driver.
         ["connection_string_key_vault_secret"] = JsonSerializer.SerializeToElement("$(ref:ecommerce-keyvault-prod.vault_uri)/secrets/cosmos-orders-connstr")
     }));
@@ -494,21 +494,21 @@ cosmosOrdersResource.AddConsumer(orderService.Id);
 aksSubnetInstance.Transition(ResourceInstanceStatus.Provisioning);
 aksSubnetInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstanceOutput
 {
-    Location  = new Uri("https://portal.azure.com/#resource/subscriptions/xxxxxxxx/resourceGroups/rg-ecommerce-networking-prod/providers/Microsoft.Network/virtualNetworks/vnet-ecommerce-hub-prod/subnets/snet-aks"),
+    Location = new Uri("https://portal.azure.com/#resource/subscriptions/xxxxxxxx/resourceGroups/rg-ecommerce-networking-prod/providers/Microsoft.Network/virtualNetworks/vnet-ecommerce-hub-prod/subnets/snet-aks"),
     Workspace = "ecommerce-prod"
 });
 
 acrInstance.Transition(ResourceInstanceStatus.Provisioning);
 acrInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstanceOutput
 {
-    Location  = new Uri("https://ecommerce-acr-prod.azurecr.io"),
+    Location = new Uri("https://ecommerce-acr-prod.azurecr.io"),
     Workspace = "ecommerce-prod"
 });
 
 aksInstance.Transition(ResourceInstanceStatus.Provisioning);
 aksInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstanceOutput
 {
-    Location  = new Uri("https://ecommerce-aks-prod.hcp.eastus.azmk8s.io"),
+    Location = new Uri("https://ecommerce-aks-prod.hcp.eastus.azmk8s.io"),
     Workspace = "ecommerce-prod"
 });
 
@@ -520,7 +520,7 @@ kvInstance.Transition(ResourceInstanceStatus.Pending);
 kvInstance.Transition(ResourceInstanceStatus.Provisioning);
 kvInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstanceOutput
 {
-    Location  = new Uri("https://ecommerce-keyvault-prod.vault.azure.net"),
+    Location = new Uri("https://ecommerce-keyvault-prod.vault.azure.net"),
     Workspace = "ecommerce-prod"
 });
 

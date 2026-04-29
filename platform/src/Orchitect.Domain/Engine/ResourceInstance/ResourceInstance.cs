@@ -24,14 +24,14 @@ public sealed record ResourceInstance
 
     private static readonly Dictionary<ResourceInstanceStatus, HashSet<ResourceInstanceStatus>> ValidTransitions = new()
     {
-        [ResourceInstanceStatus.Pending]        = [ResourceInstanceStatus.Provisioning],
-        [ResourceInstanceStatus.Provisioning]   = [ResourceInstanceStatus.Active, ResourceInstanceStatus.Failed],
-        [ResourceInstanceStatus.Active]         = [ResourceInstanceStatus.Provisioning, ResourceInstanceStatus.PendingRemoval],
-        [ResourceInstanceStatus.Failed]         = [ResourceInstanceStatus.Pending],
+        [ResourceInstanceStatus.Pending] = [ResourceInstanceStatus.Provisioning],
+        [ResourceInstanceStatus.Provisioning] = [ResourceInstanceStatus.Active, ResourceInstanceStatus.Failed],
+        [ResourceInstanceStatus.Active] = [ResourceInstanceStatus.Provisioning, ResourceInstanceStatus.PendingRemoval],
+        [ResourceInstanceStatus.Failed] = [ResourceInstanceStatus.Pending],
         [ResourceInstanceStatus.PendingRemoval] = [ResourceInstanceStatus.Removing],
-        [ResourceInstanceStatus.Removing]       = [ResourceInstanceStatus.Removed, ResourceInstanceStatus.RemovalFailed],
-        [ResourceInstanceStatus.Removed]        = [],
-        [ResourceInstanceStatus.RemovalFailed]  = [ResourceInstanceStatus.PendingRemoval]
+        [ResourceInstanceStatus.Removing] = [ResourceInstanceStatus.Removed, ResourceInstanceStatus.RemovalFailed],
+        [ResourceInstanceStatus.Removed] = [],
+        [ResourceInstanceStatus.RemovalFailed] = [ResourceInstanceStatus.PendingRemoval]
     };
 
     public static ResourceInstance Create(CreateResourceInstanceRequest request)
