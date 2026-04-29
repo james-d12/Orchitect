@@ -6,7 +6,7 @@ namespace Orchitect.Domain.Engine.ResourceDependency;
 
 public sealed class ResourceDependencyGraph : IResourceDependencyGraph
 {
-    private readonly Dictionary<ResourceId, ResourceDependencyNode> _nodes = new();
+    private readonly Dictionary<ResourceId, ResourceDependencyNode> _nodes = [];
 
     public ResourceDependencyGraphId Id { get; private init; }
     public OrganisationId OrganisationId { get; private init; }

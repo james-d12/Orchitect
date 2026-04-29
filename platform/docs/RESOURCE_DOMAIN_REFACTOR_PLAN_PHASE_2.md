@@ -24,6 +24,28 @@ Phase 1 delivered a solid core: `Resource` as declared desired state, `ResourceI
 
 ---
 
+## Why ResourceRequirement, ResourceBinding, and IResourceResolver
+
+Phase 1 has the platform team creating `Resource` objects directly and wiring instances by hand. That works when one team controls everything top-down. The real world is different — app teams express what they need via `score.yaml`, and the platform decides how to satisfy it.
+
+**Three concrete problems these models solve:**
+
+### 1. Shared resources with an audit trail
+
+Both `order-service` and `payment-service` need `azure.service-bus`. Without the requirement layer, whoever creates the `Resource` object wins — the second app silently shares it with no record of why. With `ResourceRequirement` + `ResourceBinding`, both teams independently declare their need. The resolver binds both to `ecommerce-servicebus-prod`, and the binding table records: "payment-service needed service-bus → resolved to ecommerce-servicebus-prod". You can now answer: which apps depend on this resource? What happens if I remove it?
+
+### 2. Intent vs. allocation live at different lifecycles
+
+`Resource` is what the platform *owns*. `ResourceRequirement` is what an app *asks for*. They belong to different actors and have different lifecycles. If `notification-service` is decommissioned, its requirements are deleted — but `ecommerce-servicebus-prod` remains because `order-service` and `payment-service` still depend on it. If you had app intent baked into `Resource` ownership directly, decommissioning an app that happens to own a shared resource would cascade incorrectly.
+
+### 3. Delta computation needs a declared desired state
+
+`DeploymentDelta` is computed by diffing the current `EnvironmentStateSnapshot` (what exists now) against the new desired set (what the requirements say should exist). Without requirements as a first-class concept, there is nothing to diff against — you'd compare raw `Resource` lists with no knowledge of *why* each resource exists or whether a resource that disappeared was intentionally removed or is a bug.
+
+**In one sentence:** `ResourceRequirement` is the app's voice. `ResourceBinding` is the platform's answer. `IResourceResolver` is the decision logic. Together they answer: given what this app says it needs, which concrete resource satisfies it, and is that the same resource another app is already using?
+
+---
+
 ## Pre-existing State to Reconcile
 
 ### Existing `Deployment` (evolve, do not replace)
@@ -609,6 +631,612 @@ EnvironmentStateSnapshot stored
 - Cost optimisation
 - Policy DSL
 - Full resolver implementation
+
+---
+
+## Playground Examples
+
+These examples extend the Phase 1 ecommerce scenario directly. At the point Phase 2 starts, you have:
+- 9 declared `Resource` objects (VNet, subnets, Key Vault, ACR, AKS, CosmosDB-orders, Service Bus, Redis)
+- 5 `ResourceInstance` objects provisioned and `Active`
+- A `ResourceDependencyGraph` with all 9 nodes and correct edges
+- 4 applications: `order-service`, `payment-service`, `notification-service`, `product-catalog`
+
+Phase 2 adds the intent layer on top of this.
+
+---
+
+### Step 8 — Express Requirements (as parsed from score.yaml)
+
+Each application declares what it needs. These are created by parsing the app's `score.yaml` — the platform does not create them manually. Notice how `order-service` and `payment-service` both declare a requirement for `azure.service-bus`: this is the key case that demonstrates why the requirement layer exists.
+
+```csharp
+// ── order-service requirements ──────────────────────────────────────────────
+
+// CosmosDB is dedicated to order-service — no id: in score.yaml, so the
+// resolver will create a new resource if one doesn't already belong to this app.
+var orderCosmosReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: orderService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.cosmosdb.orders",
+    Class: "direct",
+    Constraints: new Dictionary<string, string>
+    {
+        ["region"]     = "eastus",
+        ["compliance"] = "pci"
+    },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["consistency_level"] = JsonSerializer.SerializeToElement("Session"),
+        ["max_throughput"]    = JsonSerializer.SerializeToElement(4000),
+        ["public_network_access_enabled"] = JsonSerializer.SerializeToElement(false)
+    }));
+
+// Service Bus is shared — id: "ecommerce-servicebus-prod" in score.yaml.
+// The resolver will slug-match this to the existing ecommerce-servicebus-prod resource.
+var orderServiceBusReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: orderService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.service-bus",
+    Class: "direct",
+    Constraints: new Dictionary<string, string>
+    {
+        ["id"]     = "ecommerce-servicebus-prod",   // maps to Resource.Slug
+        ["region"] = "eastus"
+    },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["topic"]      = JsonSerializer.SerializeToElement("order-placed"),
+        ["sas_policy"] = JsonSerializer.SerializeToElement("send")
+    }));
+
+var orderAksReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: orderService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.aks",
+    Class: "direct",
+    Constraints: new Dictionary<string, string> { ["id"] = "ecommerce-aks-prod" },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["namespace"]       = JsonSerializer.SerializeToElement("order-service"),
+        ["service_account"] = JsonSerializer.SerializeToElement("order-service-sa")
+    }));
+
+// ── payment-service requirements ────────────────────────────────────────────
+
+// Payment-service ALSO needs service-bus — same slug constraint.
+// Two separate requirements from two separate apps, same target resource.
+var paymentServiceBusReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: paymentService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.service-bus",
+    Class: "direct",
+    Constraints: new Dictionary<string, string>
+    {
+        ["id"]         = "ecommerce-servicebus-prod",
+        ["region"]     = "eastus",
+        ["compliance"] = "pci"
+    },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["subscriptions"] = JsonSerializer.SerializeToElement(new[]
+        {
+            new { topic = "order-placed", subscription = "payment-service-sub" }
+        }),
+        ["topic"]      = JsonSerializer.SerializeToElement("payment-processed"),
+        ["sas_policy"] = JsonSerializer.SerializeToElement("listen,send")
+    }));
+
+var paymentKeyVaultReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: paymentService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.key-vault",
+    Class: "indirect",
+    Constraints: new Dictionary<string, string> { ["id"] = "ecommerce-keyvault-prod" },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["secret_names"] = JsonSerializer.SerializeToElement(new[]
+        {
+            "stripe-api-key", "stripe-webhook-secret", "cosmos-orders-connstr"
+        })
+    }));
+
+var paymentAksReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: paymentService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.aks",
+    Class: "direct",
+    Constraints: new Dictionary<string, string>
+    {
+        ["id"]         = "ecommerce-aks-prod",
+        ["compliance"] = "pci"
+    },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["namespace"]       = JsonSerializer.SerializeToElement("payment-service"),
+        ["service_account"] = JsonSerializer.SerializeToElement("payment-service-sa"),
+        ["network_policy"]  = JsonSerializer.SerializeToElement("deny-all"),
+        ["allowed_namespaces"] = JsonSerializer.SerializeToElement(new[] { "order-service" })
+    }));
+
+// ── notification-service requirements ───────────────────────────────────────
+
+var notifServiceBusReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: notifService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.service-bus",
+    Class: "direct",
+    Constraints: new Dictionary<string, string> { ["id"] = "ecommerce-servicebus-prod" },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["subscriptions"] = JsonSerializer.SerializeToElement(new[]
+        {
+            new { topic = "payment-processed", subscription = "notification-payment-sub", max_delivery_count = 10 },
+            new { topic = "order-placed",      subscription = "notification-order-sub",   max_delivery_count = 5  }
+        }),
+        ["sas_policy"] = JsonSerializer.SerializeToElement("listen")
+    }));
+
+var notifKeyVaultReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: notifService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.key-vault",
+    Class: "indirect",
+    Constraints: new Dictionary<string, string> { ["id"] = "ecommerce-keyvault-prod" },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["secret_names"] = JsonSerializer.SerializeToElement(new[]
+        {
+            "sendgrid-api-key", "twilio-account-sid", "twilio-auth-token"
+        })
+    }));
+
+// ── product-catalog requirements ─────────────────────────────────────────────
+
+// No id: — catalog needs its OWN CosmosDB account, separate from order-service's.
+// The resolver will find no existing resource matching this type for this app,
+// so a new Resource will be created: ecommerce-cosmos-products.
+var catalogCosmosReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: catalogService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.cosmosdb.orders",   // same template type, separate account
+    Class: "direct",
+    Constraints: new Dictionary<string, string>
+    {
+        ["region"]              = "eastus",
+        ["data-classification"] = "internal"
+    },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["consistency_level"] = JsonSerializer.SerializeToElement("BoundedStaleness"),
+        ["max_throughput"]    = JsonSerializer.SerializeToElement(8000),
+        ["public_network_access_enabled"] = JsonSerializer.SerializeToElement(false)
+    }));
+
+// Redis is dedicated to product-catalog — no id:, resolver creates new resource.
+var catalogRedisReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: catalogService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.redis-cache",
+    Class: "direct",
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["sku"]      = JsonSerializer.SerializeToElement("Standard"),
+        ["capacity"] = JsonSerializer.SerializeToElement(2),
+        ["enable_non_ssl_port"] = JsonSerializer.SerializeToElement(false),
+        ["redis_version"]       = JsonSerializer.SerializeToElement("7.2")
+    }));
+
+var catalogAksReq = ResourceRequirement.Create(new CreateResourceRequirementRequest(
+    OrganisationId: organisation.Id,
+    ApplicationId: catalogService.Id,
+    EnvironmentId: production.Id,
+    Type: "azure.aks",
+    Class: "direct",
+    Constraints: new Dictionary<string, string> { ["id"] = "ecommerce-aks-prod" },
+    Parameters: new Dictionary<string, JsonElement>
+    {
+        ["namespace"]       = JsonSerializer.SerializeToElement("product-catalog"),
+        ["min_replicas"]    = JsonSerializer.SerializeToElement(1),
+        ["max_replicas"]    = JsonSerializer.SerializeToElement(10)
+    }));
+
+Console.WriteLine("=== Requirements declared ===");
+Console.WriteLine($"  order-service:        3 requirements (cosmos, service-bus, aks)");
+Console.WriteLine($"  payment-service:      3 requirements (service-bus, key-vault, aks)");
+Console.WriteLine($"  notification-service: 3 requirements (service-bus, key-vault, aks)");
+Console.WriteLine($"  product-catalog:      3 requirements (cosmos-NEW, redis, aks)");
+Console.WriteLine($"  service-bus demanded by 3 apps — resolver must converge all to same resource");
+```
+
+---
+
+### Step 9 — Resolve Requirements to Resources
+
+`IResourceResolver` is a domain interface only — the playground simulates resolution inline using slug-matching, which is the simplest strategy a real resolver would use. Requirements with a `Constraints["id"]` are slug-matched to existing resources. Requirements without `id` are matched by type within the app's ownership (no match → new resource needed).
+
+```csharp
+// Simulate the resolver: slug-match or type-match against known resources.
+// A real IResourceResolver implementation lives in Infrastructure, not here.
+var allResources = new[]
+{
+    vnetResource, aksSubnetResource, dataSubnetResource, keyVaultResource,
+    acrResource, aksResource, cosmosOrdersResource, serviceBusResource, redisCacheResource
+};
+
+ResourceId ResolveBySlug(string slug) =>
+    allResources.Single(r => r.Slug == slug).Id;
+
+// ── Bind order-service ───────────────────────────────────────────────────────
+
+// CosmosDB: no slug constraint — resolver finds ecommerce-cosmos-orders
+// already declared for order-service (ApplicationId matches). Bind to it.
+var orderCosmosBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  orderCosmosReq.Id,
+    resourceId:     cosmosOrdersResource.Id);   // existing resource — no delta entry needed
+
+// Service Bus: slug match "ecommerce-servicebus-prod" → serviceBusResource.
+var orderServiceBusBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  orderServiceBusReq.Id,
+    resourceId:     ResolveBySlug("ecommerce-servicebus-prod"));
+
+// AKS: slug match.
+var orderAksBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  orderAksReq.Id,
+    resourceId:     ResolveBySlug("ecommerce-aks-prod"));
+
+// ── Bind payment-service ─────────────────────────────────────────────────────
+
+// Service Bus: SAME slug → SAME resource. Two requirements, one resource, two bindings.
+// This is the audit trail: both payment-service and order-service are recorded
+// as having required and been given ecommerce-servicebus-prod.
+var paymentServiceBusBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  paymentServiceBusReq.Id,
+    resourceId:     ResolveBySlug("ecommerce-servicebus-prod")); // same resource as order's
+
+var paymentKeyVaultBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  paymentKeyVaultReq.Id,
+    resourceId:     ResolveBySlug("ecommerce-keyvault-prod"));
+
+var paymentAksBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  paymentAksReq.Id,
+    resourceId:     ResolveBySlug("ecommerce-aks-prod"));
+
+// ── Bind notification-service ────────────────────────────────────────────────
+
+var notifServiceBusBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  notifServiceBusReq.Id,
+    resourceId:     ResolveBySlug("ecommerce-servicebus-prod")); // third app on same resource
+
+var notifKeyVaultBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  notifKeyVaultReq.Id,
+    resourceId:     ResolveBySlug("ecommerce-keyvault-prod"));
+
+// ── Bind product-catalog ─────────────────────────────────────────────────────
+
+// CosmosDB: no slug, no existing resource owned by catalog-service for type
+// azure.cosmosdb.orders → resolver signals: provision new resource.
+var cosmosProductsResource = Resource.Create(new CreateResourceRequest(
+    OrganisationId:     organisation.Id,
+    Name:               "ecommerce-cosmos-products",
+    Description:        "CosmosDB for product catalog documents. 8000 RU/s autoscale. BoundedStaleness.",
+    ResourceTemplateId: cosmosOrdersTemplate.Id,   // same template, new instance
+    EnvironmentId:      production.Id,
+    Kind:               ResourceTemplateKind.Direct,
+    ApplicationId:      catalogService.Id));
+
+var catalogCosmosBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  catalogCosmosReq.Id,
+    resourceId:     cosmosProductsResource.Id);   // NEW resource — will appear in delta
+
+// Redis: no slug, no existing redis for catalog → new resource (already exists as redisCacheResource).
+// The resolver finds redisCacheResource was created in Phase 1 for catalogService.Id.
+var catalogRedisBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  catalogRedisReq.Id,
+    resourceId:     redisCacheResource.Id);
+
+var catalogAksBinding = ResourceBinding.Create(
+    organisationId: organisation.Id,
+    environmentId:  production.Id,
+    requirementId:  catalogAksReq.Id,
+    resourceId:     ResolveBySlug("ecommerce-aks-prod"));
+
+Console.WriteLine("\n=== Resolution summary ===");
+Console.WriteLine($"  service-bus demanded by 3 apps → all bound to ecommerce-servicebus-prod");
+Console.WriteLine($"    order-service    binding: {orderServiceBusBinding.Id.Value}");
+Console.WriteLine($"    payment-service  binding: {paymentServiceBusBinding.Id.Value}");
+Console.WriteLine($"    notif-service    binding: {notifServiceBusBinding.Id.Value}");
+Console.WriteLine($"  product-catalog cosmos: no existing resource → new resource created");
+Console.WriteLine($"    new resource: {cosmosProductsResource.Slug} ({cosmosProductsResource.Id.Value})");
+```
+
+---
+
+### Step 10 — Compute DeploymentDelta
+
+The delta is computed by comparing the current `EnvironmentStateSnapshot` (the 9 resources provisioned in Phase 1) against the resolved binding set. The only new resource the bindings require that the snapshot doesn't contain is `ecommerce-cosmos-products`.
+
+```csharp
+// Phase 1 snapshot: 9 known active resources.
+var phase1ResourceIds = new[]
+{
+    vnetResource.Id, aksSubnetResource.Id, dataSubnetResource.Id,
+    keyVaultResource.Id, acrResource.Id, aksResource.Id,
+    cosmosOrdersResource.Id, serviceBusResource.Id, redisCacheResource.Id
+};
+
+// New desired set: all bound resources. Diff against snapshot.
+var desiredResourceIds = new HashSet<ResourceId>
+{
+    cosmosOrdersResource.Id, serviceBusResource.Id, aksResource.Id,  // order-service
+    keyVaultResource.Id,                                              // payment + notif
+    redisCacheResource.Id,                                           // catalog redis (existing)
+    cosmosProductsResource.Id                                        // catalog cosmos (NEW)
+};
+
+var delta = DeploymentDelta.Create(organisation.Id, production.Id);
+
+foreach (var id in desiredResourceIds)
+{
+    if (!phase1ResourceIds.Contains(id))
+        delta.AddResource(id);   // net-new resource — needs provisioning
+}
+// No updates or removals in this scenario — all existing resources are unchanged.
+
+Console.WriteLine("\n=== Deployment Delta ===");
+Console.WriteLine($"  + Add: {cosmosProductsResource.Slug} (product-catalog CosmosDB)");
+Console.WriteLine($"  ~ Update: (none)");
+Console.WriteLine($"  - Remove: (none)");
+Console.WriteLine($"  Total: {delta.AddedResourceIds.Count} added, {delta.UpdatedResourceIds.Count} updated, {delta.RemovedResourceIds.Count} removed");
+```
+
+---
+
+### Step 11 — Enriched Deployment Lifecycle
+
+The deployment tracks who requested it, when each phase started, and why it failed (if it does). The guarded `Transition` prevents invalid state jumps — the same discipline as `ResourceInstance`.
+
+```csharp
+// product-catalog deploy — adding its new cosmos resource.
+var catalogDeploy = Deployment.Create(new CreateDeploymentRequest(
+    ApplicationId: catalogService.Id,
+    EnvironmentId: production.Id,
+    CommitId:      new CommitId("3e8a91f"),
+    RequestedBy:   "james@acme.com"));    // could be "system" for automated deploys
+
+Console.WriteLine($"\n=== Deployment: {catalogDeploy.Id.Value} ===");
+Console.WriteLine($"  Status:      {catalogDeploy.Status}");        // Pending
+Console.WriteLine($"  Requested by: {catalogDeploy.RequestedBy}");
+
+// Platform begins computing the delta.
+catalogDeploy.Transition(DeploymentStatus.Planning);
+Console.WriteLine($"  → {catalogDeploy.Status}");   // Planning
+
+// Delta computed and persisted — attach it to the deployment.
+catalogDeploy.SetDelta(delta.Id);
+Console.WriteLine($"  DeltaId attached: {catalogDeploy.DeltaId}");
+
+// IaC apply begins. StartedAt is set automatically on transition to Running.
+catalogDeploy.Transition(DeploymentStatus.Running);
+Console.WriteLine($"  → {catalogDeploy.Status}");
+Console.WriteLine($"  StartedAt: {catalogDeploy.StartedAt}");
+
+// Terraform apply completes — cosmos-products provisioned successfully.
+catalogDeploy.Transition(DeploymentStatus.Succeeded);
+Console.WriteLine($"  → {catalogDeploy.Status}");
+Console.WriteLine($"  CompletedAt: {catalogDeploy.CompletedAt}");
+
+
+// ── Failure and retry scenario ───────────────────────────────────────────────
+// notification-service deploys independently; it hits a quota issue on Service Bus.
+
+var notifDeploy = Deployment.Create(new CreateDeploymentRequest(
+    ApplicationId: notifService.Id,
+    EnvironmentId: production.Id,
+    CommitId:      new CommitId("c2d44b0"),
+    RequestedBy:   "system"));
+
+notifDeploy.Transition(DeploymentStatus.Planning);
+notifDeploy.SetDelta(DeploymentDelta.Create(organisation.Id, production.Id).Id);  // empty delta — no new resources
+notifDeploy.Transition(DeploymentStatus.Running);
+
+// Terraform apply fails: Service Bus topic quota exceeded.
+notifDeploy.Transition(
+    DeploymentStatus.Failed,
+    errorSummary: "Terraform apply failed: azure.service-bus topic quota (10/10) exceeded in eastus");
+
+Console.WriteLine($"\n=== notification-service deploy failed ===");
+Console.WriteLine($"  Status:  {notifDeploy.Status}");
+Console.WriteLine($"  Error:   {notifDeploy.ErrorSummary}");
+Console.WriteLine($"  Completed: {notifDeploy.CompletedAt}");
+
+// Operator raises quota via Azure portal. Deployment retries from Pending.
+// Failed → Pending is the only valid retry path (no direct Failed → Running shortcut).
+notifDeploy.Transition(DeploymentStatus.Pending);
+notifDeploy.Transition(DeploymentStatus.Planning);
+notifDeploy.Transition(DeploymentStatus.Running);
+notifDeploy.Transition(DeploymentStatus.Succeeded);
+
+Console.WriteLine($"  → Retried and {notifDeploy.Status}");
+Console.WriteLine($"  Final CompletedAt: {notifDeploy.CompletedAt}");
+
+// Invalid transition guard — cannot go from Succeeded back to Running.
+try
+{
+    notifDeploy.Transition(DeploymentStatus.Running);
+}
+catch (InvalidOperationException ex)
+{
+    Console.WriteLine($"\n  Guard enforced: {ex.Message}");
+    // "Cannot transition from Succeeded to Running."
+}
+```
+
+---
+
+### Step 12 — Capture EnvironmentStateSnapshot
+
+After successful deployment, record the full set of active resources as the new baseline. The next delta computation will diff against this snapshot.
+
+```csharp
+// Provision the new cosmos-products instance (matches the Phase 1 pattern).
+var cosmosProductsVersion = cosmosOrdersTemplate.GetLatestVersion()!;
+var cosmosProductsInstance = ResourceInstance.Create(new CreateResourceInstanceRequest(
+    ResourceId:        cosmosProductsResource.Id,
+    OrganisationId:    organisation.Id,
+    Name:              "ecommerce-cosmos-products-instance",
+    TemplateVersionId: cosmosProductsVersion.Id,
+    EnvironmentId:     production.Id,
+    InputParameters:   new Dictionary<string, JsonElement>
+    {
+        ["consistency_level"] = JsonSerializer.SerializeToElement("BoundedStaleness"),
+        ["max_throughput"]    = JsonSerializer.SerializeToElement(8000),
+        ["private_endpoint_subnet_id"] = JsonSerializer.SerializeToElement("$(ref:ecommerce-subnet-data.subnet_id)")
+    }));
+
+cosmosProductsInstance.Transition(ResourceInstanceStatus.Provisioning);
+cosmosProductsInstance.Transition(ResourceInstanceStatus.Active, new ResourceInstanceOutput
+{
+    Location  = new Uri("https://portal.azure.com/#resource/.../ecommerce-cosmos-products"),
+    Workspace = "ecommerce-prod"
+});
+
+// Snapshot captures all 10 active resources — this becomes the new baseline.
+var activeResourceIds = new[]
+{
+    vnetResource.Id, aksSubnetResource.Id, dataSubnetResource.Id,
+    keyVaultResource.Id, acrResource.Id, aksResource.Id,
+    cosmosOrdersResource.Id, serviceBusResource.Id, redisCacheResource.Id,
+    cosmosProductsResource.Id   // newly added in this deployment
+};
+
+var snapshot = EnvironmentStateSnapshot.Capture(
+    organisationId:   organisation.Id,
+    environmentId:    production.Id,
+    deploymentId:     catalogDeploy.Id,
+    activeResourceIds: activeResourceIds);
+
+Console.WriteLine($"\n=== Environment State Snapshot ===");
+Console.WriteLine($"  SnapshotId:  {snapshot.Id.Value}");
+Console.WriteLine($"  Environment: production");
+Console.WriteLine($"  DeploymentId: {snapshot.DeploymentId.Value}");
+Console.WriteLine($"  CapturedAt:   {snapshot.CapturedAt:u}");
+Console.WriteLine($"  Resources ({snapshot.ResourceIds.Count}):");
+foreach (var id in snapshot.ResourceIds)
+    Console.WriteLine($"    {id.Value}");
+```
+
+---
+
+### Step 13 — Full Provision Summary
+
+```csharp
+Console.WriteLine("\n╔══════════════════════════════════════════════════════════╗");
+Console.WriteLine("║              Phase 2 Provision Summary                  ║");
+Console.WriteLine("╚══════════════════════════════════════════════════════════╝");
+
+Console.WriteLine("\n── Requirements ──────────────────────────────────────────");
+var allRequirements = new[]
+{
+    (orderService.Name,   orderCosmosReq.Type),
+    (orderService.Name,   orderServiceBusReq.Type),
+    (orderService.Name,   orderAksReq.Type),
+    (paymentService.Name, paymentServiceBusReq.Type),
+    (paymentService.Name, paymentKeyVaultReq.Type),
+    (paymentService.Name, paymentAksReq.Type),
+    (notifService.Name,   notifServiceBusReq.Type),
+    (notifService.Name,   notifKeyVaultReq.Type),
+    (catalogService.Name, catalogCosmosReq.Type),
+    (catalogService.Name, catalogRedisReq.Type),
+    (catalogService.Name, catalogAksReq.Type)
+};
+foreach (var (app, type) in allRequirements)
+    Console.WriteLine($"  {app,-28} → {type}");
+
+Console.WriteLine("\n── Bindings (requirement → resource slug) ────────────────");
+var allBindings = new[]
+{
+    (orderServiceBusBinding,   "azure.service-bus",        "ecommerce-servicebus-prod"),
+    (paymentServiceBusBinding, "azure.service-bus",        "ecommerce-servicebus-prod"),  // SAME resource
+    (notifServiceBusBinding,   "azure.service-bus",        "ecommerce-servicebus-prod"),  // SAME resource
+    (paymentKeyVaultBinding,   "azure.key-vault",          "ecommerce-keyvault-prod"),
+    (notifKeyVaultBinding,     "azure.key-vault",          "ecommerce-keyvault-prod"),
+    (catalogCosmosBinding,     "azure.cosmosdb.orders",    "ecommerce-cosmos-products"),  // NEW
+    (catalogRedisBinding,      "azure.redis-cache",        "ecommerce-redis-catalog")
+};
+foreach (var (binding, type, slug) in allBindings)
+    Console.WriteLine($"  {binding.Id.Value} │ {type,-28} → {slug}");
+
+Console.WriteLine("\n── Delta ─────────────────────────────────────────────────");
+Console.WriteLine($"  + ecommerce-cosmos-products (product-catalog CosmosDB, 8000 RU/s)");
+Console.WriteLine($"  (no updates, no removals)");
+
+Console.WriteLine("\n── Deployment Timeline ───────────────────────────────────");
+Console.WriteLine($"  {catalogDeploy.Id.Value}");
+Console.WriteLine($"  Requested by: {catalogDeploy.RequestedBy}");
+Console.WriteLine($"  Started:   {catalogDeploy.StartedAt:u}");
+Console.WriteLine($"  Completed: {catalogDeploy.CompletedAt:u}");
+Console.WriteLine($"  Status:    {catalogDeploy.Status}");
+
+Console.WriteLine("\n── Snapshot ──────────────────────────────────────────────");
+Console.WriteLine($"  {snapshot.ResourceIds.Count} active resources at {snapshot.CapturedAt:u}");
+Console.WriteLine($"  Next delta will diff against this snapshot.");
+```
+
+---
+
+## Example Real Flow
+
+```
+product-catalog deploy
+score.yaml
+  ↓
+ResourceRequirements created (type, class, constraints)
+  ↓
+Resolver binds:
+  azure.cosmosdb.orders (no id:) → NEW ecommerce-cosmos-products  [delta: + Add]
+  azure.redis-cache     (no id:) → ecommerce-redis-catalog         [existing, no delta]
+  azure.aks             (id: ecommerce-aks-prod) → ecommerce-aks-prod [existing, no delta]
+  ↓
+DeploymentDelta computed:
+  + Add ecommerce-cosmos-products
+  ↓
+Deployment executes in graph order (cosmos after data subnet)
+  ↓
+EnvironmentStateSnapshot stored (10 resources)
+  ↓
+Next deploy diffs against this snapshot
+```
 
 ---
 
