@@ -646,9 +646,180 @@ Phase 2 adds the intent layer on top of this.
 
 ---
 
-### Step 8 — Express Requirements (as parsed from score.yaml)
+### Step 8 — Parse score.yaml and Create ResourceRequirements
 
-Each application declares what it needs. These are created by parsing the app's `score.yaml` — the platform does not create them manually. Notice how `order-service` and `payment-service` both declare a requirement for `azure.service-bus`: this is the key case that demonstrates why the requirement layer exists.
+**The score.yaml is the API.** App teams write a score.yaml at the root of their repository. The platform clones the repo at the deployed commit, parses the file via `IScoreDriver`, and creates `ResourceRequirement` objects from each entry under `resources:`. The platform never expects app teams to interact with domain objects directly.
+
+Two score files for the ecommerce scenario live in `src/Orchitect.Playground/`:
+
+**`payment-service.score.yaml`** — references three shared/pre-existing resources by `id:`:
+```yaml
+apiVersion: score.dev/v1b1
+metadata:
+  name: payment-service
+resources:
+  service-bus:
+    type: azure.service-bus
+    class: direct
+    id: ecommerce-servicebus-prod      # slug-match to existing resource
+    parameters:
+      topic: payment-processed
+      sas_policy: listen,send
+
+  keyvault:
+    type: azure.key-vault
+    class: indirect
+    id: ecommerce-keyvault-prod
+    parameters:
+      secret_names: stripe-api-key,stripe-webhook-secret,cosmos-orders-connstr
+
+  aks:
+    type: azure.aks
+    class: direct
+    id: ecommerce-aks-prod
+    parameters:
+      namespace: payment-service
+      network_policy: deny-all
+      allowed_namespaces: order-service
+```
+
+**`product-catalog.score.yaml`** — two resources have no `id:`, so the resolver will provision new ones:
+```yaml
+apiVersion: score.dev/v1b1
+metadata:
+  name: product-catalog
+resources:
+  cosmos-products:
+    type: azure.cosmosdb
+    class: direct                      # no id: → resolver creates new resource
+    parameters:
+      consistency_level: BoundedStaleness
+      max_throughput: "8000"
+      public_network_access_enabled: "false"
+
+  redis-catalog:
+    type: azure.redis-cache
+    class: direct                      # no id: → resolver creates new resource
+    parameters:
+      sku: Standard
+      capacity: "2"
+      redis_version: "7.2"
+
+  aks:
+    type: azure.aks
+    class: direct
+    id: ecommerce-aks-prod             # shared — slug-match to existing
+    parameters:
+      namespace: product-catalog
+      min_replicas: "1"
+      max_replicas: "10"
+```
+
+The playground reads these files directly. In production `IScoreDriver.ParseAsync(deployment, application, ct)` clones the repo at `deployment.CommitId` and returns the same `ScoreFile` object.
+
+```csharp
+// In production this call clones the app repo at the deployed commit:
+//   var scoreFile = await scoreDriver.ParseAsync(deployment, application, ct);
+// In the playground we read the local file directly.
+
+static async Task<ScoreFile> LoadScore(string path)
+{
+    var yaml = await File.ReadAllTextAsync(path);
+    return new DeserializerBuilder()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .IgnoreUnmatchedProperties()
+        .Build()
+        .Deserialize<ScoreFile>(yaml);
+}
+
+// ── Map ScoreFile → ResourceRequirements ──────────────────────────────────
+
+// ScoreResource.Id becomes Constraints["id"] so the resolver can slug-match.
+// ScoreResource.Parameters is Dictionary<string,string>; we convert to JsonElement
+// because ResourceRequirement.Parameters supports full Terraform variable parity.
+static List<ResourceRequirement> BuildRequirements(
+    ScoreFile scoreFile,
+    ApplicationId applicationId,
+    OrganisationId organisationId,
+    EnvironmentId environmentId)
+{
+    var requirements = new List<ResourceRequirement>();
+
+    foreach (var (resourceKey, scoreResource) in scoreFile.Resources ?? [])
+    {
+        var constraints = new Dictionary<string, string>();
+        if (scoreResource.Id is not null)
+            constraints["id"] = scoreResource.Id;   // slug hint for the resolver
+
+        var parameters = scoreResource.Parameters?
+            .ToDictionary(
+                kvp => kvp.Key,
+                kvp => JsonSerializer.SerializeToElement(kvp.Value))
+            ?? new Dictionary<string, JsonElement>();
+
+        requirements.Add(ResourceRequirement.Create(new CreateResourceRequirementRequest(
+            OrganisationId: organisationId,
+            ApplicationId:  applicationId,
+            EnvironmentId:  environmentId,
+            Type:  scoreResource.Type,
+            Class: scoreResource.Class ?? "direct",
+            Constraints: constraints,
+            Parameters:  parameters)));
+    }
+
+    return requirements;
+}
+
+// Parse and build requirements for both apps.
+var paymentScoreFile  = await LoadScore("payment-service.score.yaml");
+var catalogScoreFile  = await LoadScore("product-catalog.score.yaml");
+
+var paymentRequirements = BuildRequirements(paymentScoreFile,  paymentService.Id,  organisation.Id, production.Id);
+var catalogRequirements = BuildRequirements(catalogScoreFile,  catalogService.Id,  organisation.Id, production.Id);
+
+// Give each requirement a name we can reference in Step 9.
+var paymentServiceBusReq = paymentRequirements.Single(r => r.Type == "azure.service-bus");
+var paymentKeyVaultReq   = paymentRequirements.Single(r => r.Type == "azure.key-vault");
+var paymentAksReq        = paymentRequirements.Single(r => r.Type == "azure.aks");
+
+var catalogCosmosReq = catalogRequirements.Single(r => r.Type == "azure.cosmosdb");
+var catalogRedisReq  = catalogRequirements.Single(r => r.Type == "azure.redis-cache");
+var catalogAksReq    = catalogRequirements.Single(r => r.Type == "azure.aks");
+
+Console.WriteLine("=== Requirements parsed from score.yaml ===");
+Console.WriteLine($"  payment-service ({paymentRequirements.Count} requirements):");
+foreach (var req in paymentRequirements)
+{
+    var idHint = req.Constraints.TryGetValue("id", out var slug) ? $" → id: {slug}" : " → (new resource)";
+    Console.WriteLine($"    [{req.Class}] {req.Type}{idHint}");
+}
+Console.WriteLine($"  product-catalog ({catalogRequirements.Count} requirements):");
+foreach (var req in catalogRequirements)
+{
+    var idHint = req.Constraints.TryGetValue("id", out var slug) ? $" → id: {slug}" : " → (new resource)";
+    Console.WriteLine($"    [{req.Class}] {req.Type}{idHint}");
+}
+
+// Expected output:
+//   payment-service (3 requirements):
+//     [direct]   azure.service-bus   → id: ecommerce-servicebus-prod
+//     [indirect] azure.key-vault     → id: ecommerce-keyvault-prod
+//     [direct]   azure.aks           → id: ecommerce-aks-prod
+//   product-catalog (3 requirements):
+//     [direct]   azure.cosmosdb      → (new resource)
+//     [direct]   azure.redis-cache   → (new resource)
+//     [direct]   azure.aks           → id: ecommerce-aks-prod
+```
+
+The presence or absence of `id:` in the score.yaml is the signal the resolver uses: if `id` is in `Constraints`, slug-match an existing resource; if absent, check ownership by type and provision a new one if needed.
+
+Note that `order-service` would produce a `service-bus` requirement with `id: ecommerce-servicebus-prod` — the same slug as `payment-service`'s. Both apps write `id: ecommerce-servicebus-prod` in their own score.yaml, both produce a `ResourceRequirement`, and the resolver binds both to the same `ecommerce-servicebus-prod` Resource. That double-binding is the record that payment-service and order-service are both consumers of this shared resource.
+
+---
+
+### Step 8 (expanded) — What the Requirements Contain
+
+The loop above produces requirements equivalent to these (shown here to make the field values explicit):
 
 ```csharp
 // ── order-service requirements ──────────────────────────────────────────────
