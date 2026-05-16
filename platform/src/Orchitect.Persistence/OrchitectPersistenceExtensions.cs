@@ -8,6 +8,9 @@ using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
+using Orchitect.Domain.Engine.Resource;
+using Orchitect.Domain.Engine.ResourceDependency;
+using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Domain.Inventory.Cloud.Services;
 using Orchitect.Domain.Inventory.Discovery.Services;
@@ -56,6 +59,9 @@ public static class OrchitectPersistenceExtensions
         services.TryAddScoped<IApplicationRepository, ApplicationRepository>();
         services.TryAddScoped<IEnvironmentRepository, EnvironmentRepository>();
         services.TryAddScoped<IDeploymentRepository, DeploymentRepository>();
+        services.TryAddScoped<IResourceRepository, ResourceRepository>();
+        services.TryAddScoped<IResourceInstanceRepository, ResourceInstanceRepository>();
+        services.TryAddScoped<IResourceDependencyGraphRepository, ResourceDependencyGraphRepository>();
 
         return services;
     }

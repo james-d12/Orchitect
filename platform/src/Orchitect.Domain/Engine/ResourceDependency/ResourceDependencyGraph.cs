@@ -1,49 +1,62 @@
+using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Engine.Environment;
+using Orchitect.Domain.Engine.Resource;
+
 namespace Orchitect.Domain.Engine.ResourceDependency;
 
 public sealed class ResourceDependencyGraph : IResourceDependencyGraph
 {
-    private readonly Dictionary<ResourceDependencyId, ResourceDependencyNode> _nodes = new();
+    private readonly Dictionary<ResourceId, ResourceDependencyNode> _nodes = [];
 
-    public int DependentCount(ResourceDependencyId dependencyId)
+    public ResourceDependencyGraphId Id { get; private init; }
+    public OrganisationId OrganisationId { get; private init; }
+    public EnvironmentId EnvironmentId { get; private init; }
+
+    private ResourceDependencyGraph() { }
+
+    public static ResourceDependencyGraph Create(OrganisationId organisationId, EnvironmentId environmentId)
+        => new() { Id = new ResourceDependencyGraphId(), OrganisationId = organisationId, EnvironmentId = environmentId };
+
+    public int DependentCount(ResourceId resourceId)
     {
-        return _nodes.TryGetValue(dependencyId, out ResourceDependencyNode? node) ? node.In.Count : 0;
+        return _nodes.TryGetValue(resourceId, out ResourceDependencyNode? node) ? node.In.Count : 0;
     }
 
-    public int DependencyCount(ResourceDependencyId dependencyId)
+    public int DependencyCount(ResourceId resourceId)
     {
-        return _nodes.TryGetValue(dependencyId, out ResourceDependencyNode? node) ? node.Out.Count : 0;
+        return _nodes.TryGetValue(resourceId, out ResourceDependencyNode? node) ? node.Out.Count : 0;
     }
 
-    public void AddResource(ResourceDependency resourceDependency)
+    public void AddResource(ResourceId resourceId)
     {
-        if (!_nodes.ContainsKey(resourceDependency.Id))
+        if (!_nodes.ContainsKey(resourceId))
         {
-            _nodes[resourceDependency.Id] = new ResourceDependencyNode { Value = resourceDependency };
+            _nodes[resourceId] = new ResourceDependencyNode { ResourceId = resourceId };
         }
     }
 
-    public bool RemoveResource(ResourceDependencyId dependencyId)
+    public bool RemoveResource(ResourceId resourceId)
     {
-        if (!_nodes.TryGetValue(dependencyId, out ResourceDependencyNode? node))
+        if (!_nodes.TryGetValue(resourceId, out ResourceDependencyNode? node))
         {
             return false;
         }
 
-        foreach (ResourceDependencyId fromId in node.In)
+        foreach (ResourceId fromId in node.In)
         {
-            _nodes[fromId].Out.Remove(dependencyId);
+            _nodes[fromId].Out.Remove(resourceId);
         }
 
-        foreach (ResourceDependencyId toId in node.Out)
+        foreach (ResourceId toId in node.Out)
         {
-            _nodes[toId].In.Remove(dependencyId);
+            _nodes[toId].In.Remove(resourceId);
         }
 
-        _nodes.Remove(dependencyId);
+        _nodes.Remove(resourceId);
         return true;
     }
 
-    public void AddDependency(ResourceDependencyId from, ResourceDependencyId to)
+    public void AddDependency(ResourceId from, ResourceId to)
     {
         if (from.Equals(to))
         {
@@ -64,7 +77,7 @@ public sealed class ResourceDependencyGraph : IResourceDependencyGraph
         _nodes[to].In.Add(from);
     }
 
-    public bool RemoveDependency(ResourceDependencyId from, ResourceDependencyId to)
+    public bool RemoveDependency(ResourceId from, ResourceId to)
     {
         if (!_nodes.TryGetValue(from, out ResourceDependencyNode? fromNode) ||
             !_nodes.TryGetValue(to, out ResourceDependencyNode? toNode))
@@ -81,7 +94,7 @@ public sealed class ResourceDependencyGraph : IResourceDependencyGraph
         return removed;
     }
 
-    public bool HasDependencyPath(ResourceDependencyId startId, ResourceDependencyId targetId)
+    public bool HasDependencyPath(ResourceId startId, ResourceId targetId)
     {
         if (!_nodes.ContainsKey(startId) || !_nodes.ContainsKey(targetId))
         {
@@ -93,18 +106,18 @@ public sealed class ResourceDependencyGraph : IResourceDependencyGraph
             return true;
         }
 
-        var stack = new Stack<ResourceDependencyId>();
-        var visited = new HashSet<ResourceDependencyId>();
+        var stack = new Stack<ResourceId>();
+        var visited = new HashSet<ResourceId>();
 
         stack.Push(startId);
         visited.Add(startId);
 
         while (stack.Count > 0)
         {
-            ResourceDependencyId currentId = stack.Pop();
+            ResourceId currentId = stack.Pop();
             ResourceDependencyNode resourceDependencyNode = _nodes[currentId];
 
-            foreach (ResourceDependencyId neighborId in resourceDependencyNode.Out.Where(id => !visited.Contains(id)))
+            foreach (ResourceId neighborId in resourceDependencyNode.Out.Where(id => !visited.Contains(id)))
             {
                 if (neighborId.Equals(targetId))
                 {
@@ -119,12 +132,17 @@ public sealed class ResourceDependencyGraph : IResourceDependencyGraph
         return false;
     }
 
-    public IList<ResourceDependency> ResolveOrder()
+    public bool ContainsResource(ResourceId resourceId)
     {
-        var inDegreeMap = new Dictionary<ResourceDependencyId, int>();
-        var zeroInDegreeQueue = new Queue<ResourceDependencyId>();
+        return _nodes.ContainsKey(resourceId);
+    }
 
-        foreach ((ResourceDependencyId resourceId, ResourceDependencyNode node) in _nodes)
+    public IList<ResourceId> ResolveOrder()
+    {
+        var inDegreeMap = new Dictionary<ResourceId, int>();
+        var zeroInDegreeQueue = new Queue<ResourceId>();
+
+        foreach ((ResourceId resourceId, ResourceDependencyNode node) in _nodes)
         {
             inDegreeMap[resourceId] = node.In.Count;
             if (node.In.Count == 0)
@@ -133,15 +151,15 @@ public sealed class ResourceDependencyGraph : IResourceDependencyGraph
             }
         }
 
-        var sortedResources = new List<ResourceDependency>(_nodes.Count);
+        var sortedResources = new List<ResourceId>(_nodes.Count);
 
         while (zeroInDegreeQueue.Count > 0)
         {
-            ResourceDependencyId currentId = zeroInDegreeQueue.Dequeue();
+            ResourceId currentId = zeroInDegreeQueue.Dequeue();
             ResourceDependencyNode resourceDependencyNode = _nodes[currentId];
-            sortedResources.Add(resourceDependencyNode.Value);
+            sortedResources.Add(currentId);
 
-            foreach (ResourceDependencyId dependentId in resourceDependencyNode.Out)
+            foreach (ResourceId dependentId in resourceDependencyNode.Out)
             {
                 inDegreeMap[dependentId]--;
                 if (inDegreeMap[dependentId] == 0)

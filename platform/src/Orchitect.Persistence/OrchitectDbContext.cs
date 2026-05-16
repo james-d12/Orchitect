@@ -6,6 +6,8 @@ using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Resource;
+using Orchitect.Domain.Engine.ResourceDependency;
+using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Discovery;
@@ -33,6 +35,8 @@ public sealed class OrchitectDbContext : IdentityDbContext
     public DbSet<Domain.Engine.Environment.Environment> Environments { get; init; } = null!;
     public DbSet<Deployment> Deployments { get; init; } = null!;
     public DbSet<Resource> Resources { get; init; } = null!;
+    public DbSet<ResourceInstance> ResourceInstances { get; init; } = null!;
+    public DbSet<ResourceDependencyGraph> ResourceDependencyGraphs { get; init; } = null!;
 
     public DbSet<Organisation> Organisations { get; init; } = null!;
     public DbSet<Credential> Credentials { get; init; } = null!;

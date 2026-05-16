@@ -57,13 +57,13 @@ jobs:
 
       - name: Check code formatting
         run: pnpm run format:check
-      
-      #- name: SonarQube Scan
-      #  uses: SonarSource/sonarqube-scan-action@v6
-      #  env:
-      #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #  with:
-      #    projectBaseDir: ./portals/Orchitect.Portal.Web
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: ./portals/Orchitect.Portal.Web
 
       - name: Build project
         run: pnpm run build
@@ -84,13 +84,13 @@ jobs:
           fetch-depth: '0'
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      
-      #- name: SonarQube Scan
-      #  uses: SonarSource/sonarqube-scan-action@v6
-      #  env:
-      #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #  with:
-      #    projectBaseDir: ./portals/Orchitect.Portal.Cli
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: ./portals/Orchitect.Portal.Cli
 
       - name: Build
         run: cargo build --release
@@ -163,28 +163,23 @@ jobs:
 
       - name: Restore dependencies
         run: dotnet restore ${{ env.SOLUTION_FILE }}
-      
-      #      - name: Build and analyze
-      #        env:
-      #          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #        run: |
-      #          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
-      #            /k:"personal-james_orchitect-platform" \
-      #            /o:"personal-james" \
-      #            /n:"Orchitect Platform" \
-      #            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
-      #            /d:sonar.qualitygate.wait=false \
-      #            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Orchitect.Engine.Persistence/Migrations/**,src/Orchitect.Inventory.*,src/Orchitect.Inventory.Persistence/Migrations/**"
-      #
-      #          dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
-      #
-      #          "${{ runner.temp }}/scanner/dotnet-sonarscanner" end \
-      #            /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
       - name: Build and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+        run: |
+          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
+            /k:"personal-james_conductor-platform" \
+            /o:"personal-james" \
+            /n:"Orchitect Platform" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.qualitygate.wait=false \
+            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Orchitect.Persistence/Migrations/**,src/Orchitect.Playground/**"
+
+          dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+          "${{ runner.temp }}/scanner/dotnet-sonarscanner" end \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
       - name: Check No Pending Model Changes
         run: dotnet ef migrations has-pending-model-changes

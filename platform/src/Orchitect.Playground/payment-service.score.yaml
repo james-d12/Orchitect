@@ -1,0 +1,28 @@
+apiVersion: score.dev/v1b1
+metadata:
+  name: payment-service
+resources:
+  service-bus:
+    type: azure.service-bus
+    class: direct
+    id: ecommerce-servicebus-prod
+    parameters:
+      topic: payment-processed
+      sas_policy: listen,send
+
+  keyvault:
+    type: azure.key-vault
+    class: indirect
+    id: ecommerce-keyvault-prod
+    parameters:
+      secret_names: stripe-api-key,stripe-webhook-secret,cosmos-orders-connstr
+
+  aks:
+    type: azure.aks
+    class: direct
+    id: ecommerce-aks-prod
+    parameters:
+      namespace: payment-service
+      service_account: payment-service-sa
+      network_policy: deny-all
+      allowed_namespaces: order-service
