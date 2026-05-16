@@ -1,5 +1,6 @@
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
-using Orchitect.Infrastructure.Engine.CommandLine;
+using Orchitect.Infrastructure.Engine.Shared.CommandLine;
 using Orchitect.Infrastructure.Engine.Terraform.Models;
 
 namespace Orchitect.Infrastructure.Engine.Terraform;
@@ -50,7 +51,7 @@ public sealed class TerraformDriver : ITerraformDriver
             }
         }
 
-        if (validResults.Count == 0)
+        if (validResults.Count != terraformPlanInputs.Count)
         {
             _logger.LogError(
                 "Could not perform Terraform Plan, as not all provided inputs were validated successfully");
@@ -58,7 +59,7 @@ public sealed class TerraformDriver : ITerraformDriver
                 "Could not validate all inputs.");
         }
 
-        TerraformProjectBuilderResult builderResult = await _projectBuilder.BuildProject(validResults, folderName);
+        TerraformProjectBuilderResult builderResult = await _projectBuilder.BuildProjectAsync(validResults, folderName);
 
         CommandLineResult initResult = await _commandLine.RunInitAsync(builderResult.StateDirectory);
 
@@ -89,18 +90,16 @@ public sealed class TerraformDriver : ITerraformDriver
             ? await _commandLine.RunPlanDestroyAsync(builderResult.StateDirectory)
             : await _commandLine.RunPlanAsync(builderResult.StateDirectory, planFileName);
 
-        if (planResult.ExitCode == (int)TerraformPlanResultExitCode.Errored)
+        switch (planResult.ExitCode)
         {
-            return new TerraformPlanResult(builderResult.StateDirectory, planFileName,
-                TerraformPlanResultState.PlanFailed,
-                planResult);
-        }
-
-        if (planResult.ExitCode == (int)TerraformPlanResultExitCode.NoChanges)
-        {
-            return new TerraformPlanResult(builderResult.StateDirectory, planFileName,
-                TerraformPlanResultState.NoChanges,
-                planResult);
+            case (int)TerraformPlanResultExitCode.Errored:
+                return new TerraformPlanResult(builderResult.StateDirectory, planFileName,
+                    TerraformPlanResultState.PlanFailed,
+                    planResult);
+            case (int)TerraformPlanResultExitCode.NoChanges:
+                return new TerraformPlanResult(builderResult.StateDirectory, planFileName,
+                    TerraformPlanResultState.NoChanges,
+                    planResult);
         }
 
         _logger.LogDebug("Terraform Plan Output: {Output}", planResult.StdOut);
@@ -132,7 +131,8 @@ public sealed class TerraformDriver : ITerraformDriver
                 _logger.LogInformation("Terraform Apply Result: {Result}", applyResult.StdOut);
                 break;
             default:
-                throw new ArgumentOutOfRangeException();
+                throw new InvalidEnumArgumentException(nameof(planResult.State), (int)planResult.State,
+                    typeof(TerraformPlanResultState));
         }
     }
 
@@ -156,7 +156,8 @@ public sealed class TerraformDriver : ITerraformDriver
                 _logger.LogInformation("Terraform Destroy Result: {Result}", applyResult.StdOut);
                 break;
             default:
-                throw new ArgumentOutOfRangeException();
+                throw new InvalidEnumArgumentException(nameof(planResult.State), (int)planResult.State,
+                    typeof(TerraformPlanResultState));
         }
     }
 }

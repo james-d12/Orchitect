@@ -8,7 +8,7 @@ using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceDependency;
 using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Infrastructure;
-using Orchitect.Infrastructure.Engine.Resources;
+using Orchitect.Infrastructure.Engine;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
 using Environment = Orchitect.Domain.Engine.Environment.Environment;
@@ -163,5 +163,5 @@ foreach (var item in order)
     Console.WriteLine(item.Identifier);
 }
 
-var resourceProvisioner = host.Services.GetRequiredService<IResourceProvisioner>();
+var resourceProvisioner = host.Services.GetRequiredService<IEngineOrchestrator>();
 await resourceProvisioner.StartAsync(paymentApi, deployment, CancellationToken.None);

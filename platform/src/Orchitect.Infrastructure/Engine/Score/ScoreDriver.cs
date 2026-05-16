@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Infrastructure.Engine.CommandLine;
 using Orchitect.Infrastructure.Engine.Score.Models;
+using Orchitect.Infrastructure.Engine.Shared.CommandLine;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 

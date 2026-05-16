@@ -1,45 +1,54 @@
 using Microsoft.Extensions.Logging;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Infrastructure.Engine.Score;
 using Orchitect.Infrastructure.Engine.Score.Models;
 
-namespace Orchitect.Infrastructure.Engine.Resources;
+namespace Orchitect.Infrastructure.Engine;
 
-public interface IResourceProvisioner
+public interface IEngineOrchestrator
 {
     Task StartAsync(Application application, Deployment deployment, CancellationToken cancellationToken);
 }
 
-public sealed class ResourceProvisioner : IResourceProvisioner
+public sealed class EngineOrchestrator : IEngineOrchestrator
 {
-    private readonly ILogger<ResourceProvisioner> _logger;
+    private readonly ILogger<EngineOrchestrator> _logger;
     private readonly IResourceTemplateRepository _resourceTemplateRepository;
-    private readonly IResourceFactory _resourceFactory;
+    private readonly IEngineProvisioner _engineProvisioner;
     private readonly IScoreDriver _scoreDriver;
 
-    public ResourceProvisioner(ILogger<ResourceProvisioner> logger, IScoreDriver scoreDriver,
-        IResourceTemplateRepository resourceTemplateRepository, IResourceFactory resourceFactory)
+    public EngineOrchestrator(ILogger<EngineOrchestrator> logger, IScoreDriver scoreDriver,
+        IResourceTemplateRepository resourceTemplateRepository, IEngineProvisioner engineProvisioner)
     {
         _logger = logger;
         _scoreDriver = scoreDriver;
         _resourceTemplateRepository = resourceTemplateRepository;
-        _resourceFactory = resourceFactory;
+        _engineProvisioner = engineProvisioner;
     }
 
     public async Task StartAsync(Application application, Deployment deployment, CancellationToken cancellationToken)
     {
-        ScoreFile? scoreFile = await _scoreDriver.ParseAsync(deployment, application, cancellationToken);
+        using var activity = Tracing.StartActivity();
 
-        if (scoreFile is null)
+        try
         {
-            _logger.LogWarning("Unable to find / parse the provided score file.");
-            return;
-        }
+            ScoreFile? scoreFile = await _scoreDriver.ParseAsync(deployment, application, cancellationToken);
 
-        if (scoreFile.Resources is not null)
-        {
+            if (scoreFile is null)
+            {
+                _logger.LogWarning("Unable to find / parse the provided score file.");
+                return;
+            }
+
+            if (scoreFile.Resources is null)
+            {
+                _logger.LogWarning("There are no resources in the score file.");
+                return;
+            }
+
             _logger.LogInformation("Provisioning Resources for score file");
 
             var directoryName = scoreFile.Metadata.Name;
@@ -69,7 +78,12 @@ public sealed class ResourceProvisioner : IResourceProvisioner
                 provisionInputs.Add(new ProvisionInput(resourceTemplate, inputs, resource.Key));
             }
 
-            await _resourceFactory.ProvisionAsync(provisionInputs, directoryName);
+            await _engineProvisioner.ProvisionAsync(provisionInputs, directoryName);
+        }
+        catch (Exception exception)
+        {
+            activity?.RecordException(exception);
+            _logger.LogError(exception, "An error occured while provisioning the score file.");
         }
     }
 }

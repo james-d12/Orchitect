@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orchitect.Infrastructure.Engine.CommandLine;
 using Orchitect.Infrastructure.Engine.Helm;
-using Orchitect.Infrastructure.Engine.Resources;
 using Orchitect.Infrastructure.Engine.Score;
+using Orchitect.Infrastructure.Engine.Shared;
+using Orchitect.Infrastructure.Engine.Shared.CommandLine;
 using Orchitect.Infrastructure.Engine.Terraform;
 
 namespace Orchitect.Infrastructure.Engine;
@@ -21,8 +21,8 @@ public static class EngineInfrastructureExtensions
     private static void AddSharedServices(this IServiceCollection services)
     {
         services.TryAddSingleton<IGitCommandLine, GitCommandLine>();
-        services.TryAddSingleton<IResourceFactory, ResourceFactory>();
-        services.TryAddScoped<IResourceProvisioner, ResourceProvisioner>();
+        services.TryAddSingleton<IEngineProvisioner, EngineProvisioner>();
+        services.TryAddScoped<IEngineOrchestrator, EngineOrchestrator>();
     }
 
     private static void AddScoreServices(this IServiceCollection services)
@@ -39,6 +39,7 @@ public static class EngineInfrastructureExtensions
 
     private static void AddTerraformServices(this IServiceCollection services)
     {
+        services.AddScoped<IProvisioner, TerraformProvisioner>();
         services.TryAddSingleton<ITerraformDriver, TerraformDriver>();
         services.TryAddSingleton<ITerraformProjectBuilder, TerraformProjectBuilder>();
         services.TryAddSingleton<ITerraformRenderer, TerraformRenderer>();

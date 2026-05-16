@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Engine.ResourceTemplate;
-using Orchitect.Infrastructure.Engine.CommandLine;
+using Orchitect.Infrastructure.Engine.Shared.CommandLine;
 using Orchitect.Infrastructure.Engine.Terraform.Models;
 
 namespace Orchitect.Infrastructure.Engine.Terraform;

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace Orchitect.Infrastructure.Engine.CommandLine;
+namespace Orchitect.Infrastructure.Engine.Shared.CommandLine;
 
 public interface IGitCommandLine
 {
