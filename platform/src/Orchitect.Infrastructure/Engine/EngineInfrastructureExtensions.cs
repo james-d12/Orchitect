@@ -39,7 +39,7 @@ public static class EngineInfrastructureExtensions
 
     private static void AddTerraformServices(this IServiceCollection services)
     {
-        services.AddScoped<IProvisioner, TerraformProvisioner>();
+        services.AddSingleton<IProvisioner, TerraformProvisioner>();
         services.TryAddSingleton<ITerraformDriver, TerraformDriver>();
         services.TryAddSingleton<ITerraformProjectBuilder, TerraformProjectBuilder>();
         services.TryAddSingleton<ITerraformRenderer, TerraformRenderer>();
