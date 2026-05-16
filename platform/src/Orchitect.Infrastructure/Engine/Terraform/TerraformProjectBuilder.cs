@@ -33,7 +33,7 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
 
     /// <inheritdoc/>
     public async Task<TerraformProjectBuilderResult> BuildProjectAsync(
-        Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> validatedPlans, 
+        Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> validatedPlans,
         string projectFolderName,
         CancellationToken cancellationToken = default)
     {
@@ -50,7 +50,7 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
         var mainTf = _renderer.RenderMainTf(validatedPlans);
         _logger.LogDebug("Render output: {Output}", mainTf);
         var mainTfOutputPath = Path.Combine(stateDirectory, "main.tf");
-        await File.WriteAllTextAsync(mainTfOutputPath, mainTf,  cancellationToken);
+        await File.WriteAllTextAsync(mainTfOutputPath, mainTf, cancellationToken);
         _logger.LogInformation("Created main.tf to: {FilePath}", mainTfOutputPath);
 
         var providers = terraformValidationResults
