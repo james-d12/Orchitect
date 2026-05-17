@@ -20,13 +20,10 @@ export default function ResourceTemplatesTable() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await apiRequest<ResourceTemplatesResponse>(
-          "/resource-templates",
-          {
-            method: "GET",
-            requiresAuth: true,
-          },
-        );
+        const data = await apiRequest<ResourceTemplatesResponse>("/resource-templates", {
+          method: "GET",
+          requiresAuth: true,
+        });
         setItems(data.resourceTemplates);
       } catch (err) {
         console.error(err);
@@ -63,12 +60,8 @@ export default function ResourceTemplatesTable() {
                 <td className="p-3">{item.version}</td>
                 <td className="p-3">{item.updatedAt}</td>
                 <td className="p-3 space-x-2">
-                  <button className="px-3 py-1 rounded bg-blue-600 text-white text-xs">
-                    Edit
-                  </button>
-                  <button className="px-3 py-1 rounded bg-red-600 text-white text-xs">
-                    Delete
-                  </button>
+                  <button className="px-3 py-1 rounded bg-blue-600 text-white text-xs">Edit</button>
+                  <button className="px-3 py-1 rounded bg-red-600 text-white text-xs">Delete</button>
                 </td>
               </tr>
             ))}

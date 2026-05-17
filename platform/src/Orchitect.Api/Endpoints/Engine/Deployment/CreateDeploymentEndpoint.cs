@@ -9,7 +9,7 @@ using Orchitect.Api.Shared;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
-using Orchitect.Infrastructure.Engine.Resources;
+using Orchitect.Infrastructure.Engine;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
 
@@ -32,7 +32,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             [FromServices]
             IEnvironmentRepository environmentRepository,
             [FromServices]
-            IResourceProvisioner resourceProvisioner,
+            IEngineOrchestrator engineOrchestrator,
             [FromServices]
             IBackgroundTaskQueueProcessor backgroundTaskQueueProcessor,
             HttpContext httpContext,
@@ -69,7 +69,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             // Resolve scoped dependencies within the background service scope
             var deploymentRepo = sp.GetRequiredService<IDeploymentRepository>();
             var appRepo = sp.GetRequiredService<IApplicationRepository>();
-            var provisioner = sp.GetRequiredService<IResourceProvisioner>();
+            var provisioner = sp.GetRequiredService<IEngineOrchestrator>();
 
             var deployment = await deploymentRepo.GetByIdAsync(deploymentId, ct);
             var app = await appRepo.GetByIdAsync(applicationId, ct);

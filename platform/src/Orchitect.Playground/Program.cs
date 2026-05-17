@@ -10,7 +10,7 @@ using Orchitect.Domain.Engine.ResourceDependency;
 using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Infrastructure;
-using Orchitect.Infrastructure.Engine.Resources;
+using Orchitect.Infrastructure.Engine;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
 using Environment = Orchitect.Domain.Engine.Environment.Environment;
@@ -551,5 +551,5 @@ bool aksBlockedByVnet = graph.HasDependencyPath(aksResource.Id, vnetResource.Id)
 Console.WriteLine($"AKS transitively blocked by VNet change: {aksBlockedByVnet}");
 
 // Demonstrate the ResourceProvisioner flow via a score.yaml-driven deployment.
-var resourceProvisioner = host.Services.GetRequiredService<IResourceProvisioner>();
-await resourceProvisioner.StartAsync(orderService, deployment, CancellationToken.None);
+var engineOrchestrator = host.Services.GetRequiredService<IEngineOrchestrator>();
+await engineOrchestrator.StartAsync(orderService, deployment, CancellationToken.None);

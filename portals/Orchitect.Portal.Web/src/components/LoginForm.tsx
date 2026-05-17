@@ -73,23 +73,14 @@ export default function LoginForm() {
         <h1 className="text-3xl font-semibold text-gray-900 mb-6">Login</h1>
 
         {success && (
-          <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-            Login successful!
-          </div>
+          <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">Login successful!</div>
         )}
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error}
-          </div>
-        )}
+        {error && <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">{error}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Email
             </label>
             <input
@@ -105,10 +96,7 @@ export default function LoginForm() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
             <input

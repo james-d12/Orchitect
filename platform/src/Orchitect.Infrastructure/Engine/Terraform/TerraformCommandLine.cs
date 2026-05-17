@@ -1,4 +1,4 @@
-using Orchitect.Infrastructure.Engine.CommandLine;
+using Orchitect.Infrastructure.Engine.Shared.CommandLine;
 
 namespace Orchitect.Infrastructure.Engine.Terraform;
 

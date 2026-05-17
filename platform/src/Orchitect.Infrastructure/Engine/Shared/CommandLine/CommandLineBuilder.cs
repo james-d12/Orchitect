@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace Orchitect.Infrastructure.Engine.CommandLine;
+namespace Orchitect.Infrastructure.Engine.Shared.CommandLine;
 
 public sealed class CommandLineBuilder
 {
