@@ -16,6 +16,7 @@ using Orchitect.Api.Queue;
 using Orchitect.Api.Settings;
 using Orchitect.Infrastructure;
 using Orchitect.Infrastructure.Core.Encryption;
+using Orchitect.Infrastructure.Engine.Runner;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
 
@@ -59,6 +60,11 @@ try
 
     builder.Services.AddOptions<EncryptionOptions>()
         .Bind(builder.Configuration.GetSection("EncryptionOptions"))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+
+    builder.Services.AddOptions<RunnerOptions>()
+        .Bind(builder.Configuration.GetSection("RunnerOptions"))
         .ValidateDataAnnotations()
         .ValidateOnStart();
 

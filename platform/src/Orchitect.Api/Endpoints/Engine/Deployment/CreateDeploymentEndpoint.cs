@@ -4,12 +4,13 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orchitect.Api.Queue;
 using Orchitect.Api.Shared;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
-using Orchitect.Infrastructure.Engine;
+using Orchitect.Infrastructure.Engine.Runner;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
 
@@ -31,8 +32,6 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             IApplicationRepository applicationRepository,
             [FromServices]
             IEnvironmentRepository environmentRepository,
-            [FromServices]
-            IEngineOrchestrator engineOrchestrator,
             [FromServices]
             IBackgroundTaskQueueProcessor backgroundTaskQueueProcessor,
             HttpContext httpContext,
@@ -60,27 +59,26 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             return TypedResults.InternalServerError();
         }
 
-        // Capture IDs to pass to background work item (avoiding captured scoped dependencies)
+        // Capture IDs to pass to the runner
         var deploymentId = deploymentResponse.Id;
         var applicationId = application.Id;
 
         await backgroundTaskQueueProcessor.QueueBackgroundWorkItemAsync(async (sp, ct) =>
         {
-            // Resolve scoped dependencies within the background service scope
-            var deploymentRepo = sp.GetRequiredService<IDeploymentRepository>();
-            var appRepo = sp.GetRequiredService<IApplicationRepository>();
-            var provisioner = sp.GetRequiredService<IEngineOrchestrator>();
+            var runner = sp.GetRequiredService<IRunner>();
+            var runnerOptions = sp.GetRequiredService<IOptions<RunnerOptions>>().Value;
 
-            var deployment = await deploymentRepo.GetByIdAsync(deploymentId, ct);
-            var app = await appRepo.GetByIdAsync(applicationId, ct);
-
-            if (deployment is null || app is null)
+            await runner.ExecuteAsync(new RunnerContext
             {
-                throw new InvalidOperationException(
-                    $"Deployment {deploymentId.Value} or Application {applicationId.Value} not found");
-            }
-
-            await provisioner.StartAsync(app, deployment, ct);
+                Image = runnerOptions.Image,
+                RunId = deploymentId.Value.ToString(),
+                Arguments =
+                [
+                    "--application-id", applicationId.Value.ToString(),
+                    "--deployment-id", deploymentId.Value.ToString()
+                ],
+                Configuration = runnerOptions.Configuration
+            }, ct);
         });
 
         var locationUrl =

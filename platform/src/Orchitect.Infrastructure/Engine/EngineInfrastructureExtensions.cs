@@ -1,10 +1,12 @@
+using Docker.DotNet;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orchitect.Infrastructure.Engine.Helm;
-using Orchitect.Infrastructure.Engine.Score;
+using Orchitect.Infrastructure.Engine.Configuration.Score;
+using Orchitect.Infrastructure.Engine.Provisioner.Helm;
+using Orchitect.Infrastructure.Engine.Provisioner.Terraform;
+using Orchitect.Infrastructure.Engine.Runner;
 using Orchitect.Infrastructure.Engine.Shared;
 using Orchitect.Infrastructure.Engine.Shared.CommandLine;
-using Orchitect.Infrastructure.Engine.Terraform;
 
 namespace Orchitect.Infrastructure.Engine;
 
@@ -16,6 +18,7 @@ public static class EngineInfrastructureExtensions
         services.AddScoreServices();
         services.AddHelmServices();
         services.AddTerraformServices();
+        services.AddRunnerServices();
     }
 
     private static void AddSharedServices(this IServiceCollection services)
@@ -45,5 +48,11 @@ public static class EngineInfrastructureExtensions
         services.TryAddSingleton<ITerraformRenderer, TerraformRenderer>();
         services.TryAddSingleton<ITerraformCommandLine, TerraformCommandLine>();
         services.TryAddSingleton<ITerraformValidator, TerraformValidator>();
+    }
+
+    private static void AddRunnerServices(this IServiceCollection services)
+    {
+        services.TryAddSingleton(_ => new DockerClientConfiguration().CreateClient());
+        services.TryAddSingleton<IRunner, DockerRunner>();
     }
 }

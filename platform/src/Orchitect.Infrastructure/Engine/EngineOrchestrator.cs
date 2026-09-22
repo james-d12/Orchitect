@@ -3,8 +3,8 @@ using Orchitect.Common.Observability;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.ResourceTemplate;
-using Orchitect.Infrastructure.Engine.Score;
-using Orchitect.Infrastructure.Engine.Score.Models;
+using Orchitect.Infrastructure.Engine.Configuration.Score;
+using Orchitect.Infrastructure.Engine.Configuration.Score.Models;
 
 namespace Orchitect.Infrastructure.Engine;
 
@@ -84,6 +84,7 @@ public sealed class EngineOrchestrator : IEngineOrchestrator
         {
             activity?.RecordException(exception);
             _logger.LogError(exception, "An error occured while provisioning the score file.");
+            throw;
         }
     }
 }

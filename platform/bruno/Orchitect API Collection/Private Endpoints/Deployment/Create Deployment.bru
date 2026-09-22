@@ -1,0 +1,31 @@
+meta {
+  name: Create Deployment
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{API_BASE_URL}}/deployments/{{RESOURCE_TEMPLATE_ID}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "applicationId": {
+      "value": "{{APPLICATION_ID}}"
+    },
+    "environmentId": {
+      "value": "{{}}"
+    },
+    "commitId": {
+      "value": "string"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
