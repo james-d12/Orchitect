@@ -7,6 +7,7 @@ public interface ITerraformRenderer
 {
     string RenderMainTf(Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> terraformValidationResults);
     string RenderProvidersTf(List<TerraformProvider> providers);
+    string RenderBackendTf(string backendType);
 }
 
 public sealed class TerraformRenderer : ITerraformRenderer
@@ -61,6 +62,15 @@ public sealed class TerraformRenderer : ITerraformRenderer
             sb.AppendLine("}");
         }
 
+        return sb.ToString();
+    }
+
+    public string RenderBackendTf(string backendType)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("terraform {");
+        sb.AppendLine($"  backend \"{backendType}\" {{}}");
+        sb.AppendLine("}");
         return sb.ToString();
     }
 

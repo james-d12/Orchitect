@@ -5,12 +5,12 @@ namespace Orchitect.Infrastructure.Engine.Provisioner.Terraform;
 public interface ITerraformCommandLine
 {
     Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory);
-    Task<CommandLineResult> RunInitAsync(string executeDirectory);
+    Task<CommandLineResult> RunInitAsync(string executeDirectory, IReadOnlyDictionary<string, string> backendConfig);
     Task<CommandLineResult> RunValidateAsync(string executeDirectory);
-    Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory);
+    Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput);
     Task<CommandLineResult> RunPlanAsync(string executeDirectory, string planFileOutput);
     Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile);
-    Task<CommandLineResult> RunDestroyAsync(string executeDirectory);
+    Task<CommandLineResult> RunDestroyAsync(string executeDirectory, string planFile);
 }
 
 public sealed class TerraformCommandLine : ITerraformCommandLine
@@ -21,9 +21,14 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
             .WithWorkingDirectory(executeDirectory)
             .ExecuteAsync();
 
-    public async Task<CommandLineResult> RunInitAsync(string executeDirectory) =>
+    public async Task<CommandLineResult> RunInitAsync(string executeDirectory,
+        IReadOnlyDictionary<string, string> backendConfig) =>
         await new CommandLineBuilder("terraform")
-            .WithArguments("init")
+            .WithArguments([
+                "init",
+                "-input=false",
+                ..backendConfig.Select(kvp => $"-backend-config={kvp.Key}={kvp.Value}")
+            ])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteAsync();
 
@@ -33,9 +38,9 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
             .WithWorkingDirectory(executeDirectory)
             .ExecuteAsync();
 
-    public async Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory) =>
+    public async Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput) =>
         await new CommandLineBuilder("terraform")
-            .WithArguments("plan -detailed-exitcode -input=false -destroy -out=plan-destroy.tfplan")
+            .WithArguments($"plan -detailed-exitcode -input=false -destroy -out={planFileOutput}")
             .WithWorkingDirectory(executeDirectory)
             .ExecuteAsync();
 
@@ -51,9 +56,9 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
             .WithWorkingDirectory(executeDirectory)
             .ExecuteStreamAsync();
 
-    public async Task<CommandLineResult> RunDestroyAsync(string executeDirectory) =>
+    public async Task<CommandLineResult> RunDestroyAsync(string executeDirectory, string planFile) =>
         await new CommandLineBuilder("terraform")
-            .WithArguments("apply -destroy plan-destroy.tfplan")
+            .WithArguments($"apply -auto-approve {planFile}")
             .WithWorkingDirectory(executeDirectory)
             .ExecuteStreamAsync();
 }

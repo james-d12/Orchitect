@@ -1,6 +1,5 @@
 using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
-using Orchitect.Infrastructure.Engine.Shared;
 
 namespace Orchitect.Infrastructure.Engine.Provisioner.Terraform;
 
@@ -15,9 +14,9 @@ public sealed class TerraformProvisioner : IProvisioner
         _terraformDriver = terraformDriver;
     }
 
-    public async Task ProvisionAsync(List<ProvisionInput> provisionInputs, string folderName, CancellationToken cancellationToken = default)
+    public async Task ProvisionAsync(List<ProvisionInput> inputs, ProvisionContext context, CancellationToken cancellationToken = default)
     {
-        var terraformProvisionInputs = provisionInputs
+        var terraformProvisionInputs = inputs
             .Where(p => p.Template.Provider == ResourceTemplateProvider.Terraform)
             .ToList();
 
@@ -26,14 +25,14 @@ public sealed class TerraformProvisioner : IProvisioner
             var terraformPlanInputs = terraformProvisionInputs
                 .Select(tp => new TerraformPlanInput(tp.Template, tp.Inputs, tp.Key))
                 .ToList();
-            TerraformPlanResult planResult = await _terraformDriver.PlanAsync(terraformPlanInputs, folderName);
+            TerraformPlanResult planResult = await _terraformDriver.PlanAsync(terraformPlanInputs, context);
             await _terraformDriver.ApplyAsync(planResult);
         }
     }
 
-    public async Task DeleteAsync(List<ProvisionInput> provisionInputs, string folderName, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(List<ProvisionInput> inputs, ProvisionContext context, CancellationToken cancellationToken = default)
     {
-        var terraformProvisionInputs = provisionInputs
+        var terraformProvisionInputs = inputs
             .Where(p => p.Template.Provider == ResourceTemplateProvider.Terraform)
             .ToList();
 
@@ -43,7 +42,7 @@ public sealed class TerraformProvisioner : IProvisioner
                 .Select(tp => new TerraformPlanInput(tp.Template, tp.Inputs, tp.Key))
                 .ToList();
             TerraformPlanResult planResult =
-                await _terraformDriver.PlanAsync(terraformPlanInputs, folderName, destroy: true);
+                await _terraformDriver.PlanAsync(terraformPlanInputs, context, destroy: true);
             await _terraformDriver.DestroyAsync(planResult);
         }
     }

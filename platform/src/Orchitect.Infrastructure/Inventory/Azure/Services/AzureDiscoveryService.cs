@@ -57,7 +57,7 @@ public sealed class AzureDiscoveryService : DiscoveryService
         var subscriptions =
             await azureService.GetSubscriptionsAsync(subscriptionFilters, cancellationToken);
 
-        var azureCloudResources = new List<Infrastructure.Inventory.Azure.Models.AzureCloudResource>();
+        var azureCloudResources = new List<Models.AzureCloudResource>();
 
         foreach (var subscription in subscriptions)
         {

@@ -34,15 +34,17 @@ public sealed class DockerRunner : IRunner
                 ],
                 HostConfig = new HostConfig
                 {
-                    // Allows the runner to reach services exposed on the Docker host (e.g. the database).
                     ExtraHosts = ["host.docker.internal:host-gateway"]
                 }
             },
             cancellationToken);
 
+        var started = false;
+        var detached = false;
+
         try
         {
-            var started = await _docker.Containers.StartContainerAsync(
+            started = await _docker.Containers.StartContainerAsync(
                 container.ID,
                 new ContainerStartParameters(),
                 cancellationToken);
@@ -65,10 +67,21 @@ public sealed class DockerRunner : IRunner
                     $"Runner '{context.RunId}' failed with exit code {wait.StatusCode}.");
             }
         }
+        catch (OperationCanceledException) when (started && cancellationToken.IsCancellationRequested)
+        {
+            detached = true;
+            _logger.LogWarning(
+                "Run {RunId} was cancelled while runner container {ContainerId} was running. The container was " +
+                "left running so terraform can finish. Check its logs and remove it once it has exited.",
+                context.RunId, container.ID);
+            throw;
+        }
         finally
         {
-            // Not using the caller's token, so the container is still removed when the run is cancelled.
-            await RemoveContainerAsync(container.ID, CancellationToken.None);
+            if (!detached)
+            {
+                await RemoveContainerAsync(container.ID, CancellationToken.None);
+            }
         }
     }
 
@@ -130,7 +143,6 @@ public sealed class DockerRunner : IRunner
         }
         catch (DockerContainerNotFoundException)
         {
-            // Already removed.
         }
     }
 }

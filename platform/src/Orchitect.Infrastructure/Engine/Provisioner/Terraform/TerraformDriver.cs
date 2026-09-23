@@ -7,7 +7,7 @@ namespace Orchitect.Infrastructure.Engine.Provisioner.Terraform;
 
 public interface ITerraformDriver
 {
-    Task<TerraformPlanResult> PlanAsync(List<TerraformPlanInput> terraformPlanInputs, string folderName,
+    Task<TerraformPlanResult> PlanAsync(List<TerraformPlanInput> terraformPlanInputs, ProvisionContext context,
         bool destroy = false);
 
     Task ApplyAsync(TerraformPlanResult planResult);
@@ -30,8 +30,8 @@ public sealed class TerraformDriver : ITerraformDriver
         _projectBuilder = projectBuilder;
     }
 
-    public async Task<TerraformPlanResult> PlanAsync(List<TerraformPlanInput> terraformPlanInputs, string folderName,
-        bool destroy = false)
+    public async Task<TerraformPlanResult> PlanAsync(List<TerraformPlanInput> terraformPlanInputs,
+        ProvisionContext context, bool destroy = false)
     {
         var validationResults = await _validator.ValidateAsync(terraformPlanInputs);
 
@@ -59,26 +59,29 @@ public sealed class TerraformDriver : ITerraformDriver
                 "Could not validate all inputs.");
         }
 
-        TerraformProjectBuilderResult builderResult = await _projectBuilder.BuildProjectAsync(validResults, folderName);
+        TerraformProjectBuilderResult builderResult = await _projectBuilder.BuildProjectAsync(validResults, context);
 
-        CommandLineResult initResult = await _commandLine.RunInitAsync(builderResult.StateDirectory);
+        CommandLineResult initResult =
+            await _commandLine.RunInitAsync(builderResult.WorkingDirectory, builderResult.BackendConfig);
 
         if (initResult.ExitCode != 0)
         {
-            return new TerraformPlanResult(builderResult.StateDirectory, string.Empty,
-                TerraformPlanResultState.InitFailed);
+            _logger.LogError("Terraform Init Failed: {ExitCode} with {Output}", initResult.ExitCode,
+                initResult.StdErr);
+            return new TerraformPlanResult(builderResult.WorkingDirectory, string.Empty,
+                TerraformPlanResultState.InitFailed, initResult);
         }
 
         _logger.LogDebug("Terraform Init Output: {Output}", initResult.StdOut);
 
-        CommandLineResult validateResult = await _commandLine.RunValidateAsync(builderResult.StateDirectory);
+        CommandLineResult validateResult = await _commandLine.RunValidateAsync(builderResult.WorkingDirectory);
 
         if (validateResult.ExitCode != 0)
         {
             _logger.LogWarning("Terraform Validate Failed: {ExitCode} with {Output}", validateResult.ExitCode,
                 validateResult.StdErr);
-            return new TerraformPlanResult(builderResult.StateDirectory, string.Empty,
-                TerraformPlanResultState.ValidateFailed);
+            return new TerraformPlanResult(builderResult.WorkingDirectory, string.Empty,
+                TerraformPlanResultState.ValidateFailed, validateResult);
         }
 
         _logger.LogDebug("Terraform Validate Output: {Output}", validateResult.StdOut);
@@ -87,56 +90,39 @@ public sealed class TerraformDriver : ITerraformDriver
         var planFileName = Path.Combine(builderResult.PlanDirectory, $"plan-{dateTimeIsoString}.tfplan");
 
         CommandLineResult planResult = destroy
-            ? await _commandLine.RunPlanDestroyAsync(builderResult.StateDirectory)
-            : await _commandLine.RunPlanAsync(builderResult.StateDirectory, planFileName);
+            ? await _commandLine.RunPlanDestroyAsync(builderResult.WorkingDirectory, planFileName)
+            : await _commandLine.RunPlanAsync(builderResult.WorkingDirectory, planFileName);
 
         switch (planResult.ExitCode)
         {
             case (int)TerraformPlanResultExitCode.Errored:
-                return new TerraformPlanResult(builderResult.StateDirectory, planFileName,
+                return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName,
                     TerraformPlanResultState.PlanFailed,
                     planResult);
             case (int)TerraformPlanResultExitCode.NoChanges:
-                return new TerraformPlanResult(builderResult.StateDirectory, planFileName,
+                return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName,
                     TerraformPlanResultState.NoChanges,
                     planResult);
         }
 
         _logger.LogDebug("Terraform Plan Output: {Output}", planResult.StdOut);
 
-        _logger.LogInformation("Successfully run plan for {Folder}", folderName);
+        _logger.LogInformation("Successfully run plan for {ProjectName}", context.ProjectName);
 
-        return new TerraformPlanResult(builderResult.StateDirectory, planFileName, TerraformPlanResultState.Success,
+        return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName, TerraformPlanResultState.Success,
             planResult);
     }
 
-    public async Task ApplyAsync(TerraformPlanResult planResult)
-    {
-        switch (planResult.State)
-        {
-            case TerraformPlanResultState.PreValidationFailed:
-            case TerraformPlanResultState.InitFailed:
-            case TerraformPlanResultState.ValidateFailed:
-            case TerraformPlanResultState.PlanFailed:
-                _logger.LogWarning("Plan Was not in a valid state: {Message} {State}",
-                    planResult.Message, planResult.State.ToString());
-                break;
-            case TerraformPlanResultState.NoChanges:
-                _logger.LogInformation("No changes needed in this plan");
-                break;
-            case TerraformPlanResultState.Success:
-                _logger.LogInformation("Running Terraform Apply in {Directory}", planResult.StateDirectory);
-                CommandLineResult applyResult =
-                    await _commandLine.RunApplyAsync(planResult.StateDirectory, planResult.PlanFilePath);
-                _logger.LogInformation("Terraform Apply Result: {Result}", applyResult.StdOut);
-                break;
-            default:
-                throw new InvalidEnumArgumentException(nameof(planResult.State), (int)planResult.State,
-                    typeof(TerraformPlanResultState));
-        }
-    }
+    public Task ApplyAsync(TerraformPlanResult planResult) =>
+        ExecutePlanAsync(planResult, "Apply",
+            () => _commandLine.RunApplyAsync(planResult.WorkingDirectory, planResult.PlanFilePath));
 
-    public async Task DestroyAsync(TerraformPlanResult planResult)
+    public Task DestroyAsync(TerraformPlanResult planResult) =>
+        ExecutePlanAsync(planResult, "Destroy",
+            () => _commandLine.RunDestroyAsync(planResult.WorkingDirectory, planResult.PlanFilePath));
+
+    private async Task ExecutePlanAsync(TerraformPlanResult planResult, string operation,
+        Func<Task<CommandLineResult>> execute)
     {
         switch (planResult.State)
         {
@@ -144,17 +130,25 @@ public sealed class TerraformDriver : ITerraformDriver
             case TerraformPlanResultState.InitFailed:
             case TerraformPlanResultState.ValidateFailed:
             case TerraformPlanResultState.PlanFailed:
-                _logger.LogWarning("Plan Was not in a valid state: {Message} {State}",
-                    planResult.Message, planResult.State.ToString());
-                break;
+                throw new InvalidOperationException(
+                    $"Terraform {operation} was not run because the plan is in state {planResult.State}: " +
+                    planResult.Message);
             case TerraformPlanResultState.NoChanges:
                 _logger.LogInformation("No changes needed in this plan");
-                break;
+                return;
             case TerraformPlanResultState.Success:
-                _logger.LogInformation("Running Terraform Destroy in {Directory}", planResult.StateDirectory);
-                CommandLineResult applyResult = await _commandLine.RunDestroyAsync(planResult.StateDirectory);
-                _logger.LogInformation("Terraform Destroy Result: {Result}", applyResult.StdOut);
-                break;
+                _logger.LogInformation("Running Terraform {Operation} in {Directory}", operation,
+                    planResult.WorkingDirectory);
+                CommandLineResult result = await execute();
+
+                if (result.ExitCode != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Terraform {operation} failed with exit code {result.ExitCode}: {result.StdErr}");
+                }
+
+                _logger.LogInformation("Terraform {Operation} Result: {Result}", operation, result.StdOut);
+                return;
             default:
                 throw new InvalidEnumArgumentException(nameof(planResult.State), (int)planResult.State,
                     typeof(TerraformPlanResultState));

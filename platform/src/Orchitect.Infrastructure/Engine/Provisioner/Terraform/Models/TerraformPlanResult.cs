@@ -4,7 +4,7 @@ namespace Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
 
 public sealed record TerraformPlanResult
 {
-    public string StateDirectory { get; init; }
+    public string WorkingDirectory { get; init; }
     public string PlanFilePath { get; init; }
     public string Message { get; init; }
     public int? ExitCode { get; init; }
@@ -14,17 +14,23 @@ public sealed record TerraformPlanResult
     {
         State = state;
         Message = message;
-        StateDirectory = string.Empty;
+        WorkingDirectory = string.Empty;
         PlanFilePath = string.Empty;
         ExitCode = null;
     }
 
-    public TerraformPlanResult(string stateDirectory, string planFilePath, TerraformPlanResultState state,
+    public TerraformPlanResult(string workingDirectory, string planFilePath, TerraformPlanResultState state,
         CommandLineResult? planCommandLineResult = null)
     {
-        StateDirectory = stateDirectory;
+        WorkingDirectory = workingDirectory;
         PlanFilePath = planFilePath;
-        Message = planCommandLineResult?.StdOut ?? planCommandLineResult?.StdErr ?? string.Empty;
+        Message = planCommandLineResult switch
+        {
+            null => string.Empty,
+            { ExitCode: not 0 and not (int)TerraformPlanResultExitCode.ChangesNeeded, StdErr.Length: > 0 } =>
+                planCommandLineResult.StdErr,
+            _ => planCommandLineResult.StdOut
+        };
         State = state;
         ExitCode = planCommandLineResult?.ExitCode;
     }

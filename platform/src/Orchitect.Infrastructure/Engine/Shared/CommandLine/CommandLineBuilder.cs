@@ -25,6 +25,16 @@ public sealed class CommandLineBuilder
         return this;
     }
 
+    public CommandLineBuilder WithArguments(IEnumerable<string> arguments)
+    {
+        foreach (var argument in arguments)
+        {
+            _startInfo.ArgumentList.Add(argument);
+        }
+
+        return this;
+    }
+
     public CommandLineBuilder WithWorkingDirectory(string workingDirectory)
     {
         _startInfo.WorkingDirectory = workingDirectory;
@@ -71,7 +81,7 @@ public sealed class CommandLineBuilder
             if (args.Data != null)
             {
                 stdErr.AppendLine(args.Data);
-                Console.Error.WriteLine(args.Data); // optional: live logging
+                Console.Error.WriteLine(args.Data);
             }
         };
 

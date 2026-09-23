@@ -64,8 +64,12 @@ try
         .ValidateOnStart();
 
     builder.Services.AddOptions<RunnerOptions>()
-        .Bind(builder.Configuration.GetSection("RunnerOptions"))
+        .Bind(builder.Configuration.GetSection(RunnerOptions.SectionName))
         .ValidateDataAnnotations()
+        .Validate(options => options.TerraformBackend.GetValidationError() is null,
+            "RunnerOptions:TerraformBackend is invalid. Mode Remote needs Type and Config; Mode Local must not set them.")
+        .Validate(options => options.SecretProvider.GetValidationError() is null,
+            "RunnerOptions:SecretProvider is invalid. AzureKeyVault needs an absolute AzureKeyVault:VaultUri.")
         .ValidateOnStart();
 
     builder.Services.AddHostedService<DiscoveryHostedService>();

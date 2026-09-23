@@ -1,6 +1,6 @@
 using Orchitect.Domain.Engine.ResourceTemplate;
 
-namespace Orchitect.Infrastructure.Engine.Shared;
+namespace Orchitect.Infrastructure.Engine.Provisioner;
 
 public interface IProvisioner
 {
@@ -8,11 +8,11 @@ public interface IProvisioner
 
     Task ProvisionAsync(
         List<ProvisionInput> inputs,
-        string folderName,
+        ProvisionContext context,
         CancellationToken cancellationToken = default);
 
     Task DeleteAsync(
         List<ProvisionInput> inputs,
-        string folderName,
+        ProvisionContext context,
         CancellationToken cancellationToken = default);
 }

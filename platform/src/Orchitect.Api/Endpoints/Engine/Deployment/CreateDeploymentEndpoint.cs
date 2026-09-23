@@ -59,7 +59,6 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             return TypedResults.InternalServerError();
         }
 
-        // Capture IDs to pass to the runner
         var deploymentId = deploymentResponse.Id;
         var applicationId = application.Id;
 
@@ -77,7 +76,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
                     "--application-id", applicationId.Value.ToString(),
                     "--deployment-id", deploymentId.Value.ToString()
                 ],
-                Configuration = runnerOptions.Configuration
+                Configuration = runnerOptions.ToEnvironment()
             }, ct);
         });
 
