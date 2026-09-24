@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{API_BASE_URL}}/deployments/{{RESOURCE_TEMPLATE_ID}}
+  url: {{API_BASE_URL}}/deployments
   body: json
   auth: inherit
 }
@@ -16,12 +16,17 @@ body:json {
       "value": "{{APPLICATION_ID}}"
     },
     "environmentId": {
-      "value": "{{}}"
+      "value": "{{ENVIRONMENT_ID}}"
     },
     "commitId": {
       "value": "string"
     }
   }
+}
+
+script:post-response {
+  var id = res.body.id
+  bru.setEnvVar("DEPLOYMENT_ID", id, {})
 }
 
 settings {
