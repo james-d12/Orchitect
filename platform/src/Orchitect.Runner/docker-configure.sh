@@ -37,7 +37,7 @@ case "$CLOUD_PROVIDER" in
 
         echo "Installing Azure CLI..."
 
-        curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+        curl --proto "=https" --tlsv1.2 -sL https://aka.ms/InstallAzureCLIDeb | bash
 
         ;;
 
@@ -45,7 +45,7 @@ case "$CLOUD_PROVIDER" in
 
         echo "Installing AWS CLI..."
 
-        curl -fsSL \
+        curl --proto "=https" --tlsv1.2 -fsSL \
             https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip \
             -o /tmp/awscliv2.zip
 
@@ -87,7 +87,7 @@ case "$IAC_PROVIDER" in
 
         echo "Installing Terraform..."
 
-        wget -O- https://apt.releases.hashicorp.com/gpg \
+        wget --secure-protocol=TLSv1_2 --max-redirect=0 -O- https://apt.releases.hashicorp.com/gpg \
             | gpg --dearmor \
             -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
@@ -143,7 +143,7 @@ esac
 
 echo "Installing Helm..."
 
-curl -fsSL \
+curl --proto "=https" --tlsv1.2 -fsSL \
     -o /tmp/get_helm.sh \
     https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
 
