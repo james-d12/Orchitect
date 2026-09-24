@@ -17,6 +17,7 @@ using Orchitect.Api.Settings;
 using Orchitect.Infrastructure.Engine;
 using Orchitect.Infrastructure.Engine.Encryption;
 using Orchitect.Infrastructure.Engine.Executor;
+using Orchitect.Infrastructure.Inventory;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
 
@@ -49,6 +50,7 @@ try
     builder.Services.AddOpenApi()
         .AddEndpointsApiExplorer()
         .AddPersistenceServices()
+        .AddInventoryInfrastructureServices()
         .AddEngineInfrastructureServices();
 
     builder.Services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<OrchitectDbContext>();

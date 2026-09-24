@@ -76,7 +76,10 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
                     "--application-id", applicationId.Value.ToString(),
                     "--deployment-id", deploymentId.Value.ToString()
                 ],
-                Configuration = runnerOptions.ToEnvironment()
+                Configuration = runnerOptions.ToEnvironment(),
+                Network = runnerOptions.Network,
+                DatabaseHost = runnerOptions.DatabaseHost,
+                DatabasePort = runnerOptions.DatabasePort
             }, ct);
         });
 

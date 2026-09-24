@@ -58,15 +58,19 @@ public sealed class TerraformValidator : ITerraformValidator
 
         var basePath = Path.Combine(Path.GetTempPath(), "orchitect", "terraform");
         var templateDir = Path.Combine(basePath, "modules", template.Name.Replace(" ", "."), latestVersion.Version);
-        var cloneResult = await CloneModuleAsync(latestVersion, templateDir);
-
-        if (!cloneResult)
+        
+        if (!Directory.Exists(templateDir))
         {
-            var message = $"Could not clone template: {template.Name} from {latestVersion.Source}";
-            return TerraformValidationResult.ModuleInvalid(message);
-        }
+            var cloneResult = await CloneModuleAsync(latestVersion, templateDir);
 
-        _logger.LogInformation("Successfully cloned Repository: {Url} to {Output}", latestVersion.Source, templateDir);
+            if (!cloneResult)
+            {
+                var message = $"Could not clone template: {template.Name} from {latestVersion.Source}";
+                return TerraformValidationResult.ModuleInvalid(message);
+            }
+            
+            _logger.LogInformation("Successfully cloned Repository: {Url} to {Output}", latestVersion.Source, templateDir);
+        }
 
         if (!string.IsNullOrEmpty(latestVersion.Source.FolderPath))
         {

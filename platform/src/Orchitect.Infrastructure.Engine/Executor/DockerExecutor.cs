@@ -1,6 +1,9 @@
+using System.Data.Common;
+using System.Diagnostics;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using Microsoft.Extensions.Logging;
+using Orchitect.Common.Observability;
 
 namespace Orchitect.Infrastructure.Engine.Executor;
 
@@ -19,25 +22,66 @@ public sealed class DockerExecutor : IExecutor
         ExecutorContext context,
         CancellationToken cancellationToken = default)
     {
+        using var activity = Tracing.StartActivity();
+        activity?.SetTag("orchitect.run.id", context.RunId);
+        activity?.SetTag("container.image.name", context.Image);
+
+        using var scope = _logger.BeginScope(new Dictionary<string, object> { ["RunId"] = context.RunId });
+
+        _logger.LogInformation(
+            "Executing run {RunId} using image {Image} with {ArgumentCount} arguments and {ConfigurationCount} configuration values.",
+            context.RunId, context.Image, context.Arguments.Count, context.Configuration.Count);
+
         await EnsureImageExistsAsync(context.Image, cancellationToken);
 
-        var container = await _docker.Containers.CreateContainerAsync(
-            new CreateContainerParameters
-            {
-                Name = $"orchitect-runner-{context.RunId}",
-                Image = context.Image,
-                Cmd = context.Arguments.ToList(),
-                Env =
-                [
-                    $"ORCHITECT_RUN_ID={context.RunId}",
-                    ..context.Configuration.Select(x => $"{x.Key}={x.Value}")
-                ],
-                HostConfig = new HostConfig
+        var network = await ResolveNetworkAsync(context.Network, cancellationToken);
+        activity?.SetTag("container.network", network);
+
+        var containerName = $"orchitect-runner-{context.RunId}";
+        CreateContainerResponse container;
+
+        try
+        {
+            container = await _docker.Containers.CreateContainerAsync(
+                new CreateContainerParameters
                 {
-                    ExtraHosts = ["host.docker.internal:host-gateway"]
-                }
-            },
-            cancellationToken);
+                    Name = containerName,
+                    Image = context.Image,
+                    Cmd = context.Arguments.ToList(),
+                    Env =
+                    [
+                        $"ORCHITECT_RUN_ID={context.RunId}",
+                        $"ConnectionStrings__orchitect={BuildRunnerConnectionString(context)}",
+                        "Logging__LogLevel__Default=Debug",
+                        ..context.Configuration.Select(x => $"{x.Key}={x.Value}")
+                    ],
+                    HostConfig = new HostConfig
+                    {
+                        NetworkMode = network,
+                        ExtraHosts = ["host.docker.internal:host-gateway"]
+                    }
+                },
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            activity.RecordException(exception);
+            _logger.LogError(exception, "Failed to create runner container {ContainerName} for run {RunId}.",
+                containerName, context.RunId);
+            throw;
+        }
+
+        activity?.SetTag("container.id", container.ID);
+        activity?.SetTag("container.name", containerName);
+
+        foreach (var warning in container.Warnings ?? [])
+        {
+            _logger.LogWarning("Docker warning while creating runner container {ContainerId}: {Warning}",
+                container.ID, warning);
+        }
+
+        _logger.LogInformation("Created runner container {ContainerId} ({ContainerName}) for run {RunId}.",
+            container.ID, containerName, context.RunId);
 
         var started = false;
         var detached = false;
@@ -55,9 +99,28 @@ public sealed class DockerExecutor : IExecutor
                     $"Failed to start runner container '{container.ID}'.");
             }
 
+            _logger.LogInformation("Started runner container {ContainerId}, waiting for it to exit.", container.ID);
+            activity?.AddEvent(new ActivityEvent("container.started"));
+
+            var stopwatch = Stopwatch.StartNew();
+
             var wait = await _docker.Containers.WaitContainerAsync(
                 container.ID,
                 cancellationToken);
+
+            stopwatch.Stop();
+            activity?.SetTag("container.exit_code", wait.StatusCode);
+            activity?.AddEvent(new ActivityEvent("container.exited"));
+
+            _logger.LogInformation(
+                "Runner container {ContainerId} exited with code {ExitCode} after {ElapsedMilliseconds}ms.",
+                container.ID, wait.StatusCode, stopwatch.ElapsedMilliseconds);
+
+            if (wait.Error is not null)
+            {
+                _logger.LogWarning("Docker reported an error while waiting on runner container {ContainerId}: {Error}",
+                    container.ID, wait.Error.Message);
+            }
 
             await LogContainerOutputAsync(container.ID, cancellationToken);
 
@@ -66,13 +129,24 @@ public sealed class DockerExecutor : IExecutor
                 throw new InvalidOperationException(
                     $"Runner '{context.RunId}' failed with exit code {wait.StatusCode}.");
             }
+
+            _logger.LogInformation("Run {RunId} completed successfully.", context.RunId);
         }
         catch (OperationCanceledException exception) when (started && cancellationToken.IsCancellationRequested)
         {
             detached = true;
+            activity?.SetTag("container.detached", true);
+            activity.RecordException(exception);
             _logger.LogWarning(exception,
                 "Run {RunId} was cancelled while runner container {ContainerId} was running. The container was " +
                 "left running so terraform can finish. Check its logs and remove it once it has exited.",
+                context.RunId, container.ID);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            activity.RecordException(exception);
+            _logger.LogError(exception, "Run {RunId} failed in runner container {ContainerId}.",
                 context.RunId, container.ID);
             throw;
         }
@@ -85,16 +159,85 @@ public sealed class DockerExecutor : IExecutor
         }
     }
 
+    private async Task<string?> ResolveNetworkAsync(
+        string? network,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(network))
+        {
+            return null;
+        }
+
+        var networks = await _docker.Networks.ListNetworksAsync(new NetworksListParameters(), cancellationToken);
+
+        if (networks.Any(x => x.Name == network))
+        {
+            return network;
+        }
+
+        var matches = networks
+            .Where(x => x.Name.StartsWith(network, StringComparison.Ordinal))
+            .Select(x => x.Name)
+            .ToList();
+
+        return matches.Count switch
+        {
+            1 => matches[0],
+            0 => throw new InvalidOperationException(
+                $"No docker network named or starting with '{network}' was found."),
+            _ => throw new InvalidOperationException(
+                $"Docker network '{network}' is ambiguous, it matches: {string.Join(", ", matches)}.")
+        };
+    }
+
+    private static string BuildRunnerConnectionString(ExecutorContext context)
+    {
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__orchitect");
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "ConnectionStrings__orchitect is not set, so the runner container cannot reach the database.");
+        }
+
+        var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+
+        if (!string.IsNullOrWhiteSpace(context.DatabaseHost))
+        {
+            builder["Host"] = context.DatabaseHost;
+        }
+        else if (builder.TryGetValue("Host", out var host) &&
+            host is string value &&
+            value is "localhost" or "127.0.0.1" or "::1")
+        {
+            builder["Host"] = "host.docker.internal";
+        }
+
+        if (context.DatabasePort is { } port)
+        {
+            builder["Port"] = port;
+        }
+
+        return builder.ConnectionString;
+    }
+
     private async Task EnsureImageExistsAsync(
         string image,
         CancellationToken cancellationToken)
     {
+        using var activity = Tracing.StartActivity();
+        activity?.SetTag("container.image.name", image);
+
         try
         {
-            await _docker.Images.InspectImageAsync(image, cancellationToken);
+            var inspect = await _docker.Images.InspectImageAsync(image, cancellationToken);
+            activity?.SetTag("container.image.id", inspect.ID);
+            _logger.LogDebug("Found runner image {Image} ({ImageId}).", image, inspect.ID);
         }
-        catch (DockerImageNotFoundException)
+        catch (DockerImageNotFoundException exception)
         {
+            activity.RecordException(exception);
+            _logger.LogError(exception, "Runner image {Image} does not exist.", image);
             throw new InvalidOperationException(
                 $"Runner image '{image}' does not exist.");
         }
@@ -104,6 +247,9 @@ public sealed class DockerExecutor : IExecutor
         string containerId,
         CancellationToken cancellationToken)
     {
+        using var activity = Tracing.StartActivity();
+        activity?.SetTag("container.id", containerId);
+
         using var stream = await _docker.Containers.GetContainerLogsAsync(
             containerId,
             tty: false,
@@ -115,6 +261,9 @@ public sealed class DockerExecutor : IExecutor
             cancellationToken);
 
         var (stdout, stderr) = await stream.ReadOutputToEndAsync(cancellationToken);
+
+        activity?.SetTag("container.stdout.length", stdout.Length);
+        activity?.SetTag("container.stderr.length", stderr.Length);
 
         if (!string.IsNullOrWhiteSpace(stdout))
         {
@@ -131,6 +280,9 @@ public sealed class DockerExecutor : IExecutor
         string containerId,
         CancellationToken cancellationToken)
     {
+        using var activity = Tracing.StartActivity();
+        activity?.SetTag("container.id", containerId);
+
         try
         {
             await _docker.Containers.RemoveContainerAsync(
@@ -140,9 +292,12 @@ public sealed class DockerExecutor : IExecutor
                     Force = true
                 },
                 cancellationToken);
+
+            _logger.LogInformation("Removed runner container {ContainerId}.", containerId);
         }
         catch (DockerContainerNotFoundException exception)
         {
+            activity.RecordException(exception);
             _logger.LogError(exception, "Container {ContainerId} does not exist.", containerId);
         }
     }

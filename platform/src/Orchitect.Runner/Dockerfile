@@ -88,7 +88,7 @@ FROM mcr.microsoft.com/dotnet/runtime:10.0-alpine AS final
 
 USER root
 
-RUN apk add --no-cache git ca-certificates
+RUN apk add --no-cache git ca-certificates krb5-libs
 
 COPY --from=iac /out/ /usr/local/bin/
 COPY --from=helm /out/helm /usr/local/bin/helm

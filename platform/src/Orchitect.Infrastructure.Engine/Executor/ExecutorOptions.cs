@@ -8,6 +8,9 @@ public sealed record ExecutorOptions
     public const string SectionName = "ExecutorOptions";
 
     public required string Image { get; init; }
+    public string? Network { get; init; }
+    public string? DatabaseHost { get; init; }
+    public int? DatabasePort { get; init; }
     public TerraformBackendOptions TerraformBackend { get; init; } = new();
     public SecretProviderOptions SecretProvider { get; init; } = new();
 

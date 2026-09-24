@@ -9,6 +9,12 @@ public sealed record ExecutorContext
     public required IReadOnlyList<string> Arguments { get; init; }
 
     public required IReadOnlyDictionary<string, string> Configuration { get; init; }
+
+    public string? Network { get; init; }
+
+    public string? DatabaseHost { get; init; }
+
+    public int? DatabasePort { get; init; }
 }
 
 public interface IExecutor
