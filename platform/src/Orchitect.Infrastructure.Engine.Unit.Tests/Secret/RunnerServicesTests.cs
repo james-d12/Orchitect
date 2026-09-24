@@ -1,3 +1,4 @@
+using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orchitect.Infrastructure.Engine.Secret;
@@ -60,5 +61,24 @@ public sealed class RunnerServicesTests
 
         Assert.IsType(expected, provider.GetRequiredService<ISecretProvider>());
         Assert.NotNull((object?)provider.GetRequiredService<ISecretEnvironmentLoader>());
+    }
+
+    [Fact]
+    public void AddRunnerServices_AzureKeyVaultWithAccessToken_RegistersSecretClient()
+    {
+        var configuration = Configuration(new()
+        {
+            ["SecretProvider:Type"] = "AzureKeyVault",
+            ["SecretProvider:AzureKeyVault:VaultUri"] = VaultUri,
+            ["SecretProvider:AzureKeyVault:AccessToken"] = "kv-token",
+            ["SecretProvider:AzureKeyVault:AccessTokenExpiresOn"] = "2026-09-24T12:00:00.0000000+00:00"
+        });
+
+        using var provider = new ServiceCollection().AddLogging().AddRunnerServices(configuration)
+            .BuildServiceProvider();
+
+        var client = provider.GetRequiredService<SecretClient>();
+
+        Assert.Equal(new Uri(VaultUri), client.VaultUri);
     }
 }

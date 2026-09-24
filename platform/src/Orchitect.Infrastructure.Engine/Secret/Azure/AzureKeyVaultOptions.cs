@@ -6,6 +6,10 @@ public sealed record AzureKeyVaultOptions
 
     public Uri? VaultUri { get; init; }
 
+    public string? AccessToken { get; init; }
+
+    public DateTimeOffset? AccessTokenExpiresOn { get; init; }
+
     public string? GetValidationError() => VaultUri switch
     {
         null => $"{ConfigPath}:VaultUri is required when {SecretProviderOptions.SectionName}:Type is " +

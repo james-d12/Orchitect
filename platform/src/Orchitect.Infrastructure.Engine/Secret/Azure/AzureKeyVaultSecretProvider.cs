@@ -21,11 +21,18 @@ public sealed class AzureKeyVaultSecretProvider(ILogger<AzureKeyVaultSecretProvi
         {
             return null;
         }
+        catch (RequestFailedException exception) when (exception.Status is 401 or 403)
+        {
+            throw new InvalidOperationException(
+                $"Key Vault '{secretClient.VaultUri}' rejected the runner's token reading secret '{name}'. " +
+                "The access token passed by the API may have expired, or its identity lacks 'Key Vault Secrets User'.",
+                exception);
+        }
         catch (Exception exception) when (exception is CredentialUnavailableException or AuthenticationFailedException)
         {
             throw new InvalidOperationException(
                 $"Runner has no Azure identity to reach Key Vault '{secretClient.VaultUri}'. " +
-                "Set AZURE_CLIENT_ID/AZURE_CLIENT_SECRET/AZURE_TENANT_ID or use a managed identity.",
+                "The API did not pass a Key Vault access token and no managed identity is available.",
                 exception);
         }
     }

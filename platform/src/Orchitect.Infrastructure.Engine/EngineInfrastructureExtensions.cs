@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
 using Docker.DotNet;
 using Microsoft.Extensions.Configuration;
@@ -65,6 +66,8 @@ public static class EngineInfrastructureExtensions
     {
         services.TryAddSingleton(_ => new DockerClientConfiguration().CreateClient());
         services.TryAddSingleton<IExecutor, DockerExecutor>();
+        services.TryAddSingleton<IRunnerSecretTokenProvider>(_ =>
+            new KeyVaultRunnerTokenProvider(new DefaultAzureCredential()));
     }
 
     public static IServiceCollection AddRunnerServices(this IServiceCollection services,
@@ -88,8 +91,9 @@ public static class EngineInfrastructureExtensions
                 services.TryAddSingleton<ISecretProvider, EnvironmentSecretProvider>();
                 break;
             case SecretProviderType.AzureKeyVault:
-                var vaultUri = options.AzureKeyVault.VaultUri!;
-                services.TryAddSingleton(_ => new SecretClient(vaultUri, AzureCredentialFactory.Create()));
+                var keyVaultOptions = options.AzureKeyVault;
+                services.TryAddSingleton(_ =>
+                    new SecretClient(keyVaultOptions.VaultUri!, AzureCredentialFactory.Create(keyVaultOptions)));
                 services.TryAddSingleton<ISecretProvider, AzureKeyVaultSecretProvider>();
                 break;
             default:

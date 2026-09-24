@@ -11,6 +11,7 @@ using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
 using Orchitect.Infrastructure.Engine.Executor;
+using Orchitect.Infrastructure.Engine.Secret;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
 
@@ -66,6 +67,8 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
         {
             var runner = sp.GetRequiredService<IExecutor>();
             var runnerOptions = sp.GetRequiredService<IOptions<ExecutorOptions>>().Value;
+            var tokenEnvironment = await sp.GetRequiredService<IRunnerSecretTokenProvider>()
+                .GetEnvironmentAsync(runnerOptions.SecretProvider, ct);
 
             await runner.ExecuteAsync(new ExecutorContext
             {
@@ -76,7 +79,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
                     "--application-id", applicationId.Value.ToString(),
                     "--deployment-id", deploymentId.Value.ToString()
                 ],
-                Configuration = runnerOptions.ToEnvironment(),
+                Configuration = runnerOptions.ToEnvironment().Concat(tokenEnvironment).ToDictionary(),
                 Network = runnerOptions.Network,
                 DatabaseHost = runnerOptions.DatabaseHost,
                 DatabasePort = runnerOptions.DatabasePort
