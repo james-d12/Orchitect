@@ -105,8 +105,6 @@ public sealed class TerraformDriver : ITerraformDriver
                     planResult);
         }
 
-        _logger.LogDebug("Terraform Plan Output: {Output}", planResult.StdOut);
-
         _logger.LogInformation("Successfully run plan for {ProjectName}", context.ProjectName);
 
         return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName, TerraformPlanResultState.Success,

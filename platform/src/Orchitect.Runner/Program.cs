@@ -14,6 +14,9 @@ using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole();
+
 builder.Services.AddEngineInfrastructureServices();
 builder.Services.AddPersistenceServices();
 builder.Services.AddRunnerServices(builder.Configuration);

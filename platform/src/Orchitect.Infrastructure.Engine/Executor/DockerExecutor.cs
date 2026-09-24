@@ -9,6 +9,9 @@ namespace Orchitect.Infrastructure.Engine.Executor;
 
 public sealed class DockerExecutor : IExecutor
 {
+    private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan RawOutputFlushInterval = TimeSpan.FromMilliseconds(500);
+
     private readonly ILogger<DockerExecutor> _logger;
     private readonly DockerClient _docker;
 
@@ -86,6 +89,8 @@ public sealed class DockerExecutor : IExecutor
         var started = false;
         var detached = false;
 
+        using var logCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
         try
         {
             started = await _docker.Containers.StartContainerAsync(
@@ -101,6 +106,8 @@ public sealed class DockerExecutor : IExecutor
 
             _logger.LogInformation("Started runner container {ContainerId}, waiting for it to exit.", container.ID);
             activity?.AddEvent(new ActivityEvent("container.started"));
+
+            Task logStreaming = StreamContainerOutputAsync(container.ID, logCancellation.Token);
 
             var stopwatch = Stopwatch.StartNew();
 
@@ -122,7 +129,7 @@ public sealed class DockerExecutor : IExecutor
                     container.ID, wait.Error.Message);
             }
 
-            await LogContainerOutputAsync(container.ID, cancellationToken);
+            await WaitForOutputAsync(container.ID, logStreaming, logCancellation);
 
             if (wait.StatusCode != 0)
             {
@@ -243,36 +250,90 @@ public sealed class DockerExecutor : IExecutor
         }
     }
 
-    private async Task LogContainerOutputAsync(
+    private async Task WaitForOutputAsync(
+        string containerId,
+        Task logStreaming,
+        CancellationTokenSource logCancellation)
+    {
+        try
+        {
+            await logStreaming.WaitAsync(OutputDrainTimeout);
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning(
+                "Output from runner container {ContainerId} did not finish within {Timeout} after it exited.",
+                containerId, OutputDrainTimeout);
+            await logCancellation.CancelAsync();
+        }
+    }
+
+    private async Task StreamContainerOutputAsync(
         string containerId,
         CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
         activity?.SetTag("container.id", containerId);
 
-        using var stream = await _docker.Containers.GetContainerLogsAsync(
-            containerId,
-            tty: false,
-            new ContainerLogsParameters
+        var shortId = containerId[..Math.Min(12, containerId.Length)];
+        var stdout = new RunnerOutputRelay(_logger, shortId, LogLevel.Information);
+        var stderr = new RunnerOutputRelay(_logger, shortId, LogLevel.Warning);
+
+        try
+        {
+            using var stream = await _docker.Containers.GetContainerLogsAsync(
+                containerId,
+                tty: false,
+                new ContainerLogsParameters
+                {
+                    ShowStdout = true,
+                    ShowStderr = true,
+                    Follow = true
+                },
+                cancellationToken);
+
+            var buffer = new byte[8192];
+            var read = stream.ReadOutputAsync(buffer, 0, buffer.Length, cancellationToken);
+
+            while (true)
             {
-                ShowStdout = true,
-                ShowStderr = true
-            },
-            cancellationToken);
+                if (await Task.WhenAny(read, Task.Delay(RawOutputFlushInterval, cancellationToken)) != read)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    stdout.FlushRaw();
+                    stderr.FlushRaw();
+                    continue;
+                }
 
-        var (stdout, stderr) = await stream.ReadOutputToEndAsync(cancellationToken);
+                var result = await read;
 
-        activity?.SetTag("container.stdout.length", stdout.Length);
-        activity?.SetTag("container.stderr.length", stderr.Length);
+                if (result.EOF)
+                {
+                    break;
+                }
 
-        if (!string.IsNullOrWhiteSpace(stdout))
-        {
-            _logger.LogInformation("Runner {ContainerId} output:\n{Output}", containerId, stdout);
+                var target = result.Target == MultiplexedStream.TargetStream.StandardError ? stderr : stdout;
+                target.Append(buffer, result.Count);
+
+                read = stream.ReadOutputAsync(buffer, 0, buffer.Length, cancellationToken);
+            }
         }
-
-        if (!string.IsNullOrWhiteSpace(stderr))
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning("Runner {ContainerId} error output:\n{Output}", containerId, stderr);
+        }
+        catch (Exception exception)
+        {
+            activity.RecordException(exception);
+            _logger.LogWarning(exception, "Stopped streaming output from runner container {ContainerId}.",
+                containerId);
+        }
+        finally
+        {
+            stdout.Complete();
+            stderr.Complete();
+
+            activity?.SetTag("container.stdout.entries", stdout.EntryCount);
+            activity?.SetTag("container.stderr.entries", stderr.EntryCount);
         }
     }
 
