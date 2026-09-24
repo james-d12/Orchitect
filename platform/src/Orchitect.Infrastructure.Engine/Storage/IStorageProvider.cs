@@ -16,5 +16,5 @@ public record StorageLogItem
 
 public interface IStorageLogProvider : IStorageProvider<StorageLogItem>
 {
-    
+
 }

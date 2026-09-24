@@ -22,14 +22,14 @@ public static class EngineInfrastructureExtensions
     public static void AddEngineInfrastructureServices(this IServiceCollection services)
     {
         services.TryAddSingleton<IEncryptionService, AesEncryptionService>();
-        
+
         services.AddSharedServices();
         services.AddScoreServices();
         services.AddHelmServices();
         services.AddTerraformServices();
         services.AddDockerRunnerServices();
     }
-    
+
     private static void AddSharedServices(this IServiceCollection services)
     {
         services.TryAddSingleton<IGitCommandLine, GitCommandLine>();
