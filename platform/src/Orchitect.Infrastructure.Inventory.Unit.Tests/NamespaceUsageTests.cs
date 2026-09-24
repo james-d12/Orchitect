@@ -1,13 +1,13 @@
 using System.Text.RegularExpressions;
 
-namespace Orchitect.Infrastructure.Unit.Tests.Inventory;
+namespace Orchitect.Infrastructure.Inventory.Unit.Tests;
 
 public sealed class NamespaceUsageTests
 {
     private static readonly string[] AllowedNamespaces =
     {
-        "Orchitect.Infrastructure.Inventory.Shared",
-        "Orchitect.Infrastructure.Inventory.Discovery"
+        "Orchitect.Infrastructure.Inventory.Inventory.Shared",
+        "Orchitect.Infrastructure.Inventory.Inventory.Discovery"
     };
 
     private static string GetRootPath()
@@ -15,7 +15,7 @@ public sealed class NamespaceUsageTests
         var baseDir = AppDomain.CurrentDomain.BaseDirectory;
         var solutionDir =
             Directory.GetParent(baseDir)?.Parent?.Parent?.Parent?.Parent?.FullName ?? string.Empty;
-        return Path.Combine(solutionDir, "Orchitect.Infrastructure", "Inventory");
+        return Path.Combine(solutionDir, "Orchitect.Infrastructure.Inventory");
     }
 
     [Theory]
@@ -38,9 +38,9 @@ public sealed class NamespaceUsageTests
 
             foreach (var usedNamespace in usings)
             {
-                if (!usedNamespace.StartsWith("Orchitect.Infrastructure.Inventory")) continue;
+                if (!usedNamespace.StartsWith("Orchitect.Infrastructure.Inventory.Inventory")) continue;
 
-                var isAllowed = usedNamespace.StartsWith($"Orchitect.Infrastructure.Inventory.{moduleName}.") ||
+                var isAllowed = usedNamespace.StartsWith($"Orchitect.Infrastructure.Inventory.Inventory.{moduleName}.") ||
                                 AllowedNamespaces.Any(n => usedNamespace.StartsWith(n));
                 Assert.True(isAllowed, $"Disallowed namespace '{usedNamespace}' found in file '{file}'");
             }

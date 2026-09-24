@@ -5,18 +5,15 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Infrastructure;
 using Orchitect.Infrastructure.Engine;
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
 using Orchitect.Infrastructure.Engine.Secret;
-using Orchitect.Persistence;
 using Orchitect.Runner;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.AddInfrastructureServices();
-builder.Services.AddPersistenceServices();
+builder.Services.AddEngineInfrastructureServices();
 builder.Services.AddRunnerServices(builder.Configuration);
 
 using var host = builder.Build();

@@ -23,7 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Orchitect.Infrastructure\Orchitect.Infrastructure.csproj" />
+      <ProjectReference Include="..\Orchitect.Infrastructure.Inventory\Orchitect.Infrastructure.Inventory.csproj" />
     </ItemGroup>
 
 </Project>

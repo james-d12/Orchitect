@@ -7,10 +7,8 @@
         <PackageReference Include="Azure.Identity" Version="1.21.0" />
         <PackageReference Include="Azure.ResourceManager" Version="1.14.0"/>
         <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.11.1" />
-        <PackageReference Include="Docker.DotNet" Version="3.125.15" />
         <PackageReference Include="NGitLab" Version="12.3.0" />
         <PackageReference Include="Octokit" Version="14.0.0"/>
-        <PackageReference Include="YamlDotNet" Version="18.1.0" />
         <PackageReference Include="Microsoft.TeamFoundationServer.Client" Version="20.256.2"/>
         <PackageReference Include="Microsoft.VisualStudio.Services.Client" Version="20.256.2"/>
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />
@@ -28,9 +26,5 @@
     <ItemGroup>
         <ProjectReference Include="..\Orchitect.Common\Orchitect.Common.csproj" />
         <ProjectReference Include="..\Orchitect.Domain\Orchitect.Domain.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Engine\Configuration\" />
     </ItemGroup>
 </Project>

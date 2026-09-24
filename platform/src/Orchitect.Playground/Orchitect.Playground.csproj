@@ -11,7 +11,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Orchitect.Infrastructure\Orchitect.Infrastructure.csproj" />
+        <ProjectReference Include="..\Orchitect.Infrastructure.Engine\Orchitect.Infrastructure.Engine.csproj" />
+        <ProjectReference Include="..\Orchitect.Infrastructure.Inventory\Orchitect.Infrastructure.Inventory.csproj" />
         <ProjectReference Include="..\Orchitect.Persistence\Orchitect.Persistence.csproj" />
         <ProjectReference Include="..\Orchitect.ServiceDefaults\Orchitect.ServiceDefaults.csproj" />
     </ItemGroup>

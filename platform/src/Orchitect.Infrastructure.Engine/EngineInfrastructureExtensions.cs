@@ -3,7 +3,9 @@ using Docker.DotNet;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orchitect.Domain.Core.Credential;
 using Orchitect.Infrastructure.Engine.Configuration.Score;
+using Orchitect.Infrastructure.Engine.Encryption;
 using Orchitect.Infrastructure.Engine.Provisioner;
 using Orchitect.Infrastructure.Engine.Provisioner.Helm;
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform;
@@ -17,15 +19,17 @@ namespace Orchitect.Infrastructure.Engine;
 
 public static class EngineInfrastructureExtensions
 {
-    internal static void AddEngineInfrastructureServices(this IServiceCollection services)
+    public static void AddEngineInfrastructureServices(this IServiceCollection services)
     {
+        services.TryAddSingleton<IEncryptionService, AesEncryptionService>();
+        
         services.AddSharedServices();
         services.AddScoreServices();
         services.AddHelmServices();
         services.AddTerraformServices();
         services.AddDockerRunnerServices();
     }
-
+    
     private static void AddSharedServices(this IServiceCollection services)
     {
         services.TryAddSingleton<IGitCommandLine, GitCommandLine>();

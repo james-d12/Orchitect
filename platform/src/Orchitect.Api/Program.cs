@@ -14,8 +14,8 @@ using Orchitect.Api.Endpoints;
 using Orchitect.Api.Jobs;
 using Orchitect.Api.Queue;
 using Orchitect.Api.Settings;
-using Orchitect.Infrastructure;
-using Orchitect.Infrastructure.Core.Encryption;
+using Orchitect.Infrastructure.Engine;
+using Orchitect.Infrastructure.Engine.Encryption;
 using Orchitect.Infrastructure.Engine.Runner;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
@@ -49,7 +49,7 @@ try
     builder.Services.AddOpenApi()
         .AddEndpointsApiExplorer()
         .AddPersistenceServices()
-        .AddInfrastructureServices();
+        .AddEngineInfrastructureServices();
 
     builder.Services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<OrchitectDbContext>();
 

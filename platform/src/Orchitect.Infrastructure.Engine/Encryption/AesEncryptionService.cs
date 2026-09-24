@@ -3,7 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Orchitect.Domain.Core.Credential;
 
-namespace Orchitect.Infrastructure.Core.Encryption;
+namespace Orchitect.Infrastructure.Engine.Encryption;
 
 public sealed class AesEncryptionService : IEncryptionService
 {
