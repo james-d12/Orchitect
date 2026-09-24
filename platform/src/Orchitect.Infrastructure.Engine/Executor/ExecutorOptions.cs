@@ -1,11 +1,11 @@
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
 using Orchitect.Infrastructure.Engine.Secret;
 
-namespace Orchitect.Infrastructure.Engine.Runner;
+namespace Orchitect.Infrastructure.Engine.Executor;
 
-public sealed record RunnerOptions
+public sealed record ExecutorOptions
 {
-    public const string SectionName = "RunnerOptions";
+    public const string SectionName = "ExecutorOptions";
 
     public required string Image { get; init; }
     public TerraformBackendOptions TerraformBackend { get; init; } = new();

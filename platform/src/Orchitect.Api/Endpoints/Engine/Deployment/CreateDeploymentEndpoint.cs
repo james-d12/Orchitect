@@ -10,7 +10,7 @@ using Orchitect.Api.Shared;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
-using Orchitect.Infrastructure.Engine.Runner;
+using Orchitect.Infrastructure.Engine.Executor;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
 
@@ -64,10 +64,10 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
 
         await backgroundTaskQueueProcessor.QueueBackgroundWorkItemAsync(async (sp, ct) =>
         {
-            var runner = sp.GetRequiredService<IRunner>();
-            var runnerOptions = sp.GetRequiredService<IOptions<RunnerOptions>>().Value;
+            var runner = sp.GetRequiredService<IExecutor>();
+            var runnerOptions = sp.GetRequiredService<IOptions<ExecutorOptions>>().Value;
 
-            await runner.ExecuteAsync(new RunnerContext
+            await runner.ExecuteAsync(new ExecutorContext
             {
                 Image = runnerOptions.Image,
                 RunId = deploymentId.Value.ToString(),

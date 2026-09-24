@@ -6,11 +6,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Infrastructure.Engine.Configuration.Score;
 using Orchitect.Infrastructure.Engine.Encryption;
+using Orchitect.Infrastructure.Engine.Executor;
 using Orchitect.Infrastructure.Engine.Provisioner;
 using Orchitect.Infrastructure.Engine.Provisioner.Helm;
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform;
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
-using Orchitect.Infrastructure.Engine.Runner;
 using Orchitect.Infrastructure.Engine.Secret;
 using Orchitect.Infrastructure.Engine.Secret.Azure;
 using Orchitect.Infrastructure.Engine.Shared.CommandLine;
@@ -63,7 +63,7 @@ public static class EngineInfrastructureExtensions
     private static void AddDockerRunnerServices(this IServiceCollection services)
     {
         services.TryAddSingleton(_ => new DockerClientConfiguration().CreateClient());
-        services.TryAddSingleton<IRunner, DockerRunner>();
+        services.TryAddSingleton<IExecutor, DockerExecutor>();
     }
 
     public static IServiceCollection AddRunnerServices(this IServiceCollection services,

@@ -2,21 +2,21 @@ using Docker.DotNet;
 using Docker.DotNet.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Orchitect.Infrastructure.Engine.Runner;
+namespace Orchitect.Infrastructure.Engine.Executor;
 
-public sealed class DockerRunner : IRunner
+public sealed class DockerExecutor : IExecutor
 {
-    private readonly ILogger<DockerRunner> _logger;
+    private readonly ILogger<DockerExecutor> _logger;
     private readonly DockerClient _docker;
 
-    public DockerRunner(ILogger<DockerRunner> logger, DockerClient docker)
+    public DockerExecutor(ILogger<DockerExecutor> logger, DockerClient docker)
     {
         _logger = logger;
         _docker = docker;
     }
 
     public async Task ExecuteAsync(
-        RunnerContext context,
+        ExecutorContext context,
         CancellationToken cancellationToken = default)
     {
         await EnsureImageExistsAsync(context.Image, cancellationToken);
@@ -67,10 +67,10 @@ public sealed class DockerRunner : IRunner
                     $"Runner '{context.RunId}' failed with exit code {wait.StatusCode}.");
             }
         }
-        catch (OperationCanceledException) when (started && cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (started && cancellationToken.IsCancellationRequested)
         {
             detached = true;
-            _logger.LogWarning(
+            _logger.LogWarning(exception,
                 "Run {RunId} was cancelled while runner container {ContainerId} was running. The container was " +
                 "left running so terraform can finish. Check its logs and remove it once it has exited.",
                 context.RunId, container.ID);
@@ -141,8 +141,9 @@ public sealed class DockerRunner : IRunner
                 },
                 cancellationToken);
         }
-        catch (DockerContainerNotFoundException)
+        catch (DockerContainerNotFoundException exception)
         {
+            _logger.LogError(exception, "Container {ContainerId} does not exist.", containerId);
         }
     }
 }

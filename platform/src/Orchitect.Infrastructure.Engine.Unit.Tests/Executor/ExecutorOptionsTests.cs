@@ -1,15 +1,15 @@
+using Orchitect.Infrastructure.Engine.Executor;
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
-using Orchitect.Infrastructure.Engine.Runner;
 using Orchitect.Infrastructure.Engine.Secret;
 using Orchitect.Infrastructure.Engine.Secret.Azure;
 
-namespace Orchitect.Infrastructure.Engine.Unit.Tests.Runner;
+namespace Orchitect.Infrastructure.Engine.Unit.Tests.Executor;
 
-public sealed class RunnerOptionsTests
+public sealed class ExecutorOptionsTests
 {
     private const string ClientSecret = "super-secret-value";
 
-    private static RunnerOptions CreateOptions() => new()
+    private static ExecutorOptions CreateOptions() => new()
     {
         Image = "orchitect-runner:azure-terraform",
         TerraformBackend = new TerraformBackendOptions
@@ -55,7 +55,7 @@ public sealed class RunnerOptionsTests
     public void ToString_DoesNotExposeConfigurationValues()
     {
         var options = CreateOptions();
-        var context = new RunnerContext
+        var context = new ExecutorContext
         {
             Image = options.Image,
             RunId = "run",

@@ -1,6 +1,6 @@
-namespace Orchitect.Infrastructure.Engine.Runner;
+namespace Orchitect.Infrastructure.Engine.Executor;
 
-public sealed record RunnerContext
+public sealed record ExecutorContext
 {
     public required string Image { get; init; }
 
@@ -11,7 +11,7 @@ public sealed record RunnerContext
     public required IReadOnlyDictionary<string, string> Configuration { get; init; }
 }
 
-public interface IRunner
+public interface IExecutor
 {
-    public Task ExecuteAsync(RunnerContext context, CancellationToken cancellationToken = default);
+    public Task ExecuteAsync(ExecutorContext context, CancellationToken cancellationToken = default);
 }

@@ -16,7 +16,7 @@ using Orchitect.Api.Queue;
 using Orchitect.Api.Settings;
 using Orchitect.Infrastructure.Engine;
 using Orchitect.Infrastructure.Engine.Encryption;
-using Orchitect.Infrastructure.Engine.Runner;
+using Orchitect.Infrastructure.Engine.Executor;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
 
@@ -63,8 +63,8 @@ try
         .ValidateDataAnnotations()
         .ValidateOnStart();
 
-    builder.Services.AddOptions<RunnerOptions>()
-        .Bind(builder.Configuration.GetSection(RunnerOptions.SectionName))
+    builder.Services.AddOptions<ExecutorOptions>()
+        .Bind(builder.Configuration.GetSection(ExecutorOptions.SectionName))
         .ValidateDataAnnotations()
         .Validate(options => options.TerraformBackend.GetValidationError() is null,
             "RunnerOptions:TerraformBackend is invalid. Mode Remote needs Type and Config; Mode Local must not set them.")
