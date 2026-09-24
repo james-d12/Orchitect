@@ -57,6 +57,7 @@ public static class EngineInfrastructureExtensions
         services.TryAddSingleton<ITerraformProjectBuilder, TerraformProjectBuilder>();
         services.TryAddSingleton<ITerraformRenderer, TerraformRenderer>();
         services.TryAddSingleton<ITerraformCommandLine, TerraformCommandLine>();
+        services.TryAddSingleton<ITerraformModuleDownloader, TerraformModuleDownloader>();
         services.TryAddSingleton<ITerraformValidator, TerraformValidator>();
     }
 

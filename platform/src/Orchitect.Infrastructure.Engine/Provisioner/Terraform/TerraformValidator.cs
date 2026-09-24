@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Engine.ResourceTemplate;
@@ -14,82 +15,119 @@ public interface ITerraformValidator
 
 public sealed class TerraformValidator : ITerraformValidator
 {
+    private const int MaxConcurrentInspections = 4;
+
     private readonly ILogger<TerraformValidator> _logger;
-    private readonly IGitCommandLine _gitCommandLine;
+    private readonly ITerraformModuleDownloader _moduleDownloader;
     private readonly ITerraformCommandLine _terraformCommandLine;
 
-    public TerraformValidator(ILogger<TerraformValidator> logger, IGitCommandLine gitCommandLine,
+    public TerraformValidator(ILogger<TerraformValidator> logger, ITerraformModuleDownloader moduleDownloader,
         ITerraformCommandLine terraformCommandLine)
     {
         _logger = logger;
-        _gitCommandLine = gitCommandLine;
+        _moduleDownloader = moduleDownloader;
         _terraformCommandLine = terraformCommandLine;
     }
 
     public async Task<Dictionary<TerraformPlanInput, TerraformValidationResult>> ValidateAsync(
         List<TerraformPlanInput> terraformPlanInputs)
     {
-        var validateTasks = terraformPlanInputs.Select(ValidatePlanAsync).ToList();
-        var results = await Task.WhenAll(validateTasks);
-        return terraformPlanInputs
-            .Zip(results, (input, result) => new { input, result })
-            .ToDictionary(x => x.input, x => x.result);
+        var results = new Dictionary<TerraformPlanInput, TerraformValidationResult>();
+        var versions = new Dictionary<TerraformPlanInput, ResourceTemplateVersion>();
+
+        foreach (var planInput in terraformPlanInputs)
+        {
+            _logger.LogInformation("Validating Template: {Template} using the Terraform Driver.",
+                planInput.Template.Name);
+
+            var (version, error) = ResolveVersion(planInput.Template);
+
+            if (version is null)
+            {
+                results[planInput] = TerraformValidationResult.TemplateInvalid(error);
+                continue;
+            }
+
+            versions[planInput] = version;
+        }
+
+        var downloads = await _moduleDownloader.DownloadAsync(versions.Values.Select(v => v.Source));
+
+        var modules = await InspectModulesAsync(downloads.Values
+            .Where(download => download.IsSuccess)
+            .Select(download => download.Directory!)
+            .Distinct());
+
+        foreach (var (planInput, version) in versions)
+        {
+            results[planInput] = ValidateInputs(planInput, version, downloads[version.Source], modules);
+        }
+
+        return terraformPlanInputs.ToDictionary(planInput => planInput, planInput => results[planInput]);
     }
 
-    private async Task<TerraformValidationResult> ValidatePlanAsync(TerraformPlanInput terraformPlanInput)
+    private static (ResourceTemplateVersion? Version, string Error) ResolveVersion(ResourceTemplate template)
     {
-        ResourceTemplate template = terraformPlanInput.Template;
-        var inputs = terraformPlanInput.Inputs;
-
-        _logger.LogInformation("Validating Template: {Template} using the Terraform Driver.", template.Name);
-
         if (template.Provider != ResourceTemplateProvider.Terraform)
         {
-            var message = $"The template: {template.Name} is configured to use {template.Provider}";
-            return TerraformValidationResult.TemplateInvalid(message);
+            return (null, $"The template: {template.Name} is configured to use {template.Provider}");
         }
 
-        ResourceTemplateVersion? latestVersion = template.GetLatestVersion();
-        if (latestVersion is null)
-        {
-            var message = $"No Version could be found for {template.Name} found.";
-            return TerraformValidationResult.TemplateInvalid(message);
-        }
+        return template.GetLatestVersion() is { } version
+            ? (version, string.Empty)
+            : (null, $"No Version could be found for {template.Name} found.");
+    }
 
-        var basePath = Path.Combine(Path.GetTempPath(), "orchitect", "terraform");
-        var templateDir = Path.Combine(basePath, "modules", template.Name.Replace(" ", "."), latestVersion.Version);
-        
-        if (!Directory.Exists(templateDir))
-        {
-            var cloneResult = await CloneModuleAsync(latestVersion, templateDir);
+    private async Task<IReadOnlyDictionary<string, ModuleInspection>> InspectModulesAsync(
+        IEnumerable<string> moduleDirectories)
+    {
+        var inspections = new ConcurrentDictionary<string, ModuleInspection>();
 
-            if (!cloneResult)
-            {
-                var message = $"Could not clone template: {template.Name} from {latestVersion.Source}";
-                return TerraformValidationResult.ModuleInvalid(message);
-            }
-            
-            _logger.LogInformation("Successfully cloned Repository: {Url} to {Output}", latestVersion.Source, templateDir);
-        }
+        await Parallel.ForEachAsync(moduleDirectories,
+            new ParallelOptions { MaxDegreeOfParallelism = MaxConcurrentInspections },
+            async (moduleDirectory, _) =>
+                inspections[moduleDirectory] = await InspectModuleAsync(moduleDirectory));
 
-        if (!string.IsNullOrEmpty(latestVersion.Source.FolderPath))
-        {
-            templateDir = Path.Combine(templateDir, latestVersion.Source.FolderPath);
-        }
+        _logger.LogInformation("Inspected {ModuleCount} unique modules.", inspections.Count);
 
-        var (isValidModule, errorMessage) = IsValidModuleDirectory(templateDir);
+        return inspections;
+    }
+
+    private async Task<ModuleInspection> InspectModuleAsync(string moduleDirectory)
+    {
+        var (isValidModule, errorMessage) = IsValidModuleDirectory(moduleDirectory);
 
         if (!isValidModule)
         {
-            return TerraformValidationResult.ModuleInvalid(errorMessage);
+            return new ModuleInspection(null, errorMessage);
         }
 
-        TerraformConfig? terraformConfig = await ParseTerraformModuleAsync(templateDir);
+        TerraformConfig? terraformConfig = await ParseTerraformModuleAsync(moduleDirectory);
 
-        if (terraformConfig is null)
+        return terraformConfig is null
+            ? new ModuleInspection(null, $"Could not parse module in {moduleDirectory}")
+            : new ModuleInspection(terraformConfig, string.Empty);
+    }
+
+    private static TerraformValidationResult ValidateInputs(TerraformPlanInput planInput,
+        ResourceTemplateVersion version, TerraformModuleDownloadResult download,
+        IReadOnlyDictionary<string, ModuleInspection> modules)
+    {
+        var template = planInput.Template;
+        var inputs = planInput.Inputs;
+
+        if (!download.IsSuccess)
         {
-            var message = $"Could not parse module: {template.Name} from {latestVersion.Source}";
-            return TerraformValidationResult.ModuleInvalid(message);
+            return TerraformValidationResult.ModuleInvalid(
+                $"Could not clone template: {template.Name} from {version.Source}. {download.Error}");
+        }
+
+        var moduleDirectory = download.Directory!;
+        var inspection = modules[moduleDirectory];
+
+        if (inspection.Config is not { } terraformConfig)
+        {
+            return TerraformValidationResult.ModuleInvalid(inspection.Error);
         }
 
         var invalidInputs = inputs
@@ -119,7 +157,7 @@ public sealed class TerraformValidator : ITerraformValidator
             return TerraformValidationResult.InputInvalid(message);
         }
 
-        return TerraformValidationResult.Valid(terraformConfig, templateDir);
+        return TerraformValidationResult.Valid(terraformConfig, moduleDirectory);
     }
 
     private async Task<TerraformConfig?> ParseTerraformModuleAsync(string moduleDirectory)
@@ -155,10 +193,5 @@ public sealed class TerraformValidator : ITerraformValidator
             : (true, string.Empty);
     }
 
-    private async Task<bool> CloneModuleAsync(ResourceTemplateVersion latestVersion, string templateDir)
-    {
-        return !string.IsNullOrEmpty(latestVersion.Source.Tag)
-            ? await _gitCommandLine.CloneTagAsync(latestVersion.Source.BaseUrl, latestVersion.Source.Tag, templateDir)
-            : await _gitCommandLine.CloneAsync(latestVersion.Source.BaseUrl, templateDir);
-    }
+    private sealed record ModuleInspection(TerraformConfig? Config, string Error);
 }
