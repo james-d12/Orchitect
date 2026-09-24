@@ -3,15 +3,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orchitect.Api.Queue;
 using Orchitect.Api.Shared;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
-using Orchitect.Infrastructure.Engine.Executor;
-using Orchitect.Infrastructure.Engine.Secret;
+using Orchitect.Infrastructure.Engine.Queue;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
 
@@ -34,7 +30,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             [FromServices]
             IEnvironmentRepository environmentRepository,
             [FromServices]
-            IBackgroundTaskQueueProcessor backgroundTaskQueueProcessor,
+            IDeploymentQueue deploymentQueue,
             HttpContext httpContext,
             CancellationToken cancellationToken)
     {
@@ -60,31 +56,8 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             return TypedResults.InternalServerError();
         }
 
-        var deploymentId = deploymentResponse.Id;
-        var applicationId = application.Id;
-
-        await backgroundTaskQueueProcessor.QueueBackgroundWorkItemAsync(async (sp, ct) =>
-        {
-            var runner = sp.GetRequiredService<IExecutor>();
-            var runnerOptions = sp.GetRequiredService<IOptions<ExecutorOptions>>().Value;
-            var tokenEnvironment = await sp.GetRequiredService<IRunnerSecretTokenProvider>()
-                .GetEnvironmentAsync(runnerOptions.SecretProvider, ct);
-
-            await runner.ExecuteAsync(new ExecutorContext
-            {
-                Image = runnerOptions.Image,
-                RunId = deploymentId.Value.ToString(),
-                Arguments =
-                [
-                    "--application-id", applicationId.Value.ToString(),
-                    "--deployment-id", deploymentId.Value.ToString()
-                ],
-                Configuration = runnerOptions.ToEnvironment().Concat(tokenEnvironment).ToDictionary(),
-                Network = runnerOptions.Network,
-                DatabaseHost = runnerOptions.DatabaseHost,
-                DatabasePort = runnerOptions.DatabasePort
-            }, ct);
-        });
+        var deploymentRequest = new DeploymentQueueRequest(application.Id, deploymentResponse.Id);
+        await deploymentQueue.QueueDeploymentTaskAsync(deploymentRequest, cancellationToken);
 
         var locationUrl =
             new Uri(

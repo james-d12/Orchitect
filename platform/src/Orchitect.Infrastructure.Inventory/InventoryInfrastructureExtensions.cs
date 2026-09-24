@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orchitect.Infrastructure.Inventory.Azure.Extensions;
 using Orchitect.Infrastructure.Inventory.AzureDevOps.Extensions;

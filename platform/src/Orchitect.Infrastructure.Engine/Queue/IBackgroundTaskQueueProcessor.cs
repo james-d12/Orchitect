@@ -1,4 +1,4 @@
-namespace Orchitect.Api.Queue;
+namespace Orchitect.Infrastructure.Engine.Queue;
 
 public interface IBackgroundTaskQueueProcessor
 {

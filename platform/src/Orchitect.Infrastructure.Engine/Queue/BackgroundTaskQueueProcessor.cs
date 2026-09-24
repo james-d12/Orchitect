@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 
-namespace Orchitect.Api.Queue;
+namespace Orchitect.Infrastructure.Engine.Queue;
 
 public sealed class BackgroundTaskQueueProcessor : IBackgroundTaskQueueProcessor
 {

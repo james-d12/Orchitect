@@ -20,7 +20,7 @@ builder.AddServiceDefaults();
 
 builder.Services
     .AddPersistenceServices()
-    .AddEngineInfrastructureServices();
+    .AddEngineInfrastructureServices(builder.Configuration);
 builder.Configuration.AddUserSecrets<Program>();
 
 await builder.Services.ApplyMigrations();
