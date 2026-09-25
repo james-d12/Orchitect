@@ -67,12 +67,78 @@ public sealed class TerraformValidatorTests : IDisposable
         Assert.Contains("sku", results[input].Message);
     }
 
+    [Fact]
+    public async Task ValidateAsync_InputCaseDiffersFromVariable_IsInputInvalid()
+    {
+        var validator = CreateValidator(new TerraformModuleDownloaderTests.FakeGitCommandLine(),
+            new InspectingTerraformCommandLine());
+        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
+            new Dictionary<string, string> { ["Name"] = "payments" }, "paymentstorage");
+
+        var results = await validator.ValidateAsync([input]);
+
+        Assert.Equal(TerraformValidationResult.ValidationResultState.InputInvalid, results[input].State);
+        Assert.Contains("Name", results[input].Message);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_InspectReportsDiagnostics_IsModuleInvalidWithDiagnostic()
+    {
+        const string diagnosticsJson =
+            """
+            {"variables":{},"diagnostics":[{"severity":"error","summary":"Unclosed configuration block",
+            "detail":"There is no closing brace for this block.","pos":{"filename":"main.tf","line":3}}]}
+            """;
+        var validator = CreateValidator(new TerraformModuleDownloaderTests.FakeGitCommandLine(),
+            new InspectingTerraformCommandLine(_ => new CommandLineResult(diagnosticsJson, string.Empty, 1)));
+        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
+            new Dictionary<string, string>(), "paymentstorage");
+
+        var results = await validator.ValidateAsync([input]);
+
+        Assert.Equal(TerraformValidationResult.ValidationResultState.ModuleInvalid, results[input].State);
+        Assert.Contains("main.tf:3: Unclosed configuration block", results[input].Message);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_InspectReturnsMalformedJson_OnlyThatTemplateIsModuleInvalid()
+    {
+        var git = new TerraformModuleDownloaderTests.FakeGitCommandLine("broken");
+        var commandLine = new InspectingTerraformCommandLine(directory => directory.EndsWith("broken")
+            ? new CommandLineResult("not json", "boom", 1)
+            : new CommandLineResult(
+                """{"variables":{"name":{"name":"name","type":"string","required":true}}}""", string.Empty, 0));
+        var validator = CreateValidator(git, commandLine);
+        var broken = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform, "broken"),
+            new Dictionary<string, string>(), "broken");
+        var healthy = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
+            new Dictionary<string, string> { ["name"] = "payments" }, "healthy");
+
+        var results = await validator.ValidateAsync([broken, healthy]);
+
+        Assert.Equal(TerraformValidationResult.ValidationResultState.ModuleInvalid, results[broken].State);
+        Assert.Contains("boom", results[broken].Message);
+        Assert.IsType<TerraformValidationResult.ValidResult>(results[healthy]);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_TfFilesOnlyInSubdirectory_IsModuleInvalid()
+    {
+        var validator = CreateValidator(new NestedOnlyGitCommandLine(), new InspectingTerraformCommandLine());
+        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
+            new Dictionary<string, string> { ["name"] = "payments" }, "paymentstorage");
+
+        var results = await validator.ValidateAsync([input]);
+
+        Assert.Equal(TerraformValidationResult.ValidationResultState.ModuleInvalid, results[input].State);
+    }
+
     private TerraformValidator CreateValidator(IGitCommandLine git, ITerraformCommandLine commandLine) =>
         new(NullLogger<TerraformValidator>.Instance,
             new TerraformModuleDownloader(NullLogger<TerraformModuleDownloader>.Instance, git, _cacheRoot),
             commandLine);
 
-    private static ResourceTemplate Template(ResourceTemplateProvider provider) =>
+    private static ResourceTemplate Template(ResourceTemplateProvider provider, string folderPath = "") =>
         ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest
         {
             OrganisationId = new OrganisationId(),
@@ -85,25 +151,49 @@ public sealed class TerraformValidatorTests : IDisposable
             {
                 BaseUrl = new Uri("https://example.com/storage.git"),
                 Tag = string.Empty,
-                FolderPath = string.Empty
+                FolderPath = folderPath
             },
             Notes = string.Empty,
             State = ResourceTemplateVersionState.Active
         });
+
+    private sealed class NestedOnlyGitCommandLine : IGitCommandLine
+    {
+        public Task<bool> CloneAsync(Uri source, string destination) => Clone(destination);
+
+        public Task<bool> CloneTagAsync(Uri source, string tag, string destination) => Clone(destination);
+
+        public Task<bool> CloneCommitAsync(Uri source, string commit, string destination) => Clone(destination);
+
+        private static Task<bool> Clone(string destination)
+        {
+            var examples = Path.Combine(destination, "examples");
+            Directory.CreateDirectory(examples);
+            File.WriteAllText(Path.Combine(examples, "variables.tf"), string.Empty);
+            File.WriteAllText(Path.Combine(examples, "outputs.tf"), string.Empty);
+            return Task.FromResult(true);
+        }
+    }
 
     private sealed class InspectingTerraformCommandLine : ITerraformCommandLine
     {
         private const string ModuleJson =
             """{"variables":{"name":{"name":"name","type":"string","required":true}}}""";
 
+        private readonly Func<string, CommandLineResult> _inspect;
         private int _inspectCount;
+
+        public InspectingTerraformCommandLine(Func<string, CommandLineResult>? inspect = null)
+        {
+            _inspect = inspect ?? (_ => new CommandLineResult(ModuleJson, string.Empty, 0));
+        }
 
         public int InspectCount => _inspectCount;
 
         public Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory)
         {
             Interlocked.Increment(ref _inspectCount);
-            return Task.FromResult(new CommandLineResult(ModuleJson, string.Empty, 0));
+            return Task.FromResult(_inspect(executeDirectory));
         }
 
         public Task<CommandLineResult> RunInitAsync(string executeDirectory,
@@ -119,9 +209,6 @@ public sealed class TerraformValidatorTests : IDisposable
             throw new NotSupportedException();
 
         public Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile) =>
-            throw new NotSupportedException();
-
-        public Task<CommandLineResult> RunDestroyAsync(string executeDirectory, string planFile) =>
             throw new NotSupportedException();
     }
 }

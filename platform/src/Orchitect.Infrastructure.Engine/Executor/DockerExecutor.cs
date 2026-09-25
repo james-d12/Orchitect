@@ -1,8 +1,9 @@
-using System.Data.Common;
 using System.Diagnostics;
 using Docker.DotNet;
 using Docker.DotNet.Models;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Orchitect.Common.Observability;
 
 namespace Orchitect.Infrastructure.Engine.Executor;
@@ -11,14 +12,20 @@ public sealed class DockerExecutor : IExecutor
 {
     private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan RawOutputFlushInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan OutputRelayStopTimeout = TimeSpan.FromSeconds(2);
+
+    private const string RunnerLabel = "orchitect.runner";
+    private const string RunIdLabel = "orchitect.run-id";
 
     private readonly ILogger<DockerExecutor> _logger;
     private readonly DockerClient _docker;
+    private readonly IConfiguration _configuration;
 
-    public DockerExecutor(ILogger<DockerExecutor> logger, DockerClient docker)
+    public DockerExecutor(ILogger<DockerExecutor> logger, DockerClient docker, IConfiguration configuration)
     {
         _logger = logger;
         _docker = docker;
+        _configuration = configuration;
     }
 
     public async Task ExecuteAsync(
@@ -40,7 +47,7 @@ public sealed class DockerExecutor : IExecutor
         var network = await ResolveNetworkAsync(context.Network, cancellationToken);
         activity?.SetTag("container.network", network);
 
-        var containerName = $"orchitect-runner-{context.RunId}";
+        var containerName = $"orchitect-runner-{context.RunId}-{Guid.NewGuid().ToString("N")[..8]}";
         CreateContainerResponse container;
 
         try
@@ -50,18 +57,28 @@ public sealed class DockerExecutor : IExecutor
                 {
                     Name = containerName,
                     Image = context.Image,
+                    Labels = new Dictionary<string, string>
+                    {
+                        [RunnerLabel] = "true",
+                        [RunIdLabel] = context.RunId
+                    },
                     Cmd = context.Arguments.ToList(),
                     Env =
                     [
                         $"ORCHITECT_RUN_ID={context.RunId}",
                         $"ConnectionStrings__orchitect={BuildRunnerConnectionString(context)}",
-                        "Logging__LogLevel__Default=Debug",
                         ..context.Configuration.Select(x => $"{x.Key}={x.Value}")
                     ],
                     HostConfig = new HostConfig
                     {
                         NetworkMode = network,
-                        ExtraHosts = ["host.docker.internal:host-gateway"]
+                        ExtraHosts = ["host.docker.internal:host-gateway"],
+                        CapDrop = ["ALL"],
+                        SecurityOpt = ["no-new-privileges"],
+                        Init = true,
+                        Memory = context.MemoryBytes ?? 0,
+                        NanoCPUs = context.NanoCpus ?? 0,
+                        PidsLimit = context.PidsLimit
                     }
                 },
                 cancellationToken);
@@ -197,32 +214,38 @@ public sealed class DockerExecutor : IExecutor
         };
     }
 
-    private static string BuildRunnerConnectionString(ExecutorContext context)
+    private string BuildRunnerConnectionString(ExecutorContext context)
     {
-        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__orchitect");
+        var connectionString = _configuration.GetConnectionString("orchitect");
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
-                "ConnectionStrings__orchitect is not set, so the runner container cannot reach the database.");
+                "ConnectionStrings:orchitect is not set, so the runner container cannot reach the database.");
         }
 
-        var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+        return RewriteConnectionString(connectionString, context.DatabaseHost, context.DatabasePort);
+    }
 
-        if (!string.IsNullOrWhiteSpace(context.DatabaseHost))
+    /// <summary>
+    /// Points a connection string at the database as seen from inside the runner container.
+    /// </summary>
+    internal static string RewriteConnectionString(string connectionString, string? databaseHost, int? databasePort)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+
+        if (!string.IsNullOrWhiteSpace(databaseHost))
         {
-            builder["Host"] = context.DatabaseHost;
+            builder.Host = databaseHost;
         }
-        else if (builder.TryGetValue("Host", out var host) &&
-            host is string value &&
-            value is "localhost" or "127.0.0.1" or "::1")
+        else if (builder.Host is "localhost" or "127.0.0.1" or "::1")
         {
-            builder["Host"] = "host.docker.internal";
+            builder.Host = "host.docker.internal";
         }
 
-        if (context.DatabasePort is { } port)
+        if (databasePort is { } port)
         {
-            builder["Port"] = port;
+            builder.Port = port;
         }
 
         return builder.ConnectionString;
@@ -265,6 +288,16 @@ public sealed class DockerExecutor : IExecutor
                 "Output from runner container {ContainerId} did not finish within {Timeout} after it exited.",
                 containerId, OutputDrainTimeout);
             await logCancellation.CancelAsync();
+
+            try
+            {
+                await logStreaming.WaitAsync(OutputRelayStopTimeout);
+            }
+            catch (TimeoutException)
+            {
+                _logger.LogWarning("Output relay for runner container {ContainerId} did not stop after cancellation.",
+                    containerId);
+            }
         }
     }
 
@@ -278,6 +311,7 @@ public sealed class DockerExecutor : IExecutor
         var shortId = containerId[..Math.Min(12, containerId.Length)];
         var stdout = new ExecutorOutputRelay(_logger, shortId, LogLevel.Information);
         var stderr = new ExecutorOutputRelay(_logger, shortId, LogLevel.Warning);
+        Task<MultiplexedStream.ReadResult>? read = null;
 
         try
         {
@@ -293,7 +327,7 @@ public sealed class DockerExecutor : IExecutor
                 cancellationToken);
 
             var buffer = new byte[8192];
-            var read = stream.ReadOutputAsync(buffer, 0, buffer.Length, cancellationToken);
+            read = stream.ReadOutputAsync(buffer, 0, buffer.Length, cancellationToken);
 
             while (true)
             {
@@ -318,6 +352,11 @@ public sealed class DockerExecutor : IExecutor
                 read = stream.ReadOutputAsync(buffer, 0, buffer.Length, cancellationToken);
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogDebug("Stopped streaming output from runner container {ContainerId} after cancellation.",
+                containerId);
+        }
         catch (Exception exception)
         {
             activity.RecordException(exception);
@@ -326,6 +365,12 @@ public sealed class DockerExecutor : IExecutor
         }
         finally
         {
+            if (read is { IsCompleted: false })
+            {
+                _ = read.ContinueWith(t => _ = t.Exception, CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+            }
+
             stdout.Complete();
             stderr.Complete();
 
@@ -356,7 +401,7 @@ public sealed class DockerExecutor : IExecutor
         catch (DockerContainerNotFoundException exception)
         {
             activity.RecordException(exception);
-            _logger.LogError(exception, "Container {ContainerId} does not exist.", containerId);
+            _logger.LogWarning(exception, "Container {ContainerId} does not exist.", containerId);
         }
     }
 }

@@ -15,6 +15,12 @@ public sealed record ExecutorContext
     public string? DatabaseHost { get; init; }
 
     public int? DatabasePort { get; init; }
+
+    public long? MemoryBytes { get; init; }
+
+    public long? NanoCpus { get; init; }
+
+    public long? PidsLimit { get; init; }
 }
 
 public interface IExecutor

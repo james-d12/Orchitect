@@ -41,7 +41,10 @@ public sealed class DeploymentQueue : IDeploymentQueue
                 Configuration = _executorOptions.ToEnvironment().Concat(tokenEnvironment).ToDictionary(),
                 Network = _executorOptions.Network,
                 DatabaseHost = _executorOptions.DatabaseHost,
-                DatabasePort = _executorOptions.DatabasePort
+                DatabasePort = _executorOptions.DatabasePort,
+                MemoryBytes = _executorOptions.MemoryBytes,
+                NanoCpus = _executorOptions.NanoCpus,
+                PidsLimit = _executorOptions.PidsLimit
             }, ct);
         });
     }

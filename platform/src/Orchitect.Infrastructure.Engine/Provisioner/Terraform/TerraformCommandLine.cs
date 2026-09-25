@@ -9,17 +9,21 @@ public interface ITerraformCommandLine
     Task<CommandLineResult> RunValidateAsync(string executeDirectory);
     Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput);
     Task<CommandLineResult> RunPlanAsync(string executeDirectory, string planFileOutput);
+
+    /// <summary>
+    /// Applies a saved plan file. Also used to apply destroy plans.
+    /// </summary>
     Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile);
-    Task<CommandLineResult> RunDestroyAsync(string executeDirectory, string planFile);
 }
 
 public sealed class TerraformCommandLine : ITerraformCommandLine
 {
     private const string TerraformCommand = "terraform";
-    
+    private const string LockTimeout = "-lock-timeout=5m";
+
     public async Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory) =>
         await new CommandLineBuilder("terraform-config-inspect")
-            .WithArguments("--json .")
+            .WithArguments(["--json", "."])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteAsync();
 
@@ -37,31 +41,30 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
 
     public async Task<CommandLineResult> RunValidateAsync(string executeDirectory) =>
         await new CommandLineBuilder(TerraformCommand)
-            .WithArguments("validate -no-color")
+            .WithArguments(["validate", "-no-color"])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteAsync();
 
     public async Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput) =>
         await new CommandLineBuilder(TerraformCommand)
-            .WithArguments($"plan -detailed-exitcode -input=false -no-color -destroy -out={planFileOutput}")
+            .WithArguments([
+                "plan", "-detailed-exitcode", "-input=false", "-no-color", LockTimeout, "-destroy",
+                $"-out={planFileOutput}"
+            ])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteStreamAsync();
 
     public async Task<CommandLineResult> RunPlanAsync(string executeDirectory, string planFileOutput) =>
         await new CommandLineBuilder(TerraformCommand)
-            .WithArguments($"plan -detailed-exitcode -input=false -no-color -out={planFileOutput}")
+            .WithArguments([
+                "plan", "-detailed-exitcode", "-input=false", "-no-color", LockTimeout, $"-out={planFileOutput}"
+            ])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteStreamAsync();
 
     public async Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile) =>
         await new CommandLineBuilder(TerraformCommand)
-            .WithArguments($"apply -auto-approve -no-color {planFile}")
-            .WithWorkingDirectory(executeDirectory)
-            .ExecuteStreamAsync();
-
-    public async Task<CommandLineResult> RunDestroyAsync(string executeDirectory, string planFile) =>
-        await new CommandLineBuilder(TerraformCommand)
-            .WithArguments($"apply -auto-approve -no-color {planFile}")
+            .WithArguments(["apply", "-auto-approve", "-input=false", "-no-color", LockTimeout, planFile])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteStreamAsync();
 }

@@ -36,8 +36,8 @@ public sealed class TerraformDriverTests
         await driver.DestroyAsync(planResult);
 
         Assert.Equal(TerraformPlanResultState.Success, planResult.State);
-        Assert.NotNull(commandLine.DestroyPlanFile);
-        Assert.Equal(commandLine.PlanDestroyOutput, commandLine.DestroyPlanFile);
+        Assert.NotNull(commandLine.ApplyPlanFile);
+        Assert.Equal(commandLine.PlanDestroyOutput, commandLine.ApplyPlanFile);
     }
 
     [Fact]
@@ -103,21 +103,61 @@ public sealed class TerraformDriverTests
         Assert.False(commandLine.ApplyCalled);
     }
 
-    private static TerraformDriver CreateDriver(ITerraformCommandLine commandLine)
+    [Theory]
+    [InlineData(137)]
+    [InlineData(143)]
+    [InlineData(-1)]
+    public async Task PlanAsync_UnexpectedExitCode_IsPlanFailed(int exitCode)
+    {
+        var commandLine = new RecordingTerraformCommandLine { PlanExitCode = exitCode };
+        var driver = CreateDriver(commandLine);
+
+        var planResult = await driver.PlanAsync([TerraformTestData.PlanInput()], TerraformTestData.NewContext());
+
+        Assert.Equal(TerraformPlanResultState.PlanFailed, planResult.State);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => driver.ApplyAsync(planResult));
+        Assert.False(commandLine.ApplyCalled);
+    }
+
+    [Fact]
+    public async Task PlanAsync_ChangesNeeded_IsSuccess()
+    {
+        var driver = CreateDriver(new RecordingTerraformCommandLine());
+
+        var planResult = await driver.PlanAsync([TerraformTestData.PlanInput()], TerraformTestData.NewContext());
+
+        Assert.Equal(TerraformPlanResultState.Success, planResult.State);
+    }
+
+    [Fact]
+    public async Task PlanAsync_ValidationFails_MessageContainsReasons()
+    {
+        var validator = new FixedTerraformValidator(
+            TerraformValidationResult.InputInvalid("These inputs were not present in the terraform module: sku"));
+        var driver = CreateDriver(new RecordingTerraformCommandLine(), validator);
+
+        var planResult = await driver.PlanAsync([TerraformTestData.PlanInput()], TerraformTestData.NewContext());
+
+        Assert.Equal(TerraformPlanResultState.PreValidationFailed, planResult.State);
+        Assert.Contains("Storage Account", planResult.Message);
+        Assert.Contains("sku", planResult.Message);
+    }
+
+    private static TerraformDriver CreateDriver(ITerraformCommandLine commandLine,
+        ITerraformValidator? validator = null)
     {
         var projectBuilder = new TerraformProjectBuilder(NullLogger<TerraformProjectBuilder>.Instance,
             new TerraformRenderer(), Options.Create(TerraformTestData.AzureBackend()));
 
-        return new TerraformDriver(NullLogger<TerraformDriver>.Instance, new AlwaysValidTerraformValidator(),
-            commandLine, projectBuilder);
+        return new TerraformDriver(NullLogger<TerraformDriver>.Instance,
+            validator ?? new FixedTerraformValidator(TerraformTestData.ValidResult()), commandLine, projectBuilder);
     }
 
-    private sealed class AlwaysValidTerraformValidator : ITerraformValidator
+    private sealed class FixedTerraformValidator(TerraformValidationResult result) : ITerraformValidator
     {
         public Task<Dictionary<TerraformPlanInput, TerraformValidationResult>> ValidateAsync(
             List<TerraformPlanInput> terraformPlanInputs) =>
-            Task.FromResult(terraformPlanInputs.ToDictionary(input => input,
-                TerraformValidationResult (_) => TerraformTestData.ValidResult()));
+            Task.FromResult(terraformPlanInputs.ToDictionary(input => input, _ => result));
     }
 
     private sealed class RecordingTerraformCommandLine : ITerraformCommandLine
@@ -130,7 +170,7 @@ public sealed class TerraformDriverTests
 
         public List<IReadOnlyDictionary<string, string>> InitBackendConfigs { get; } = [];
         public string? PlanDestroyOutput { get; private set; }
-        public string? DestroyPlanFile { get; private set; }
+        public string? ApplyPlanFile { get; private set; }
         public bool ApplyCalled { get; private set; }
 
         public Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory) => Task.FromResult(Success);
@@ -156,13 +196,8 @@ public sealed class TerraformDriverTests
         public Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile)
         {
             ApplyCalled = true;
+            ApplyPlanFile = planFile;
             return Task.FromResult(new CommandLineResult(string.Empty, "apply error", ApplyExitCode));
-        }
-
-        public Task<CommandLineResult> RunDestroyAsync(string executeDirectory, string planFile)
-        {
-            DestroyPlanFile = planFile;
-            return Task.FromResult(new CommandLineResult(string.Empty, "destroy error", ApplyExitCode));
         }
     }
 }

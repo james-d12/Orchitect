@@ -43,14 +43,9 @@ public sealed class EngineOrchestrator : IEngineOrchestrator
         {
             var provisionRequest = await BuildProvisionInputsAsync(application, deployment, cancellationToken);
 
-            if (provisionRequest is null)
-            {
-                return;
-            }
-
             _logger.LogInformation("Provisioning Resources for score file");
 
-            await _engineProvisioner.ProvisionAsync(provisionRequest.Value.Inputs, provisionRequest.Value.Context,
+            await _engineProvisioner.ProvisionAsync(provisionRequest.Inputs, provisionRequest.Context,
                 cancellationToken);
         }
         catch (Exception exception)
@@ -70,14 +65,9 @@ public sealed class EngineOrchestrator : IEngineOrchestrator
         {
             var provisionRequest = await BuildProvisionInputsAsync(application, deployment, cancellationToken);
 
-            if (provisionRequest is null)
-            {
-                return;
-            }
-
             _logger.LogInformation("Destroying Resources for score file");
 
-            await _engineProvisioner.DeleteAsync(provisionRequest.Value.Inputs, provisionRequest.Value.Context,
+            await _engineProvisioner.DeleteAsync(provisionRequest.Inputs, provisionRequest.Context,
                 cancellationToken);
         }
         catch (Exception exception)
@@ -88,21 +78,15 @@ public sealed class EngineOrchestrator : IEngineOrchestrator
         }
     }
 
-    private async Task<(ProvisionContext Context, List<ProvisionInput> Inputs)?> BuildProvisionInputsAsync(
+    private async Task<(ProvisionContext Context, List<ProvisionInput> Inputs)> BuildProvisionInputsAsync(
         Application application, Deployment deployment, CancellationToken cancellationToken)
     {
-        ScoreFile? scoreFile = await _scoreDriver.ParseAsync(deployment, application, cancellationToken);
+        ScoreFile scoreFile = await _scoreDriver.ParseAsync(deployment, application, cancellationToken)
+                              ?? throw new InvalidOperationException("Unable to find or parse the score file.");
 
-        if (scoreFile is null)
+        if (scoreFile.Resources is null || scoreFile.Resources.Count == 0)
         {
-            _logger.LogWarning("Unable to find / parse the provided score file.");
-            return null;
-        }
-
-        if (scoreFile.Resources is null)
-        {
-            _logger.LogWarning("There are no resources in the score file.");
-            return null;
+            throw new InvalidOperationException("There are no resources in the score file.");
         }
 
         var context = new ProvisionContext(
@@ -115,22 +99,12 @@ public sealed class EngineOrchestrator : IEngineOrchestrator
         foreach (var resource in scoreFile.Resources)
         {
             var type = resource.Value.Type.Trim().ToLower();
-            var inputs = resource.Value.Parameters;
+            var inputs = resource.Value.Parameters ?? [];
 
-            ResourceTemplate? resourceTemplate =
-                await _resourceTemplateRepository.GetByTypeAsync(type, cancellationToken);
-
-            if (resourceTemplate is null)
-            {
-                _logger.LogInformation("Could not get resource template for: {Type}", type);
-                continue;
-            }
-
-            if (inputs is null)
-            {
-                _logger.LogInformation("No inputs present in the score file");
-                continue;
-            }
+            ResourceTemplate resourceTemplate =
+                await _resourceTemplateRepository.GetByTypeAsync(type, cancellationToken)
+                ?? throw new InvalidOperationException(
+                    $"No resource template found for type '{type}' (resource '{resource.Key}').");
 
             provisionInputs.Add(new ProvisionInput(resourceTemplate, inputs, resource.Key));
         }

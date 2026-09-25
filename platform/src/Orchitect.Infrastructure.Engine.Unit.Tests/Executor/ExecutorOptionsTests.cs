@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Orchitect.Infrastructure.Engine.Executor;
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
 using Orchitect.Infrastructure.Engine.Secret;
@@ -39,6 +40,14 @@ public sealed class ExecutorOptionsTests
         Assert.Equal("https://orchitect.vault.azure.net/", environment["SecretProvider__AzureKeyVault__VaultUri"]);
         Assert.Equal("arm-client-secret", environment["SecretProvider__Mappings__ARM_CLIENT_SECRET"]);
         Assert.Equal(ClientSecret, environment["AZURE_CLIENT_SECRET"]);
+    }
+
+    [Fact]
+    public void ToEnvironment_SetsRunnerLogLevel_DefaultingToInformation()
+    {
+        Assert.Equal("Information", CreateOptions().ToEnvironment()["Logging__LogLevel__Default"]);
+        Assert.Equal("Warning",
+            (CreateOptions() with { LogLevel = LogLevel.Warning }).ToEnvironment()["Logging__LogLevel__Default"]);
     }
 
     [Fact]

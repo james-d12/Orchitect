@@ -95,18 +95,53 @@ public sealed class TerraformValidator : ITerraformValidator
 
     private async Task<ModuleInspection> InspectModuleAsync(string moduleDirectory)
     {
-        var (isValidModule, errorMessage) = IsValidModuleDirectory(moduleDirectory);
-
-        if (!isValidModule)
+        if (!Directory.EnumerateFiles(moduleDirectory, "*.tf", SearchOption.TopDirectoryOnly).Any())
         {
-            return new ModuleInspection(null, errorMessage);
+            return new ModuleInspection(null, $"Could not find any .tf files in template directory: {moduleDirectory}");
         }
 
-        TerraformConfig? terraformConfig = await ParseTerraformModuleAsync(moduleDirectory);
+        CommandLineResult result = await _terraformCommandLine.RunTerraformJsonOutput(moduleDirectory);
 
-        return terraformConfig is null
-            ? new ModuleInspection(null, $"Could not parse module in {moduleDirectory}")
-            : new ModuleInspection(terraformConfig, string.Empty);
+        TerraformConfig? terraformConfig;
+
+        try
+        {
+            terraformConfig = JsonSerializer.Deserialize<TerraformConfig>(result.StdOut);
+        }
+        catch (JsonException exception)
+        {
+            _logger.LogWarning(exception, "Could not parse json output for {Module}: {StdErr}", moduleDirectory,
+                result.StdErr);
+            return new ModuleInspection(null,
+                $"Could not parse module in {moduleDirectory} (exit code {result.ExitCode}): {result.StdErr} {result.StdOut}".TrimEnd());
+        }
+
+        if (terraformConfig is null)
+        {
+            return new ModuleInspection(null,
+                $"Could not parse module in {moduleDirectory} (exit code {result.ExitCode}): {result.StdErr}".TrimEnd());
+        }
+
+        var errors = terraformConfig.Diagnostics
+            .Where(d => d.Severity.Equals("error", StringComparison.OrdinalIgnoreCase))
+            .Select(FormatDiagnostic)
+            .ToList();
+
+        if (errors.Count > 0 || result.ExitCode != 0)
+        {
+            _logger.LogWarning("Module {Module} has errors: {Errors}", moduleDirectory, string.Join("; ", errors));
+            var details = errors.Count > 0 ? string.Join("; ", errors) : result.StdErr;
+            return new ModuleInspection(null, $"Module in {moduleDirectory} is invalid: {details}".TrimEnd());
+        }
+
+        return new ModuleInspection(terraformConfig, string.Empty);
+    }
+
+    private static string FormatDiagnostic(TerraformConfig.Diagnostic diagnostic)
+    {
+        var position = diagnostic.Pos is { } pos ? $"{pos.Filename}:{pos.Line}: " : string.Empty;
+        var detail = string.IsNullOrWhiteSpace(diagnostic.Detail) ? string.Empty : $" - {diagnostic.Detail}";
+        return $"{position}{diagnostic.Summary}{detail}";
     }
 
     private static TerraformValidationResult ValidateInputs(TerraformPlanInput planInput,
@@ -131,8 +166,7 @@ public sealed class TerraformValidator : ITerraformValidator
         }
 
         var invalidInputs = inputs
-            .Where(i =>
-                !terraformConfig.Variables.Keys.Any(key => key.Equals(i.Key, StringComparison.OrdinalIgnoreCase)))
+            .Where(i => !terraformConfig.Variables.ContainsKey(i.Key))
             .Select(i => i.Key)
             .ToList();
 
@@ -144,8 +178,7 @@ public sealed class TerraformValidator : ITerraformValidator
 
         var requiredInputs = terraformConfig.Variables.Values.Where(v => v.Required).ToList();
         var requiredInputsNotSatisfied = requiredInputs
-            .Where(variable =>
-                !inputs.Any(input => input.Key.Equals(variable.Name, StringComparison.OrdinalIgnoreCase)))
+            .Where(variable => !inputs.ContainsKey(variable.Name))
             .ToList();
 
         if (requiredInputsNotSatisfied.Count > 0)
@@ -158,39 +191,6 @@ public sealed class TerraformValidator : ITerraformValidator
         }
 
         return TerraformValidationResult.Valid(terraformConfig, moduleDirectory);
-    }
-
-    private async Task<TerraformConfig?> ParseTerraformModuleAsync(string moduleDirectory)
-    {
-        CommandLineResult runTerraformJsonOutput = await _terraformCommandLine.RunTerraformJsonOutput(moduleDirectory);
-
-        if (runTerraformJsonOutput.ExitCode != 0)
-        {
-            _logger.LogWarning("Could not get json output for {Module}", moduleDirectory);
-            return null;
-        }
-
-        return JsonSerializer.Deserialize<TerraformConfig>(runTerraformJsonOutput.StdOut);
-    }
-
-    private static (bool, string) IsValidModuleDirectory(string moduleDirectory)
-    {
-        var variablesFile = Directory
-            .GetFiles(moduleDirectory, "variables.tf", SearchOption.AllDirectories)
-            .FirstOrDefault();
-
-        if (variablesFile is null)
-        {
-            return (false, $"Could not find variables.tf in template directory: {moduleDirectory} found.");
-        }
-
-        var outputsFile = Directory
-            .GetFiles(moduleDirectory, "outputs.tf", SearchOption.AllDirectories)
-            .FirstOrDefault();
-
-        return outputsFile is null
-            ? (false, $"Could not find outputs.tf in template directory: {moduleDirectory} found.")
-            : (true, string.Empty);
     }
 
     private sealed record ModuleInspection(TerraformConfig? Config, string Error);

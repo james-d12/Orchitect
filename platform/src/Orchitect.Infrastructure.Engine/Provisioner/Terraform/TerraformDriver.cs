@@ -36,6 +36,7 @@ public sealed class TerraformDriver : ITerraformDriver
         var validationResults = await _validator.ValidateAsync(terraformPlanInputs);
 
         var validResults = new Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult>();
+        var validationErrors = new List<string>();
 
         foreach (var result in validationResults)
         {
@@ -47,6 +48,7 @@ public sealed class TerraformDriver : ITerraformDriver
                 default:
                     _logger.LogError("Validation failed for {Template}: {State} - {Message}",
                         result.Key.Template.Name, result.Value.State, result.Value.Message);
+                    validationErrors.Add($"{result.Key.Template.Name}: {result.Value.Message}");
                     break;
             }
         }
@@ -56,7 +58,7 @@ public sealed class TerraformDriver : ITerraformDriver
             _logger.LogError(
                 "Could not perform Terraform Plan, as not all provided inputs were validated successfully");
             return new TerraformPlanResult(TerraformPlanResultState.PreValidationFailed,
-                "Could not validate all inputs.");
+                $"Could not validate all inputs. {string.Join("; ", validationErrors)}");
         }
 
         TerraformProjectBuilderResult builderResult = await _projectBuilder.BuildProjectAsync(validResults, context);
@@ -95,20 +97,21 @@ public sealed class TerraformDriver : ITerraformDriver
 
         switch (planResult.ExitCode)
         {
-            case (int)TerraformPlanResultExitCode.Errored:
+            case (int)TerraformPlanResultExitCode.ChangesNeeded:
+                _logger.LogInformation("Successfully run plan for {ProjectName}", context.ProjectName);
                 return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName,
-                    TerraformPlanResultState.PlanFailed,
-                    planResult);
+                    TerraformPlanResultState.Success, planResult);
             case (int)TerraformPlanResultExitCode.NoChanges:
                 return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName,
-                    TerraformPlanResultState.NoChanges,
-                    planResult);
+                    TerraformPlanResultState.NoChanges, planResult);
+            case (int)TerraformPlanResultExitCode.Errored:
+                return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName,
+                    TerraformPlanResultState.PlanFailed, planResult);
+            default:
+                _logger.LogError("Terraform Plan exited with unexpected code {ExitCode}", planResult.ExitCode);
+                return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName,
+                    TerraformPlanResultState.PlanFailed, planResult);
         }
-
-        _logger.LogInformation("Successfully run plan for {ProjectName}", context.ProjectName);
-
-        return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName, TerraformPlanResultState.Success,
-            planResult);
     }
 
     public Task ApplyAsync(TerraformPlanResult planResult) =>
@@ -117,7 +120,7 @@ public sealed class TerraformDriver : ITerraformDriver
 
     public Task DestroyAsync(TerraformPlanResult planResult) =>
         ExecutePlanAsync(planResult, "Destroy",
-            () => _commandLine.RunDestroyAsync(planResult.WorkingDirectory, planResult.PlanFilePath));
+            () => _commandLine.RunApplyAsync(planResult.WorkingDirectory, planResult.PlanFilePath));
 
     private async Task ExecutePlanAsync(TerraformPlanResult planResult, string operation,
         Func<Task<CommandLineResult>> execute)

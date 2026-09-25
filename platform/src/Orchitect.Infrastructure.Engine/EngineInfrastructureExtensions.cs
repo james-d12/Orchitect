@@ -65,10 +65,11 @@ public static class EngineInfrastructureExtensions
         services.AddOptions<ExecutorOptions>()
             .Bind(configuration.GetSection(ExecutorOptions.SectionName))
             .ValidateDataAnnotations()
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Image), "ExecutorOptions:Image is required.")
             .Validate(options => options.TerraformBackend.GetValidationError() is null,
-                "RunnerOptions:TerraformBackend is invalid. Mode Remote needs Type and Config; Mode Local must not set them.")
+                "ExecutorOptions:TerraformBackend is invalid. Mode Remote needs Type and Config; Mode Local must not set them.")
             .Validate(options => options.SecretProvider.GetValidationError() is null,
-                "RunnerOptions:SecretProvider is invalid. AzureKeyVault needs an absolute AzureKeyVault:VaultUri.")
+                "ExecutorOptions:SecretProvider is invalid. AzureKeyVault needs an absolute AzureKeyVault:VaultUri.")
             .ValidateOnStart();
 
         services.TryAddSingleton(_ => new DockerClientConfiguration().CreateClient());

@@ -16,6 +16,9 @@ public sealed record TerraformConfig
     [JsonPropertyName("required_providers")]
     public Dictionary<string, RequiredProvider> RequiredProviders { get; init; } = [];
 
+    [JsonPropertyName("diagnostics")]
+    public List<Diagnostic> Diagnostics { get; init; } = [];
+
     public sealed record Variable
     {
         [JsonPropertyName("name")]
@@ -50,5 +53,29 @@ public sealed record TerraformConfig
 
         [JsonPropertyName("version_constraints")]
         public List<string> VersionConstraints { get; set; } = [];
+    }
+
+    public sealed record Diagnostic
+    {
+        [JsonPropertyName("severity")]
+        public string Severity { get; set; } = string.Empty;
+
+        [JsonPropertyName("summary")]
+        public string Summary { get; set; } = string.Empty;
+
+        [JsonPropertyName("detail")]
+        public string? Detail { get; set; }
+
+        [JsonPropertyName("pos")]
+        public SourcePosition? Pos { get; set; }
+    }
+
+    public sealed record SourcePosition
+    {
+        [JsonPropertyName("filename")]
+        public string Filename { get; set; } = string.Empty;
+
+        [JsonPropertyName("line")]
+        public int Line { get; set; }
     }
 }
