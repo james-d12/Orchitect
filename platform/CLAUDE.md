@@ -27,7 +27,7 @@ dotnet run --project src/Orchitect.Playground
 ### Prerequisites
 
 - .NET SDK 10.0.2+ (specified in global.json with latestMinor rollForward)
-- dotnet-ef tool (install via `scripts/setup.sh`)
+- Local dotnet tools: dotnet-ef, dotnet-stryker, dotnet-sonarscanner (install via `dotnet tool restore`)
 - PostgreSQL (provided automatically by Aspire AppHost on port 41031)
 
 ### Database Migrations

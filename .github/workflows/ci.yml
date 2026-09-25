@@ -133,33 +133,15 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      - name: Cache SonarQube Cloud scanner
-        id: cache-sonar-scanner
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}/scanner
-          key: ${{ runner.os }}-sonar-scanner
-          restore-keys: ${{ runner.os }}-sonar-scanner
-
       - name: Cache NuGet packages
         uses: actions/cache@v5
-        env:
-          cache-name: nuget-package-cache
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-${{ env.cache-name }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('platform/**/*.csproj', 'platform/Directory.Build.props', 'platform/.config/dotnet-tools.json') }}
+          restore-keys: ${{ runner.os }}-nuget-
 
-      - name: Install Stryker.NET
-        run: dotnet tool install -g dotnet-stryker
-
-      - name: Install EF Tools
-        run: dotnet tool install -g dotnet-ef --version 10.0.5
-
-      - name: Install SonarQube Cloud scanner
-        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p "${{ runner.temp }}/scanner"
-          dotnet tool update dotnet-sonarscanner --tool-path "${{ runner.temp }}/scanner"
+      - name: Restore .NET tools
+        run: dotnet tool restore
 
       - name: Restore dependencies
         run: dotnet restore ${{ env.SOLUTION_FILE }}
@@ -168,7 +150,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          "${{ runner.temp }}/scanner/dotnet-sonarscanner" begin \
+          dotnet tool run dotnet-sonarscanner begin \
             /k:"personal-james_conductor-platform" \
             /o:"personal-james" \
             /n:"Orchitect Platform" \
@@ -180,7 +162,7 @@ jobs:
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
-          "${{ runner.temp }}/scanner/dotnet-sonarscanner" end \
+          dotnet tool run dotnet-sonarscanner end \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
       - name: Check No Pending Model Changes
