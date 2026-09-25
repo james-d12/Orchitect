@@ -257,11 +257,11 @@ public sealed class DockerExecutor : IExecutor
     {
         try
         {
-            await logStreaming.WaitAsync(OutputDrainTimeout);
+            await logStreaming.WaitAsync(OutputDrainTimeout, logCancellation.Token);
         }
-        catch (TimeoutException)
+        catch (TimeoutException exception)
         {
-            _logger.LogWarning(
+            _logger.LogWarning(exception,
                 "Output from runner container {ContainerId} did not finish within {Timeout} after it exited.",
                 containerId, OutputDrainTimeout);
             await logCancellation.CancelAsync();
@@ -276,8 +276,8 @@ public sealed class DockerExecutor : IExecutor
         activity?.SetTag("container.id", containerId);
 
         var shortId = containerId[..Math.Min(12, containerId.Length)];
-        var stdout = new RunnerOutputRelay(_logger, shortId, LogLevel.Information);
-        var stderr = new RunnerOutputRelay(_logger, shortId, LogLevel.Warning);
+        var stdout = new ExecutorOutputRelay(_logger, shortId, LogLevel.Information);
+        var stderr = new ExecutorOutputRelay(_logger, shortId, LogLevel.Warning);
 
         try
         {
@@ -317,9 +317,6 @@ public sealed class DockerExecutor : IExecutor
 
                 read = stream.ReadOutputAsync(buffer, 0, buffer.Length, cancellationToken);
             }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
         }
         catch (Exception exception)
         {

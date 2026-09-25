@@ -12,8 +12,8 @@ public sealed class DeploymentQueue : IDeploymentQueue
     private readonly IRunnerSecretTokenProvider _tokenProvider;
 
     public DeploymentQueue(
-        IBackgroundTaskQueueProcessor backgroundTaskQueueProcessor, 
-        IExecutor executor, 
+        IBackgroundTaskQueueProcessor backgroundTaskQueueProcessor,
+        IExecutor executor,
         IOptions<ExecutorOptions> executorOptions,
         IRunnerSecretTokenProvider tokenProvider)
     {

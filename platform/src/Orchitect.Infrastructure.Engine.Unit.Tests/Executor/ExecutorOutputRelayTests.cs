@@ -4,13 +4,13 @@ using Orchitect.Infrastructure.Engine.Executor;
 
 namespace Orchitect.Infrastructure.Engine.Unit.Tests.Executor;
 
-public sealed class RunnerOutputRelayTests
+public sealed class ExecutorOutputRelayTests
 {
     [Fact]
     public void Append_JsonEntry_LogsOneEntryWithOriginalLevelAndMultiLineMessage()
     {
         var logger = new ListLogger();
-        var relay = new RunnerOutputRelay(logger, "abc", LogLevel.Information);
+        var relay = new ExecutorOutputRelay(logger, "abc", LogLevel.Information);
 
         Append(relay,
             """{"EventId":0,"LogLevel":"Debug","Category":"Orchitect.Builder","Message":"Render output: module {\n  name = \"x\"\n}"}""" +
@@ -27,7 +27,7 @@ public sealed class RunnerOutputRelayTests
     public void Append_JsonEntryWithException_IncludesException()
     {
         var logger = new ListLogger();
-        var relay = new RunnerOutputRelay(logger, "abc", LogLevel.Information);
+        var relay = new ExecutorOutputRelay(logger, "abc", LogLevel.Information);
 
         Append(relay, """{"LogLevel":"Error","Category":"C","Message":"failed","Exception":"System.Exception: boom"}""" + "\n");
         relay.Complete();
@@ -41,7 +41,7 @@ public sealed class RunnerOutputRelayTests
     public void Append_RawLines_AreBatchedIntoOneEntryUntilFlushed()
     {
         var logger = new ListLogger();
-        var relay = new RunnerOutputRelay(logger, "abc", LogLevel.Warning);
+        var relay = new ExecutorOutputRelay(logger, "abc", LogLevel.Warning);
 
         Append(relay, "Plan: 2 to add\nmodule.a: Creating...\n");
 
@@ -58,7 +58,7 @@ public sealed class RunnerOutputRelayTests
     public void Append_JsonEntryAfterRawLines_FlushesRawLinesFirst()
     {
         var logger = new ListLogger();
-        var relay = new RunnerOutputRelay(logger, "abc", LogLevel.Information);
+        var relay = new ExecutorOutputRelay(logger, "abc", LogLevel.Information);
 
         Append(relay, "raw one\nraw two\n");
         Append(relay, """{"LogLevel":"Information","Category":"C","Message":"done"}""" + "\n");
@@ -73,7 +73,7 @@ public sealed class RunnerOutputRelayTests
     public void Append_LineSplitAcrossChunks_IsReassembled()
     {
         var logger = new ListLogger();
-        var relay = new RunnerOutputRelay(logger, "abc", LogLevel.Information);
+        var relay = new ExecutorOutputRelay(logger, "abc", LogLevel.Information);
         var bytes = Encoding.UTF8.GetBytes("""{"LogLevel":"Information","Category":"C","Message":"héllo"}""" + "\n");
         var split = Array.IndexOf(bytes, (byte)0xC3) + 1;
 
@@ -89,7 +89,7 @@ public sealed class RunnerOutputRelayTests
     public void Complete_BlankRawLinesOnly_LogsNothing()
     {
         var logger = new ListLogger();
-        var relay = new RunnerOutputRelay(logger, "abc", LogLevel.Information);
+        var relay = new ExecutorOutputRelay(logger, "abc", LogLevel.Information);
 
         Append(relay, "\n\n");
         relay.Complete();
@@ -97,7 +97,7 @@ public sealed class RunnerOutputRelayTests
         Assert.Empty(logger.Entries);
     }
 
-    private static void Append(RunnerOutputRelay relay, string text)
+    private static void Append(ExecutorOutputRelay relay, string text)
     {
         var bytes = Encoding.UTF8.GetBytes(text);
         relay.Append(bytes, bytes.Length);

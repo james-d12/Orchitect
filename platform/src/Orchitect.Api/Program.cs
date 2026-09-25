@@ -42,7 +42,7 @@ try
         options.ValidateScopes = true;
         options.ValidateOnBuild = true;
     });
-    
+
     builder.Services.AddLogging();
     builder.Services.AddOpenApi()
         .AddEndpointsApiExplorer()
@@ -55,14 +55,14 @@ try
             .Bind(builder.Configuration.GetSection(EncryptionOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
-    
+
     builder.Services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<OrchitectDbContext>();
 
     builder.Services.AddOptions<JwtOptions>()
         .Bind(builder.Configuration.GetSection("JwtOptions"))
         .ValidateDataAnnotations()
         .ValidateOnStart();
-    
+
     builder.Services.AddHostedService<DiscoveryHostedService>();
 
     builder.Services.ConfigureHttpJsonOptions(options =>

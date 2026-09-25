@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orchitect.Infrastructure.Engine.Executor;
 
-public sealed class RunnerOutputRelay
+public sealed class ExecutorOutputRelay
 {
     private const int MaxRawLines = 200;
 
@@ -16,7 +16,7 @@ public sealed class RunnerOutputRelay
     private readonly List<string> _rawLines = [];
     private char[] _chars = [];
 
-    public RunnerOutputRelay(ILogger logger, string containerId, LogLevel rawLevel)
+    public ExecutorOutputRelay(ILogger logger, string containerId, LogLevel rawLevel)
     {
         _logger = logger;
         _containerId = containerId;
