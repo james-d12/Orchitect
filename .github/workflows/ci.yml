@@ -156,9 +156,9 @@ jobs:
             /n:"Orchitect Platform" \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.qualitygate.wait=false \
-            /d:sonar.exclusions="**/bin/**,**/obj/**,src/Orchitect.Persistence/Migrations/**,src/Orchitect.Playground/**" \
+            /d:sonar.exclusions="**/bin/**,**/obj/**,**/Orchitect.Persistence/Migrations/**,**/Orchitect.Playground/**" \
             /d:sonar.cs.cobertura.reportsPaths="coverage/**/coverage.cobertura.xml" \
-            /d:sonar.coverage.exclusions="src/Orchitect.Playground/Program.cs"
+            /d:sonar.coverage.exclusions="**/Orchitect.Playground/Program.cs,**/Orchitect.Persistence/Migrations/**"
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
