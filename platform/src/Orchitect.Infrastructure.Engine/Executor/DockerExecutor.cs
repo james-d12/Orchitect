@@ -63,6 +63,7 @@ public sealed class DockerExecutor : IExecutor
                         [RunIdLabel] = context.RunId
                     },
                     Cmd = context.Arguments.ToList(),
+                    StopTimeout = context.StopGracePeriod,
                     Env =
                     [
                         $"ORCHITECT_RUN_ID={context.RunId}",

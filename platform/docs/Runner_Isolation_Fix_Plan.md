@@ -133,8 +133,8 @@ Every phase ends with the same checks:
   - On cancel, send SIGINT through a `libc kill` P/Invoke. On Windows, use `Kill(true)`.
   - Wait up to a 5-minute grace period, then `Kill(true)` and throw `OperationCanceledException`.
 - Thread `CancellationToken` through `ITerraformCommandLine`, `TerraformValidator`, `TerraformDriver` and `TerraformProvisioner`. The provisioner currently ignores its token.
-- `Orchitect.Runner/Program.cs`: invoke with `ProcessTerminationTimeout = null`.
-- `DockerExecutor`: set `StopTimeout` from a new `ExecutorOptions.StopGracePeriod` (default 5 min).
+- `Orchitect.Runner/Program.cs`: invoke with `ProcessTerminationTimeout = Timeout.InfiniteTimeSpan`. `null` turns signal handling off, so SIGTERM would kill the runner without cancelling the token. The container's `StopTimeout` is the hard limit.
+- `DockerExecutor`: set `StopTimeout` from a new `ExecutorOptions.StopGracePeriod` (default 6 min, longer than the runner's 5-minute SIGINT grace period, so the runner can kill Terraform itself before Docker sends SIGKILL).
 - Test: `CommandLineBuilder` cancel against a `sleep`/trap script records the SIGINT.
 - Check: `docker stop` on a running runner, and Terraform logs that it's interrupted and releases the lock.
 

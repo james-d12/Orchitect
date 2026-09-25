@@ -8,10 +8,10 @@ namespace Orchitect.Infrastructure.Engine.Provisioner.Terraform;
 public interface ITerraformDriver
 {
     Task<TerraformPlanResult> PlanAsync(List<TerraformPlanInput> terraformPlanInputs, ProvisionContext context,
-        bool destroy = false);
+        bool destroy = false, CancellationToken cancellationToken = default);
 
-    Task ApplyAsync(TerraformPlanResult planResult);
-    Task DestroyAsync(TerraformPlanResult planResult);
+    Task ApplyAsync(TerraformPlanResult planResult, CancellationToken cancellationToken = default);
+    Task DestroyAsync(TerraformPlanResult planResult, CancellationToken cancellationToken = default);
 }
 
 public sealed class TerraformDriver : ITerraformDriver
@@ -31,9 +31,9 @@ public sealed class TerraformDriver : ITerraformDriver
     }
 
     public async Task<TerraformPlanResult> PlanAsync(List<TerraformPlanInput> terraformPlanInputs,
-        ProvisionContext context, bool destroy = false)
+        ProvisionContext context, bool destroy = false, CancellationToken cancellationToken = default)
     {
-        var validationResults = await _validator.ValidateAsync(terraformPlanInputs);
+        var validationResults = await _validator.ValidateAsync(terraformPlanInputs, cancellationToken);
 
         var validResults = new Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult>();
         var validationErrors = new List<string>();
@@ -61,10 +61,12 @@ public sealed class TerraformDriver : ITerraformDriver
                 $"Could not validate all inputs. {string.Join("; ", validationErrors)}");
         }
 
-        TerraformProjectBuilderResult builderResult = await _projectBuilder.BuildProjectAsync(validResults, context);
+        TerraformProjectBuilderResult builderResult = await _projectBuilder.BuildProjectAsync(validResults, context,
+            cancellationToken);
 
         CommandLineResult initResult =
-            await _commandLine.RunInitAsync(builderResult.WorkingDirectory, builderResult.BackendConfig);
+            await _commandLine.RunInitAsync(builderResult.WorkingDirectory, builderResult.BackendConfig,
+                cancellationToken);
 
         if (initResult.ExitCode != 0)
         {
@@ -76,7 +78,8 @@ public sealed class TerraformDriver : ITerraformDriver
 
         _logger.LogDebug("Terraform Init Output: {Output}", initResult.StdOut);
 
-        CommandLineResult validateResult = await _commandLine.RunValidateAsync(builderResult.WorkingDirectory);
+        CommandLineResult validateResult = await _commandLine.RunValidateAsync(builderResult.WorkingDirectory,
+            cancellationToken);
 
         if (validateResult.ExitCode != 0)
         {
@@ -92,8 +95,8 @@ public sealed class TerraformDriver : ITerraformDriver
         var planFileName = Path.Combine(builderResult.PlanDirectory, $"plan-{dateTimeIsoString}.tfplan");
 
         CommandLineResult planResult = destroy
-            ? await _commandLine.RunPlanDestroyAsync(builderResult.WorkingDirectory, planFileName)
-            : await _commandLine.RunPlanAsync(builderResult.WorkingDirectory, planFileName);
+            ? await _commandLine.RunPlanDestroyAsync(builderResult.WorkingDirectory, planFileName, cancellationToken)
+            : await _commandLine.RunPlanAsync(builderResult.WorkingDirectory, planFileName, cancellationToken);
 
         switch (planResult.ExitCode)
         {
@@ -114,13 +117,15 @@ public sealed class TerraformDriver : ITerraformDriver
         }
     }
 
-    public Task ApplyAsync(TerraformPlanResult planResult) =>
+    public Task ApplyAsync(TerraformPlanResult planResult, CancellationToken cancellationToken = default) =>
         ExecutePlanAsync(planResult, "Apply",
-            () => _commandLine.RunApplyAsync(planResult.WorkingDirectory, planResult.PlanFilePath));
+            () => _commandLine.RunApplyAsync(planResult.WorkingDirectory, planResult.PlanFilePath,
+                cancellationToken));
 
-    public Task DestroyAsync(TerraformPlanResult planResult) =>
+    public Task DestroyAsync(TerraformPlanResult planResult, CancellationToken cancellationToken = default) =>
         ExecutePlanAsync(planResult, "Destroy",
-            () => _commandLine.RunApplyAsync(planResult.WorkingDirectory, planResult.PlanFilePath));
+            () => _commandLine.RunApplyAsync(planResult.WorkingDirectory, planResult.PlanFilePath,
+                cancellationToken));
 
     private async Task ExecutePlanAsync(TerraformPlanResult planResult, string operation,
         Func<Task<CommandLineResult>> execute)

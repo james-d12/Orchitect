@@ -10,7 +10,7 @@ namespace Orchitect.Infrastructure.Engine.Provisioner.Terraform;
 public interface ITerraformValidator
 {
     Task<Dictionary<TerraformPlanInput, TerraformValidationResult>> ValidateAsync(
-        List<TerraformPlanInput> terraformPlanInputs);
+        List<TerraformPlanInput> terraformPlanInputs, CancellationToken cancellationToken = default);
 }
 
 public sealed class TerraformValidator : ITerraformValidator
@@ -30,7 +30,7 @@ public sealed class TerraformValidator : ITerraformValidator
     }
 
     public async Task<Dictionary<TerraformPlanInput, TerraformValidationResult>> ValidateAsync(
-        List<TerraformPlanInput> terraformPlanInputs)
+        List<TerraformPlanInput> terraformPlanInputs, CancellationToken cancellationToken = default)
     {
         var results = new Dictionary<TerraformPlanInput, TerraformValidationResult>();
         var versions = new Dictionary<TerraformPlanInput, ResourceTemplateVersion>();
@@ -56,7 +56,7 @@ public sealed class TerraformValidator : ITerraformValidator
         var modules = await InspectModulesAsync(downloads.Values
             .Where(download => download.IsSuccess)
             .Select(download => download.Directory!)
-            .Distinct());
+            .Distinct(), cancellationToken);
 
         foreach (var (planInput, version) in versions)
         {
@@ -79,28 +79,33 @@ public sealed class TerraformValidator : ITerraformValidator
     }
 
     private async Task<IReadOnlyDictionary<string, ModuleInspection>> InspectModulesAsync(
-        IEnumerable<string> moduleDirectories)
+        IEnumerable<string> moduleDirectories, CancellationToken cancellationToken)
     {
         var inspections = new ConcurrentDictionary<string, ModuleInspection>();
 
         await Parallel.ForEachAsync(moduleDirectories,
-            new ParallelOptions { MaxDegreeOfParallelism = MaxConcurrentInspections },
-            async (moduleDirectory, _) =>
-                inspections[moduleDirectory] = await InspectModuleAsync(moduleDirectory));
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = MaxConcurrentInspections,
+                CancellationToken = cancellationToken
+            },
+            async (moduleDirectory, token) =>
+                inspections[moduleDirectory] = await InspectModuleAsync(moduleDirectory, token));
 
         _logger.LogInformation("Inspected {ModuleCount} unique modules.", inspections.Count);
 
         return inspections;
     }
 
-    private async Task<ModuleInspection> InspectModuleAsync(string moduleDirectory)
+    private async Task<ModuleInspection> InspectModuleAsync(string moduleDirectory,
+        CancellationToken cancellationToken)
     {
         if (!Directory.EnumerateFiles(moduleDirectory, "*.tf", SearchOption.TopDirectoryOnly).Any())
         {
             return new ModuleInspection(null, $"Could not find any .tf files in template directory: {moduleDirectory}");
         }
 
-        CommandLineResult result = await _terraformCommandLine.RunTerraformJsonOutput(moduleDirectory);
+        CommandLineResult result = await _terraformCommandLine.RunTerraformJsonOutput(moduleDirectory, cancellationToken);
 
         TerraformConfig? terraformConfig;
 

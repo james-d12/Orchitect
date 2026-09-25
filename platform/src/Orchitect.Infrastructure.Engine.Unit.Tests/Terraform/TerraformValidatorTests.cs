@@ -206,25 +206,31 @@ public sealed class TerraformValidatorTests : IDisposable
 
         public int InspectCount => _inspectCount;
 
-        public Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory)
+        public Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory,
+            CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _inspectCount);
             return Task.FromResult(_inspect(executeDirectory));
         }
 
         public Task<CommandLineResult> RunInitAsync(string executeDirectory,
-            IReadOnlyDictionary<string, string> backendConfig) => throw new NotSupportedException();
-
-        public Task<CommandLineResult> RunValidateAsync(string executeDirectory) =>
+            IReadOnlyDictionary<string, string> backendConfig, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput) =>
+        public Task<CommandLineResult> RunValidateAsync(string executeDirectory,
+            CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<CommandLineResult> RunPlanAsync(string executeDirectory, string planFileOutput) =>
+        public Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput,
+            CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile) =>
+        public Task<CommandLineResult> RunPlanAsync(string executeDirectory, string planFileOutput,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile,
+            CancellationToken cancellationToken) =>
             throw new NotSupportedException();
     }
 }

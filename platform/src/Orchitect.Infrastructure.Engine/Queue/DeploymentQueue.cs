@@ -44,7 +44,8 @@ public sealed class DeploymentQueue : IDeploymentQueue
                 DatabasePort = _executorOptions.DatabasePort,
                 MemoryBytes = _executorOptions.MemoryBytes,
                 NanoCpus = _executorOptions.NanoCpus,
-                PidsLimit = _executorOptions.PidsLimit
+                PidsLimit = _executorOptions.PidsLimit,
+                StopGracePeriod = _executorOptions.StopGracePeriod
             }, ct);
         });
     }

@@ -129,6 +129,25 @@ public sealed class TerraformDriverTests
         Assert.Equal(TerraformPlanResultState.Success, planResult.State);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PlanAndApply_PassCancellationTokenToEveryTerraformCommand(bool destroy)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var commandLine = new RecordingTerraformCommandLine();
+        var driver = CreateDriver(commandLine);
+
+        var planResult = await driver.PlanAsync([TerraformTestData.PlanInput()], TerraformTestData.NewContext(),
+            destroy, cancellation.Token);
+        await (destroy
+            ? driver.DestroyAsync(planResult, cancellation.Token)
+            : driver.ApplyAsync(planResult, cancellation.Token));
+
+        Assert.Equal(4, commandLine.Tokens.Count);
+        Assert.All(commandLine.Tokens, token => Assert.Equal(cancellation.Token, token));
+    }
+
     [Fact]
     public async Task PlanAsync_ValidationFails_MessageContainsReasons()
     {
@@ -156,7 +175,7 @@ public sealed class TerraformDriverTests
     private sealed class FixedTerraformValidator(TerraformValidationResult result) : ITerraformValidator
     {
         public Task<Dictionary<TerraformPlanInput, TerraformValidationResult>> ValidateAsync(
-            List<TerraformPlanInput> terraformPlanInputs) =>
+            List<TerraformPlanInput> terraformPlanInputs, CancellationToken cancellationToken) =>
             Task.FromResult(terraformPlanInputs.ToDictionary(input => input, _ => result));
     }
 
@@ -172,31 +191,46 @@ public sealed class TerraformDriverTests
         public string? PlanDestroyOutput { get; private set; }
         public string? ApplyPlanFile { get; private set; }
         public bool ApplyCalled { get; private set; }
+        public List<CancellationToken> Tokens { get; } = [];
 
-        public Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory) => Task.FromResult(Success);
+        public Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory,
+            CancellationToken cancellationToken) => Task.FromResult(Success);
 
         public Task<CommandLineResult> RunInitAsync(string executeDirectory,
-            IReadOnlyDictionary<string, string> backendConfig)
+            IReadOnlyDictionary<string, string> backendConfig, CancellationToken cancellationToken)
         {
             InitBackendConfigs.Add(backendConfig);
+            Tokens.Add(cancellationToken);
             return Task.FromResult(new CommandLineResult(string.Empty, "init error", InitExitCode));
         }
 
-        public Task<CommandLineResult> RunValidateAsync(string executeDirectory) => Task.FromResult(Success);
+        public Task<CommandLineResult> RunValidateAsync(string executeDirectory, CancellationToken cancellationToken)
+        {
+            Tokens.Add(cancellationToken);
+            return Task.FromResult(Success);
+        }
 
-        public Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput)
+        public Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput,
+            CancellationToken cancellationToken)
         {
             PlanDestroyOutput = planFileOutput;
+            Tokens.Add(cancellationToken);
             return Task.FromResult(new CommandLineResult(string.Empty, "plan error", PlanExitCode));
         }
 
-        public Task<CommandLineResult> RunPlanAsync(string executeDirectory, string planFileOutput) =>
-            Task.FromResult(new CommandLineResult(string.Empty, "plan error", PlanExitCode));
+        public Task<CommandLineResult> RunPlanAsync(string executeDirectory, string planFileOutput,
+            CancellationToken cancellationToken)
+        {
+            Tokens.Add(cancellationToken);
+            return Task.FromResult(new CommandLineResult(string.Empty, "plan error", PlanExitCode));
+        }
 
-        public Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile)
+        public Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile,
+            CancellationToken cancellationToken)
         {
             ApplyCalled = true;
             ApplyPlanFile = planFile;
+            Tokens.Add(cancellationToken);
             return Task.FromResult(new CommandLineResult(string.Empty, "apply error", ApplyExitCode));
         }
     }

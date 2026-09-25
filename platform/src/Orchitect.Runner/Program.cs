@@ -94,7 +94,8 @@ rootCommand.SetAction(async (parseResult, cancellationToken) =>
     }
 });
 
-return await rootCommand.Parse(args).InvokeAsync();
+return await rootCommand.Parse(args)
+    .InvokeAsync(new InvocationConfiguration { ProcessTerminationTimeout = Timeout.InfiniteTimeSpan });
 
 namespace Orchitect.Runner
 {

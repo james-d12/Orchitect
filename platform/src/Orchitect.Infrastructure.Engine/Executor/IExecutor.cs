@@ -21,6 +21,8 @@ public sealed record ExecutorContext
     public long? NanoCpus { get; init; }
 
     public long? PidsLimit { get; init; }
+
+    public TimeSpan? StopGracePeriod { get; init; }
 }
 
 public interface IExecutor

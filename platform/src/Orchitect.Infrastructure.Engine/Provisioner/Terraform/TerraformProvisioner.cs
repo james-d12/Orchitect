@@ -25,8 +25,9 @@ public sealed class TerraformProvisioner : IProvisioner
             var terraformPlanInputs = terraformProvisionInputs
                 .Select(tp => new TerraformPlanInput(tp.Template, tp.Inputs, tp.Key))
                 .ToList();
-            TerraformPlanResult planResult = await _terraformDriver.PlanAsync(terraformPlanInputs, context);
-            await _terraformDriver.ApplyAsync(planResult);
+            TerraformPlanResult planResult = await _terraformDriver.PlanAsync(terraformPlanInputs, context,
+                cancellationToken: cancellationToken);
+            await _terraformDriver.ApplyAsync(planResult, cancellationToken);
         }
     }
 
@@ -42,8 +43,8 @@ public sealed class TerraformProvisioner : IProvisioner
                 .Select(tp => new TerraformPlanInput(tp.Template, tp.Inputs, tp.Key))
                 .ToList();
             TerraformPlanResult planResult =
-                await _terraformDriver.PlanAsync(terraformPlanInputs, context, destroy: true);
-            await _terraformDriver.DestroyAsync(planResult);
+                await _terraformDriver.PlanAsync(terraformPlanInputs, context, destroy: true, cancellationToken);
+            await _terraformDriver.DestroyAsync(planResult, cancellationToken);
         }
     }
 }
