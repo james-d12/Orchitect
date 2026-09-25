@@ -82,6 +82,22 @@ public sealed class TerraformValidatorTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidateAsync_ValueDoesNotMatchVariableType_IsInputInvalid()
+    {
+        const string moduleJson =
+            """{"variables":{"replicas":{"name":"replicas","type":"number","required":true}}}""";
+        var validator = CreateValidator(new TerraformModuleDownloaderTests.FakeGitCommandLine(),
+            new InspectingTerraformCommandLine(_ => new CommandLineResult(moduleJson, string.Empty, 0)));
+        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
+            new Dictionary<string, string> { ["replicas"] = "three" }, "paymentstorage");
+
+        var results = await validator.ValidateAsync([input]);
+
+        Assert.Equal(TerraformValidationResult.ValidationResultState.InputInvalid, results[input].State);
+        Assert.Contains("replicas", results[input].Message);
+    }
+
+    [Fact]
     public async Task ValidateAsync_InspectReportsDiagnostics_IsModuleInvalidWithDiagnostic()
     {
         const string diagnosticsJson =

@@ -1,91 +1,140 @@
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
 
 namespace Orchitect.Infrastructure.Engine.Provisioner.Terraform;
 
 public interface ITerraformRenderer
 {
-    string RenderMainTf(Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> terraformValidationResults);
-    string RenderProvidersTf(List<TerraformProvider> providers);
-    string RenderBackendTf(string backendType);
+    /// <summary>
+    /// Renders the module blocks as main.tf.json and their input values as terraform.tfvars.json.
+    /// Input values only appear in the tfvars file, so Terraform never evaluates them as expressions.
+    /// </summary>
+    TerraformRenderedModules RenderModules(
+        Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> terraformValidationResults);
+
+    /// <summary>
+    /// Renders the required_providers and provider blocks as providers.tf.json.
+    /// </summary>
+    string RenderProviders(List<TerraformProvider> providers);
+
+    /// <summary>
+    /// Renders a partial backend block as backend.tf.json.
+    /// </summary>
+    string RenderBackend(string backendType);
 }
 
 public sealed class TerraformRenderer : ITerraformRenderer
 {
-    public string RenderMainTf(Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> terraformValidationResults)
+    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
+
+    public TerraformRenderedModules RenderModules(
+        Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> terraformValidationResults)
     {
-        var sb = new StringBuilder();
+        var variables = new JsonObject();
+        var modules = new JsonObject();
+        var tfVars = new JsonObject();
 
-        foreach ((TerraformPlanInput terraformPlanInput, TerraformValidationResult.ValidResult terraformValidationResult) in terraformValidationResults)
+        foreach (var (planInput, validationResult) in terraformValidationResults)
         {
-            var key = terraformPlanInput.Key.Replace(" ", "_").Trim().ToLowerInvariant();
-            var templateName = terraformPlanInput.Template.Name.Replace(" ", "_").ToLowerInvariant();
-            var moduleName = string.Join("_", templateName, key);
+            var moduleName = ToIdentifier($"{planInput.Template.Name}_{planInput.Key}");
 
-            sb.AppendLine($"module \"{moduleName}\" {{");
-            sb.AppendLine($"  source = \"{terraformValidationResult.ModuleDirectory}\"");
-
-            foreach (var kvp in terraformPlanInput.Inputs)
+            if (modules.ContainsKey(moduleName))
             {
-                var value = QuoteIfNeeded(kvp.Value);
-                sb.AppendLine($"  {kvp.Key} = {value}");
+                throw new InvalidOperationException(
+                    $"More than one resource renders to the Terraform module name '{moduleName}'.");
             }
 
-            sb.AppendLine("}");
-            sb.AppendLine("");
+            var module = new JsonObject { ["source"] = validationResult.ModuleDirectory };
+
+            foreach (var (inputName, rawValue) in planInput.Inputs)
+            {
+                var variableName = $"{moduleName}__{inputName}";
+                var variableType = validationResult.Config.Variables.GetValueOrDefault(inputName)?.Type;
+
+                if (string.IsNullOrWhiteSpace(variableType))
+                {
+                    variableType = null;
+                }
+
+                if (!TerraformValueConverter.TryConvert(rawValue, variableType, out var value, out var error))
+                {
+                    throw new InvalidOperationException($"Input '{inputName}' of '{moduleName}' is invalid: {error}");
+                }
+
+                variables[variableName] = variableType is null
+                    ? new JsonObject()
+                    : new JsonObject { ["type"] = variableType };
+                module[inputName] = $"${{var.{variableName}}}";
+                tfVars[variableName] = value;
+            }
+
+            modules[moduleName] = module;
         }
 
-        return sb.ToString();
+        var mainTf = new JsonObject();
+
+        if (variables.Count > 0)
+        {
+            mainTf["variable"] = variables;
+        }
+
+        mainTf["module"] = modules;
+
+        return new TerraformRenderedModules(Serialize(mainTf), Serialize(tfVars));
     }
 
-    public string RenderProvidersTf(List<TerraformProvider> providers)
+    public string RenderProviders(List<TerraformProvider> providers)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine("terraform {");
-        sb.AppendLine("    required_providers {");
+        var requiredProviders = new JsonObject();
+        var providerBlocks = new JsonObject();
 
-        foreach (TerraformProvider provider in providers)
+        foreach (var provider in providers)
         {
-            sb.AppendLine($"      {provider.Name} = {{");
-            sb.AppendLine($"         source = \"{provider.Source}\"");
-            sb.AppendLine($"         version = \"{provider.Version}\"");
-            sb.AppendLine("        }");
+            var requirement = new JsonObject { ["source"] = provider.Source };
+
+            if (!string.IsNullOrWhiteSpace(provider.Version))
+            {
+                requirement["version"] = provider.Version;
+            }
+
+            requiredProviders[provider.Name] = requirement;
+            providerBlocks[provider.Name] = new JsonObject { ["features"] = new JsonObject() };
         }
 
-        sb.AppendLine("     }");
-        sb.AppendLine("}");
-
-        foreach (TerraformProvider provider in providers)
+        return Serialize(new JsonObject
         {
-            sb.AppendLine($"provider \"{provider.Name}\" {{");
-            sb.AppendLine("   features {}");
-            sb.AppendLine("}");
-        }
-
-        return sb.ToString();
+            ["terraform"] = new JsonObject { ["required_providers"] = requiredProviders },
+            ["provider"] = providerBlocks
+        });
     }
 
-    public string RenderBackendTf(string backendType)
+    public string RenderBackend(string backendType) =>
+        Serialize(new JsonObject
+        {
+            ["terraform"] = new JsonObject
+            {
+                ["backend"] = new JsonObject { [backendType] = new JsonObject() }
+            }
+        });
+
+    private static string ToIdentifier(string name)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine("terraform {");
-        sb.AppendLine($"  backend \"{backendType}\" {{}}");
-        sb.AppendLine("}");
-        return sb.ToString();
-    }
+        var builder = new StringBuilder(name.Length);
 
-    private static string QuoteIfNeeded(string value)
-    {
-        if (bool.TryParse(value, out _) || int.TryParse(value, out _) || double.TryParse(value, out _))
+        foreach (var character in name.ToLowerInvariant())
         {
-            return value;
+            builder.Append(char.IsAsciiLetterOrDigit(character) || character is '_' or '-' ? character : '_');
         }
 
-        if (value.StartsWith('[') && value.EndsWith(']'))
+        if (builder.Length == 0 || !(char.IsAsciiLetter(builder[0]) || builder[0] == '_'))
         {
-            return value.Replace("\'", "\"");
+            builder.Insert(0, '_');
         }
 
-        return $"\"{value}\"";
+        return builder.ToString();
     }
+
+    private static string Serialize(JsonNode node) => node.ToJsonString(SerializerOptions);
 }

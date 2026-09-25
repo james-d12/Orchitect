@@ -190,6 +190,20 @@ public sealed class TerraformValidator : ITerraformValidator
             return TerraformValidationResult.InputInvalid(message);
         }
 
+        var invalidValues = inputs
+            .Select(input => TerraformValueConverter.TryConvert(input.Value,
+                terraformConfig.Variables[input.Key].Type, out _, out var error)
+                ? null
+                : $"{input.Key}: {error}")
+            .OfType<string>()
+            .ToList();
+
+        if (invalidValues.Count > 0)
+        {
+            return TerraformValidationResult.InputInvalid(
+                $"These inputs have values that do not match their variable type: {string.Join("; ", invalidValues)}");
+        }
+
         return TerraformValidationResult.Valid(terraformConfig, moduleDirectory);
     }
 

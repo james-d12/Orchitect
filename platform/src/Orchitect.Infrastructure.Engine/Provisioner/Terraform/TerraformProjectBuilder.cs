@@ -7,7 +7,8 @@ namespace Orchitect.Infrastructure.Engine.Provisioner.Terraform;
 public interface ITerraformProjectBuilder
 {
     /// <summary>
-    /// Creates a Terraform project (main.tf, providers.tf and, when configured, backend.tf) for the given context.
+    /// Creates a Terraform project (main.tf.json, terraform.tfvars.json, providers.tf.json and, when configured,
+    /// backend.tf.json) for the given context.
     /// </summary>
     Task<TerraformProjectBuilderResult> BuildProjectAsync(
         Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> validatedPlans,
@@ -17,6 +18,8 @@ public interface ITerraformProjectBuilder
 
 public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
 {
+    private static readonly string[] GeneratedFilePatterns = ["*.tf", "*.tf.json", "*.tfvars", "*.tfvars.json"];
+
     private readonly ILogger<TerraformProjectBuilder> _logger;
     private readonly ITerraformRenderer _renderer;
     private readonly TerraformBackendOptions _backendOptions;
@@ -49,14 +52,14 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
         }
 
         Directory.CreateDirectory(plansDirectory);
+        DeleteGeneratedFiles(workingDirectory);
 
         var terraformValidationResults = validatedPlans.Values.ToList();
 
-        var mainTf = _renderer.RenderMainTf(validatedPlans);
-        _logger.LogDebug("Render output: {Output}", mainTf);
-        var mainTfOutputPath = Path.Combine(workingDirectory, "main.tf");
-        await File.WriteAllTextAsync(mainTfOutputPath, mainTf, cancellationToken);
-        _logger.LogInformation("Created main.tf to: {FilePath}", mainTfOutputPath);
+        var modules = _renderer.RenderModules(validatedPlans);
+        _logger.LogDebug("Render output: {Output}", modules.MainTfJson);
+        await WriteFileAsync(workingDirectory, "main.tf.json", modules.MainTfJson, cancellationToken);
+        await WriteFileAsync(workingDirectory, "terraform.tfvars.json", modules.TfVarsJson, cancellationToken);
 
         var providers = terraformValidationResults
             .SelectMany(vr => vr.Config.RequiredProviders)
@@ -73,21 +76,16 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
             throw new InvalidOperationException("No provider found for any templates passed.");
         }
 
-        var providersTf = _renderer.RenderProvidersTf(providers);
+        var providersTf = _renderer.RenderProviders(providers);
         _logger.LogDebug("Render output: {Output}", providersTf);
-        var providersTfOutputPath = Path.Combine(workingDirectory, "providers.tf");
-        await File.WriteAllTextAsync(providersTfOutputPath, providersTf, cancellationToken);
-        _logger.LogInformation("Created providers.tf to: {FilePath}", providersTfOutputPath);
+        await WriteFileAsync(workingDirectory, "providers.tf.json", providersTf, cancellationToken);
 
         var backendConfig = new Dictionary<string, string>();
 
         if (_backendOptions.IsRemote)
         {
-            var backendTf = _renderer.RenderBackendTf(_backendOptions.Type!);
-            var backendTfOutputPath = Path.Combine(workingDirectory, "backend.tf");
-            await File.WriteAllTextAsync(backendTfOutputPath, backendTf, cancellationToken);
-            _logger.LogInformation("Created backend.tf for {BackendType} to: {FilePath}", _backendOptions.Type,
-                backendTfOutputPath);
+            var backendTf = _renderer.RenderBackend(_backendOptions.Type!);
+            await WriteFileAsync(workingDirectory, "backend.tf.json", backendTf, cancellationToken);
 
             foreach (var (key, value) in _backendOptions.Config)
             {
@@ -96,6 +94,23 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
         }
 
         return new TerraformProjectBuilderResult(workingDirectory, plansDirectory, backendConfig);
+    }
+
+    private static void DeleteGeneratedFiles(string workingDirectory)
+    {
+        foreach (var file in GeneratedFilePatterns.SelectMany(pattern =>
+                     Directory.EnumerateFiles(workingDirectory, pattern, SearchOption.TopDirectoryOnly)))
+        {
+            File.Delete(file);
+        }
+    }
+
+    private async Task WriteFileAsync(string workingDirectory, string fileName, string contents,
+        CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(workingDirectory, fileName);
+        await File.WriteAllTextAsync(path, contents, cancellationToken);
+        _logger.LogInformation("Created {FileName} at: {FilePath}", fileName, path);
     }
 
     private static string ResolvePlaceholders(string value, ProvisionContext context) => value

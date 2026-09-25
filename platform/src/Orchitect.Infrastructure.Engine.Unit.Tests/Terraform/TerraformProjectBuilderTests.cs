@@ -18,7 +18,7 @@ public sealed class TerraformProjectBuilderTests
 
         var result = await builder.BuildProjectAsync(TerraformTestData.ValidatedPlans(), context);
 
-        Assert.True(File.Exists(Path.Combine(result.WorkingDirectory, "backend.tf")));
+        Assert.True(File.Exists(Path.Combine(result.WorkingDirectory, "backend.tf.json")));
         Assert.Equal($"{context.ApplicationId}/{context.EnvironmentId}.tfstate", result.BackendConfig["key"]);
         Assert.Equal("orchitectstate", result.BackendConfig["storage_account_name"]);
         Assert.Equal("tfstate", result.BackendConfig["container_name"]);
@@ -36,7 +36,7 @@ public sealed class TerraformProjectBuilderTests
 
         var second = await builder.BuildProjectAsync(TerraformTestData.ValidatedPlans(), context);
 
-        Assert.False(File.Exists(Path.Combine(second.WorkingDirectory, "backend.tf")));
+        Assert.False(File.Exists(Path.Combine(second.WorkingDirectory, "backend.tf.json")));
         Assert.Empty(second.BackendConfig);
         Assert.True(File.Exists(localState));
     }
@@ -54,8 +54,38 @@ public sealed class TerraformProjectBuilderTests
         var second = await builder.BuildProjectAsync(TerraformTestData.ValidatedPlans(), context);
 
         Assert.False(File.Exists(leftover));
-        Assert.True(File.Exists(Path.Combine(second.WorkingDirectory, "main.tf")));
+        Assert.True(File.Exists(Path.Combine(second.WorkingDirectory, "main.tf.json")));
         Assert.True(Directory.Exists(second.PlanDirectory));
+    }
+
+    [Fact]
+    public async Task BuildProjectAsync_WritesModulesAndInputValuesToSeparateFiles()
+    {
+        var builder = CreateBuilder(TerraformTestData.AzureBackend());
+
+        var result = await builder.BuildProjectAsync(TerraformTestData.ValidatedPlans(), TerraformTestData.NewContext());
+
+        var tfVars = await File.ReadAllTextAsync(Path.Combine(result.WorkingDirectory, "terraform.tfvars.json"));
+        var main = await File.ReadAllTextAsync(Path.Combine(result.WorkingDirectory, "main.tf.json"));
+        Assert.Contains("\"orders\"", tfVars);
+        Assert.DoesNotContain("\"orders\"", main);
+        Assert.True(File.Exists(Path.Combine(result.WorkingDirectory, "providers.tf.json")));
+    }
+
+    [Fact]
+    public async Task BuildProjectAsync_WithoutBackend_RemovesPreviouslyGeneratedConfiguration()
+    {
+        var context = TerraformTestData.NewContext();
+        var builder = CreateBuilder(new TerraformBackendOptions());
+
+        var first = await builder.BuildProjectAsync(TerraformTestData.ValidatedPlans(), context);
+        var legacyMainTf = Path.Combine(first.WorkingDirectory, "main.tf");
+        await File.WriteAllTextAsync(legacyMainTf, "module \"old\" {}");
+
+        var second = await builder.BuildProjectAsync(TerraformTestData.ValidatedPlans(), context);
+
+        Assert.False(File.Exists(legacyMainTf));
+        Assert.True(File.Exists(Path.Combine(second.WorkingDirectory, "main.tf.json")));
     }
 
     public static TheoryData<TerraformBackendOptions> InvalidBackends => new()
