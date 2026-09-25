@@ -23,7 +23,7 @@ WORKDIR /tmp/helm
 
 RUN ARCH="${TARGETARCH:-amd64}" \
     && FILE="helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" \
-    && wget -q "https://get.helm.sh/${FILE}" "https://get.helm.sh/${FILE}.sha256sum" \
+    && wget --max-redirect=0  -q "https://get.helm.sh/${FILE}" "https://get.helm.sh/${FILE}.sha256sum" \
     && sha256sum -c "${FILE}.sha256sum" \
     && mkdir /out \
     && tar -xzf "${FILE}" -C /out --strip-components=1 "linux-${ARCH}/helm"
@@ -38,7 +38,7 @@ WORKDIR /tmp/terraform
 RUN ARCH="${TARGETARCH:-amd64}" \
     && FILE="terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip" \
     && BASE="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}" \
-    && wget -q "${BASE}/${FILE}" "${BASE}/terraform_${TERRAFORM_VERSION}_SHA256SUMS" \
+    && wget --max-redirect=0  -q "${BASE}/${FILE}" "${BASE}/terraform_${TERRAFORM_VERSION}_SHA256SUMS" \
     && grep " ${FILE}\$" "terraform_${TERRAFORM_VERSION}_SHA256SUMS" | sha256sum -c \
     && mkdir /out \
     && unzip -q "${FILE}" terraform -d /out
