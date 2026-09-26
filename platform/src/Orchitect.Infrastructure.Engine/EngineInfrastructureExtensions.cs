@@ -76,7 +76,7 @@ public static class EngineInfrastructureExtensions
                 "ExecutorOptions:SecretProvider is invalid. AzureKeyVault needs an absolute AzureKeyVault:VaultUri.")
             .ValidateOnStart();
 
-        services.TryAddSingleton(_ => new DockerClientConfiguration().CreateClient());
+        services.TryAddSingleton<IDockerClient>(_ => new DockerClientConfiguration().CreateClient());
         services.TryAddSingleton<IExecutor, DockerExecutor>();
         services.TryAddSingleton<IRunnerSecretTokenProvider>(_ =>
             new KeyVaultRunnerTokenProvider(new DefaultAzureCredential()));

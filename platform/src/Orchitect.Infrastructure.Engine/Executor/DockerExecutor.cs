@@ -19,10 +19,10 @@ public sealed class DockerExecutor : IExecutor
     private const string RunIdLabel = "orchitect.run-id";
 
     private readonly ILogger<DockerExecutor> _logger;
-    private readonly DockerClient _docker;
+    private readonly IDockerClient _docker;
     private readonly IConfiguration _configuration;
 
-    public DockerExecutor(ILogger<DockerExecutor> logger, DockerClient docker, IConfiguration configuration)
+    public DockerExecutor(ILogger<DockerExecutor> logger, IDockerClient docker, IConfiguration configuration)
     {
         _logger = logger;
         _docker = docker;
@@ -117,14 +117,11 @@ public sealed class DockerExecutor : IExecutor
         _logger.LogInformation("Created runner container {ContainerId} ({ContainerName}) for run {RunId}.",
             container.ID, containerName, context.RunId);
 
-        var started = false;
-        var detached = false;
-
         using var logCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         try
         {
-            started = await _docker.Containers.StartContainerAsync(
+            var started = await _docker.Containers.StartContainerAsync(
                 container.ID,
                 new ContainerStartParameters(),
                 cancellationToken);
@@ -178,15 +175,9 @@ public sealed class DockerExecutor : IExecutor
 
             return new ExecutorResult(wait.StatusCode);
         }
-        catch (OperationCanceledException exception) when (started && cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
-            detached = true;
-            activity?.SetTag("container.detached", true);
             activity.RecordException(exception);
-            _logger.LogWarning(exception,
-                "Run {RunId} was cancelled while runner container {ContainerId} was running. The container was " +
-                "left running so terraform can finish. Check its logs and remove it once it has exited.",
-                context.RunId, container.ID);
             throw;
         }
         catch (Exception exception)
@@ -198,10 +189,8 @@ public sealed class DockerExecutor : IExecutor
         }
         finally
         {
-            if (!detached)
-            {
-                await RemoveContainerAsync(container.ID, CancellationToken.None);
-            }
+            var detached = await CleanupContainerAsync(container.ID, context.RunId, cancellationToken);
+            activity?.SetTag("container.detached", detached);
         }
     }
 
@@ -355,6 +344,11 @@ public sealed class DockerExecutor : IExecutor
         {
             await logStreaming.WaitAsync(OutputDrainTimeout, logCancellation.Token);
         }
+        catch (OperationCanceledException) when (logCancellation.IsCancellationRequested)
+        {
+            _logger.LogDebug("Stopped waiting for output from runner container {ContainerId} after cancellation.",
+                containerId);
+        }
         catch (TimeoutException exception)
         {
             _logger.LogWarning(exception,
@@ -449,6 +443,44 @@ public sealed class DockerExecutor : IExecutor
 
             activity?.SetTag("container.stdout.entries", stdout.EntryCount);
             activity?.SetTag("container.stderr.entries", stderr.EntryCount);
+        }
+    }
+
+    private async Task<bool> CleanupContainerAsync(
+        string containerId,
+        string runId,
+        CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested && await IsRunningAsync(containerId))
+        {
+            _logger.LogWarning(
+                "Run {RunId} was cancelled while runner container {ContainerId} was running. The container was " +
+                "left running so terraform can finish. Check its logs and remove it once it has exited.",
+                runId, containerId);
+            return true;
+        }
+
+        await RemoveContainerAsync(containerId, CancellationToken.None);
+        return false;
+    }
+
+    private async Task<bool> IsRunningAsync(string containerId)
+    {
+        try
+        {
+            var container = await _docker.Containers.InspectContainerAsync(containerId, CancellationToken.None);
+            return container.State?.Running == true;
+        }
+        catch (DockerContainerNotFoundException)
+        {
+            return false;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception,
+                "Could not inspect runner container {ContainerId}; leaving it in place in case it is still running.",
+                containerId);
+            return true;
         }
     }
 

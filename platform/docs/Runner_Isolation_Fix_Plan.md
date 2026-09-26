@@ -165,7 +165,9 @@ Every phase ends with the same checks:
 - The `finally` calls `CleanupContainerAsync`, which runs `InspectContainerAsync`:
   - running and caller cancelled → detach, with the existing warning
   - otherwise → remove
-- Check: cancel during start detaches a running container, and cancel after exit removes it. Use a unit test with a mocked `DockerClient` if feasible, otherwise test manually.
+  - an inspect failure → detach, so a container that may still be running isn't killed. The M9 sweep removes it later.
+- Output draining stops quietly on cancellation, so a run that exits just before shutdown still reports its exit code.
+- `DockerExecutor` depends on `IDockerClient`, so it's unit tested with NSubstitute. The tests cover cancel during start (running or not), cancel while waiting, cancel after exit during the drain, and the M4 timeout paths.
 
 ## Phase 7 – M6: backend config file → review
 - `TerraformProjectBuilder` writes `backend.tfbackend` (HCL `key = "escaped"`) with a 0600 `UnixCreateMode`.
