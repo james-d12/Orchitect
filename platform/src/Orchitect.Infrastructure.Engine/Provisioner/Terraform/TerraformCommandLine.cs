@@ -5,7 +5,7 @@ namespace Orchitect.Infrastructure.Engine.Provisioner.Terraform;
 public interface ITerraformCommandLine
 {
     Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory, CancellationToken cancellationToken = default);
-    Task<CommandLineResult> RunInitAsync(string executeDirectory, IReadOnlyDictionary<string, string> backendConfig,
+    Task<CommandLineResult> RunInitAsync(string executeDirectory, string? backendConfigFile,
         CancellationToken cancellationToken = default);
     Task<CommandLineResult> RunValidateAsync(string executeDirectory, CancellationToken cancellationToken = default);
     Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput, CancellationToken cancellationToken = default);
@@ -29,13 +29,13 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
             .ExecuteAsync(cancellationToken);
 
     public async Task<CommandLineResult> RunInitAsync(string executeDirectory,
-        IReadOnlyDictionary<string, string> backendConfig, CancellationToken cancellationToken = default) =>
+        string? backendConfigFile, CancellationToken cancellationToken = default) =>
         await new CommandLineBuilder(TerraformCommand)
             .WithArguments([
                 "init",
                 "-input=false",
                 "-no-color",
-                ..backendConfig.Select(kvp => $"-backend-config={kvp.Key}={kvp.Value}")
+                ..(backendConfigFile is null ? Array.Empty<string>() : [$"-backend-config={backendConfigFile}"])
             ])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteAsync(cancellationToken);

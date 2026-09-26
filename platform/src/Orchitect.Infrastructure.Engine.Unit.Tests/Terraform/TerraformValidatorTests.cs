@@ -214,7 +214,7 @@ public sealed class TerraformValidatorTests : IDisposable
         }
 
         public Task<CommandLineResult> RunInitAsync(string executeDirectory,
-            IReadOnlyDictionary<string, string> backendConfig, CancellationToken cancellationToken) =>
+            string? backendConfigFile, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task<CommandLineResult> RunValidateAsync(string executeDirectory,

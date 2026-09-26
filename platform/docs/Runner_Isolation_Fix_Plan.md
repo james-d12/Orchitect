@@ -173,8 +173,9 @@ Every phase ends with the same checks:
 - `TerraformProjectBuilder` writes `backend.tfbackend` (HCL `key = "escaped"`) with a 0600 `UnixCreateMode`.
 - `TerraformProjectBuilderResult.BackendConfig` → `string? BackendConfigFile`.
 - `RunInitAsync` passes `-backend-config=<file>`.
-- Tests: the file content, the placeholders and the mode.
-- Check: a remote azurerm `init` works, including `use_azuread_auth = "true"`.
+- `TerraformRenderer.RenderBackendConfig` writes the file. Keys must be identifiers, and values escape `\`, `"`, newlines, `${` and `%{`, so they stay literal.
+- Tests: the file content, the placeholders, the mode, the escaping and invalid keys.
+- Check: a real `terraform init` against an http backend read an escaped value literally and converted `"true"` and `"2"` to bool and number. The same conversion applies to azurerm's `use_azuread_auth = "true"`.
 
 ## Phase 8 – M7: secrets out of container env → review
 - `ExecutorContext.Secrets` holds the connection string, the Key Vault token environment and `ExecutorOptions.Configuration`.

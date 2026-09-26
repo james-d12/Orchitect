@@ -65,7 +65,7 @@ public sealed class TerraformDriver : ITerraformDriver
             cancellationToken);
 
         CommandLineResult initResult =
-            await _commandLine.RunInitAsync(builderResult.WorkingDirectory, builderResult.BackendConfig,
+            await _commandLine.RunInitAsync(builderResult.WorkingDirectory, builderResult.BackendConfigFile,
                 cancellationToken);
 
         if (initResult.ExitCode != 0)

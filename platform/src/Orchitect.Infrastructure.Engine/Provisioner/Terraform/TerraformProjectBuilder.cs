@@ -8,7 +8,7 @@ public interface ITerraformProjectBuilder
 {
     /// <summary>
     /// Creates a Terraform project (main.tf.json, terraform.tfvars.json, providers.tf.json and, when configured,
-    /// backend.tf.json) for the given context.
+    /// backend.tf.json plus an owner-only backend.tfbackend holding the backend settings) for the given context.
     /// </summary>
     Task<TerraformProjectBuilderResult> BuildProjectAsync(
         Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> validatedPlans,
@@ -18,7 +18,7 @@ public interface ITerraformProjectBuilder
 
 public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
 {
-    private static readonly string[] GeneratedFilePatterns = ["*.tf", "*.tf.json", "*.tfvars", "*.tfvars.json"];
+    private static readonly string[] GeneratedFilePatterns = ["*.tf", "*.tf.json", "*.tfvars", "*.tfvars.json", "*.tfbackend"];
 
     private readonly ILogger<TerraformProjectBuilder> _logger;
     private readonly ITerraformRenderer _renderer;
@@ -80,20 +80,21 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
         _logger.LogDebug("Render output: {Output}", providersTf);
         await WriteFileAsync(workingDirectory, "providers.tf.json", providersTf, cancellationToken);
 
-        var backendConfig = new Dictionary<string, string>();
+        string? backendConfigFile = null;
 
         if (_backendOptions.IsRemote)
         {
             var backendTf = _renderer.RenderBackend(_backendOptions.Type!);
             await WriteFileAsync(workingDirectory, "backend.tf.json", backendTf, cancellationToken);
 
-            foreach (var (key, value) in _backendOptions.Config)
-            {
-                backendConfig[key] = ResolvePlaceholders(value, context);
-            }
+            var backendConfig = _backendOptions.Config.ToDictionary(
+                kvp => kvp.Key, kvp => ResolvePlaceholders(kvp.Value, context));
+            backendConfigFile = Path.Combine(workingDirectory, "backend.tfbackend");
+            await WriteOwnerOnlyFileAsync(backendConfigFile, _renderer.RenderBackendConfig(backendConfig),
+                cancellationToken);
         }
 
-        return new TerraformProjectBuilderResult(workingDirectory, plansDirectory, backendConfig);
+        return new TerraformProjectBuilderResult(workingDirectory, plansDirectory, backendConfigFile);
     }
 
     private static void DeleteGeneratedFiles(string workingDirectory)
@@ -111,6 +112,20 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
         var path = Path.Combine(workingDirectory, fileName);
         await File.WriteAllTextAsync(path, contents, cancellationToken);
         _logger.LogInformation("Created {FileName} at: {FilePath}", fileName, path);
+    }
+
+    private async Task WriteOwnerOnlyFileAsync(string path, string contents, CancellationToken cancellationToken)
+    {
+        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        await using var stream = new FileStream(path, options);
+        await using var writer = new StreamWriter(stream);
+        await writer.WriteAsync(contents.AsMemory(), cancellationToken);
+        _logger.LogInformation("Created {FileName} at: {FilePath}", Path.GetFileName(path), path);
     }
 
     private static string ResolvePlaceholders(string value, ProvisionContext context) => value

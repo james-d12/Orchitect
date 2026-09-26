@@ -11,7 +11,7 @@ public sealed class TerraformProjectBuilderTests
         new(NullLogger<TerraformProjectBuilder>.Instance, new TerraformRenderer(), Options.Create(backendOptions));
 
     [Fact]
-    public async Task BuildProjectAsync_WithBackend_WritesBackendTfAndResolvesPlaceholders()
+    public async Task BuildProjectAsync_WithBackend_WritesBackendConfigFileAndResolvesPlaceholders()
     {
         var context = TerraformTestData.NewContext();
         var builder = CreateBuilder(TerraformTestData.AzureBackend());
@@ -19,9 +19,27 @@ public sealed class TerraformProjectBuilderTests
         var result = await builder.BuildProjectAsync(TerraformTestData.ValidatedPlans(), context);
 
         Assert.True(File.Exists(Path.Combine(result.WorkingDirectory, "backend.tf.json")));
-        Assert.Equal($"{context.ApplicationId}/{context.EnvironmentId}.tfstate", result.BackendConfig["key"]);
-        Assert.Equal("orchitectstate", result.BackendConfig["storage_account_name"]);
-        Assert.Equal("tfstate", result.BackendConfig["container_name"]);
+        Assert.Equal(Path.Combine(result.WorkingDirectory, "backend.tfbackend"), result.BackendConfigFile);
+        Assert.Equal(
+            "container_name = \"tfstate\"\n" +
+            $"key = \"{context.ApplicationId}/{context.EnvironmentId}.tfstate\"\n" +
+            "storage_account_name = \"orchitectstate\"\n",
+            await File.ReadAllTextAsync(result.BackendConfigFile!));
+    }
+
+    [Fact]
+    public async Task BuildProjectAsync_WithBackend_BackendConfigFileIsOwnerOnly()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var builder = CreateBuilder(TerraformTestData.AzureBackend());
+
+        var result = await builder.BuildProjectAsync(TerraformTestData.ValidatedPlans(), TerraformTestData.NewContext());
+
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(result.BackendConfigFile!));
     }
 
     [Fact]
@@ -37,7 +55,7 @@ public sealed class TerraformProjectBuilderTests
         var second = await builder.BuildProjectAsync(TerraformTestData.ValidatedPlans(), context);
 
         Assert.False(File.Exists(Path.Combine(second.WorkingDirectory, "backend.tf.json")));
-        Assert.Empty(second.BackendConfig);
+        Assert.Null(second.BackendConfigFile);
         Assert.True(File.Exists(localState));
     }
 

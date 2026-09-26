@@ -21,8 +21,8 @@ public sealed class TerraformDriverTests
 
         Assert.Equal(2, commandLine.InitBackendConfigs.Count);
         Assert.Equal(commandLine.InitBackendConfigs[0], commandLine.InitBackendConfigs[1]);
-        Assert.Equal($"{context.ApplicationId}/{context.EnvironmentId}.tfstate",
-            commandLine.InitBackendConfigs[0]["key"]);
+        Assert.Contains($"key = \"{context.ApplicationId}/{context.EnvironmentId}.tfstate\"",
+            commandLine.InitBackendConfigs[0]);
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public sealed class TerraformDriverTests
         public int PlanExitCode { get; init; } = (int)TerraformPlanResultExitCode.ChangesNeeded;
         public int ApplyExitCode { get; init; }
 
-        public List<IReadOnlyDictionary<string, string>> InitBackendConfigs { get; } = [];
+        public List<string?> InitBackendConfigs { get; } = [];
         public string? PlanDestroyOutput { get; private set; }
         public string? ApplyPlanFile { get; private set; }
         public bool ApplyCalled { get; private set; }
@@ -197,9 +197,9 @@ public sealed class TerraformDriverTests
             CancellationToken cancellationToken) => Task.FromResult(Success);
 
         public Task<CommandLineResult> RunInitAsync(string executeDirectory,
-            IReadOnlyDictionary<string, string> backendConfig, CancellationToken cancellationToken)
+            string? backendConfigFile, CancellationToken cancellationToken)
         {
-            InitBackendConfigs.Add(backendConfig);
+            InitBackendConfigs.Add(backendConfigFile is null ? null : File.ReadAllText(backendConfigFile));
             Tokens.Add(cancellationToken);
             return Task.FromResult(new CommandLineResult(string.Empty, "init error", InitExitCode));
         }

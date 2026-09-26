@@ -101,6 +101,32 @@ public sealed class TerraformRendererTests
         Assert.NotNull(providers["provider"]!["azurerm"]!["features"]);
     }
 
+    [Fact]
+    public void RenderBackendConfig_EscapesValuesSoTheyStayLiteral()
+    {
+        var rendered = new TerraformRenderer().RenderBackendConfig(new Dictionary<string, string>
+        {
+            ["key"] = "a\"b\\c\n${file(\"/etc/passwd\")}%{if true}x%{endif}",
+            ["use_azuread_auth"] = "true"
+        });
+
+        Assert.Equal(
+            "key = \"a\\\"b\\\\c\\n$${file(\\\"/etc/passwd\\\")}%%{if true}x%%{endif}\"\n" +
+            "use_azuread_auth = \"true\"\n",
+            rendered);
+    }
+
+    [Theory]
+    [InlineData("key\nresource")]
+    [InlineData("key = \"x\"")]
+    [InlineData("1key")]
+    [InlineData("")]
+    public void RenderBackendConfig_InvalidKey_Throws(string key)
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            new TerraformRenderer().RenderBackendConfig(new Dictionary<string, string> { [key] = "value" }));
+    }
+
     private static Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> Plans(
         Dictionary<string, string> inputs, params (string Name, string? Type)[] variables)
     {

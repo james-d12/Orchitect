@@ -40,7 +40,7 @@ The API validates `TerraformBackend` and `SecretProvider` at startup (`ValidateO
 | `Network`, `DatabaseHost`, `DatabasePort` | Docker network for the container and how the runner reaches Postgres. The runner's connection string is derived from the API's own `ConnectionStrings:orchitect`, with the host/port rewritten. |
 | `LogLevel` | The runner's default log level (default `Information`). `Debug` logs the rendered Terraform, which includes input values. |
 | `MemoryBytes`, `NanoCpus`, `PidsLimit` | Container limits (defaults 2 GiB, 2 CPUs, 512 PIDs). Set to null to remove a limit. |
-| `TerraformBackend` | Where state lives. `Mode` is `Local` (default, lost with the container) or `Remote`. For `Remote`, `Type` is any Terraform backend (`azurerm`, `s3`, `gcs`, ...) and `Config` is backend-specific, passed as-is to `terraform init -backend-config`. Orchitect only substitutes `{applicationId}`, `{environmentId}` and `{projectName}`. Setting `Type`/`Config` with `Mode = Local` is rejected. |
+| `TerraformBackend` | Where state lives. `Mode` is `Local` (default, lost with the container) or `Remote`. For `Remote`, `Type` is any Terraform backend (`azurerm`, `s3`, `gcs`, ...) and `Config` is backend-specific. It's written to an owner-only `backend.tfbackend` file and passed with `terraform init -backend-config=<file>`, so values never appear in process arguments. Orchitect only substitutes `{applicationId}`, `{environmentId}` and `{projectName}`. Setting `Type`/`Config` with `Mode = Local` is rejected. |
 | `SecretProvider` | Where the Runner reads extra secrets from. `Type` is `Environment` (default) or `AzureKeyVault`, and each provider has its own typed section (`AzureKeyVault:VaultUri`). `Mappings` maps env var name to secret name. They are loaded into the Runner's env before any terraform command. `Environment` reads the secret from another env var, which lets one credential set both `AZURE_*` and `ARM_*` (e.g. `Mappings:ARM_CLIENT_SECRET = AZURE_CLIENT_SECRET`). With no mappings it does nothing. |
 | `Configuration` | Opaque env vars, e.g. cloud credentials. |
 
@@ -90,6 +90,7 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
 
 ### 2. Terraform state persistence
 - [x] Render a partial `backend "<type>" {}` and pass `TerraformBackend:Config` via `terraform init -backend-config`. Works for any backend.
+- [x] Backend settings go in a 0600 `backend.tfbackend` file instead of `-backend-config=key=value` arguments, so secrets such as `access_key` or `sas_token` aren't visible in `ps` (`Runner_Isolation_Fix_Plan.md`, M6).
 - [x] Remove the "remnant files" check. With a remote backend the working directory (`/tmp/orchitect/terraform/<applicationId>/<environmentId>`) is recreated. Without one it is kept, because it holds the local state.
 - [x] Runner-side destroy (`--operation destroy`). It builds the same project and backend config as provision, so it uses the same state. Destroy never deletes the state itself.
 - [ ] End-to-end check against real Azure:

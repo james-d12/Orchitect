@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -23,9 +24,15 @@ public interface ITerraformRenderer
     /// Renders a partial backend block as backend.tf.json.
     /// </summary>
     string RenderBackend(string backendType);
+
+    /// <summary>
+    /// Renders backend settings as a backend.tfbackend file for terraform init -backend-config.
+    /// Values are escaped so Terraform reads them as literal strings.
+    /// </summary>
+    string RenderBackendConfig(IReadOnlyDictionary<string, string> config);
 }
 
-public sealed class TerraformRenderer : ITerraformRenderer
+public sealed partial class TerraformRenderer : ITerraformRenderer
 {
     private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
@@ -118,6 +125,35 @@ public sealed class TerraformRenderer : ITerraformRenderer
                 ["backend"] = new JsonObject { [backendType] = new JsonObject() }
             }
         });
+
+    public string RenderBackendConfig(IReadOnlyDictionary<string, string> config)
+    {
+        var builder = new StringBuilder();
+
+        foreach (var (key, value) in config.OrderBy(kvp => kvp.Key, StringComparer.Ordinal))
+        {
+            if (!BackendConfigKey().IsMatch(key))
+            {
+                throw new InvalidOperationException($"Backend config key '{key}' is not a valid identifier.");
+            }
+
+            builder.Append(key).Append(" = \"").Append(EscapeHclString(value)).Append("\"\n");
+        }
+
+        return builder.ToString();
+    }
+
+    private static string EscapeHclString(string value) => value
+        .Replace("\\", "\\\\", StringComparison.Ordinal)
+        .Replace("\"", "\\\"", StringComparison.Ordinal)
+        .Replace("\n", "\\n", StringComparison.Ordinal)
+        .Replace("\r", "\\r", StringComparison.Ordinal)
+        .Replace("\t", "\\t", StringComparison.Ordinal)
+        .Replace("${", "$${", StringComparison.Ordinal)
+        .Replace("%{", "%%{", StringComparison.Ordinal);
+
+    [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_-]*$")]
+    private static partial Regex BackendConfigKey();
 
     private static string ToIdentifier(string name)
     {
