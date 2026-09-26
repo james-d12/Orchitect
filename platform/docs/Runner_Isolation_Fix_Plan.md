@@ -184,13 +184,11 @@ Every phase ends with the same checks:
 - `DockerExecutor`:
   - After create and before start, build a tar in memory with `System.Formats.Tar`: `secrets.json`, uid/gid 1654, mode 0400.
   - Extract it with `ExtractArchiveToContainerAsync` to `/run/orchitect`.
-- Runner `Program.cs`:
-  - `AddJsonFile("/run/orchitect/secrets.json", optional: true)`.
-  - Copy top-level string keys into the process environment for Terraform and Azure.
-  - Delete the file.
-- Dockerfile: `mkdir /run/orchitect`, owned by `$APP_UID`.
-- Tests: the tar builder, and that `ToEnvironment` excludes `Configuration`.
-- Check: `docker inspect` shows no connection string, token or `ARM_*`.
+- Runner `Program.cs`: before the host is built, `RunnerSecretsFile.LoadIntoEnvironment()` reads `/run/orchitect/secrets.json`, deletes it, and sets each key as a process environment variable. Configuration binding (`ConnectionStrings__orchitect`, `SecretProvider__AzureKeyVault__AccessToken`), Azure and Terraform (`ARM_*`) then work unchanged.
+- There's no tmpfs mount: Docker creates tmpfs mounts at start, which would hide a file copied in before start.
+- Dockerfile: `mkdir /run/orchitect`, owned by `$APP_UID`, mode 700.
+- Tests: the tar entry (name, mode, uid/gid, content), loading and deleting the file, `ToEnvironment` excluding `Configuration`, the executor copying secrets before start and keeping them out of `Env`, and the queue passing the token and `Configuration` as secrets.
+- Check: with the rebuilt image, `docker inspect` showed only `Logging__LogLevel__Default` in the env. The runner used the connection string from the file, and the file was gone after the run.
 
 ## Phase 9 – M8: split DI registrations → review
 - Replace `AddEngineInfrastructureServices` with two methods:

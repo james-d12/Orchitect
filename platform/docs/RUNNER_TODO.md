@@ -9,7 +9,7 @@ Items left over after the Runner review (`REVIEW_CODE.md`) and the first pass of
   1. loads the Application and Deployment from the DB by ID
   2. loads the mapped secrets into its environment (`ISecretEnvironmentLoader`)
   3. calls `IEngineOrchestrator.StartAsync` or `DestroyAsync`, depending on `--operation`
-- Only these cross the boundary: the IDs (and `--operation provision|destroy`) as container args, and env vars built by `ExecutorOptions.ToEnvironment()`. The Runner resolves every concrete implementation through its own DI root.
+- Only these cross the boundary: the IDs (and `--operation provision|destroy`) as container args, non-secret env vars built by `ExecutorOptions.ToEnvironment()`, and a `/run/orchitect/secrets.json` copied into the container before it starts (connection string, Key Vault token, `Configuration`). The runner loads that file into its environment and deletes it at startup. The Runner resolves every concrete implementation through its own DI root.
 - Destroy is Runner-side only for now: run the image with `--operation destroy`. There is no API endpoint yet.
 
 ## Build
@@ -28,7 +28,7 @@ The image pins Terraform, Helm, `terraform-config-inspect` and its base images. 
 
 All of it lives under `ExecutorOptions` in the API. Keep real values in user-secrets or env vars, never in `appsettings.json`. `appsettings.json` only sets safe defaults: `TerraformBackend:Mode = Local` and `SecretProvider:Type = Environment`.
 
-The API flattens the typed sections into container env (`TerraformBackend__*`, `SecretProvider__*`) and passes `Configuration` through as-is.
+The API flattens the typed sections into container env (`TerraformBackend__*`, `SecretProvider__*`). `Configuration`, the Key Vault token and the runner's connection string go in the secrets file instead, so `docker inspect` doesn't show them.
 
 The API validates `TerraformBackend` and `SecretProvider` at startup (`ValidateOnStart`), so invalid config stops the API from booting instead of failing inside a container. `Configuration` is opaque and not validated, so a typo in a key (e.g. `AZURE_CLIENTID`) only shows up when the Runner runs.
 
@@ -42,7 +42,7 @@ The API validates `TerraformBackend` and `SecretProvider` at startup (`ValidateO
 | `MemoryBytes`, `NanoCpus`, `PidsLimit` | Container limits (defaults 2 GiB, 2 CPUs, 512 PIDs). Set to null to remove a limit. |
 | `TerraformBackend` | Where state lives. `Mode` is `Local` (default, lost with the container) or `Remote`. For `Remote`, `Type` is any Terraform backend (`azurerm`, `s3`, `gcs`, ...) and `Config` is backend-specific. It's written to an owner-only `backend.tfbackend` file and passed with `terraform init -backend-config=<file>`, so values never appear in process arguments. Orchitect only substitutes `{applicationId}`, `{environmentId}` and `{projectName}`. Setting `Type`/`Config` with `Mode = Local` is rejected. |
 | `SecretProvider` | Where the Runner reads extra secrets from. `Type` is `Environment` (default) or `AzureKeyVault`, and each provider has its own typed section (`AzureKeyVault:VaultUri`). `Mappings` maps env var name to secret name. They are loaded into the Runner's env before any terraform command. `Environment` reads the secret from another env var, which lets one credential set both `AZURE_*` and `ARM_*` (e.g. `Mappings:ARM_CLIENT_SECRET = AZURE_CLIENT_SECRET`). With no mappings it does nothing. |
-| `Configuration` | Opaque env vars, e.g. cloud credentials. |
+| `Configuration` | Opaque env vars, e.g. cloud credentials. Delivered through the secrets file, not container env. |
 
 Example (Azure):
 ```bash

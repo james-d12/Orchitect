@@ -6,11 +6,14 @@ using Microsoft.Extensions.Options;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Infrastructure.Engine;
+using Orchitect.Infrastructure.Engine.Executor;
 using Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
 using Orchitect.Infrastructure.Engine.Secret;
 using Orchitect.Persistence;
 using Orchitect.Runner;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
+
+RunnerSecretsFile.LoadIntoEnvironment();
 
 var builder = Host.CreateApplicationBuilder(args);
 

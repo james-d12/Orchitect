@@ -62,9 +62,15 @@ public sealed class DockerExecutor : IExecutor
 
         var containerName = $"orchitect-runner-{context.RunId}-{Guid.NewGuid().ToString("N")[..8]}";
         CreateContainerResponse container;
+        Dictionary<string, string> secrets;
 
         try
         {
+            secrets = new Dictionary<string, string>(context.Secrets)
+            {
+                ["ConnectionStrings__orchitect"] = BuildRunnerConnectionString(context)
+            };
+
             container = await _docker.Containers.CreateContainerAsync(
                 new CreateContainerParameters
                 {
@@ -80,7 +86,6 @@ public sealed class DockerExecutor : IExecutor
                     Env =
                     [
                         $"ORCHITECT_RUN_ID={context.RunId}",
-                        $"ConnectionStrings__orchitect={BuildRunnerConnectionString(context)}",
                         ..context.Configuration.Select(x => $"{x.Key}={x.Value}")
                     ],
                     HostConfig = new HostConfig
@@ -121,6 +126,8 @@ public sealed class DockerExecutor : IExecutor
 
         try
         {
+            await CopySecretsAsync(container.ID, secrets, cancellationToken);
+
             var started = await _docker.Containers.StartContainerAsync(
                 container.ID,
                 new ContainerStartParameters(),
@@ -282,6 +289,23 @@ public sealed class DockerExecutor : IExecutor
             throw new InvalidOperationException(
                 $"Runner image '{image}' does not exist.");
         }
+    }
+
+    private async Task CopySecretsAsync(
+        string containerId,
+        IReadOnlyDictionary<string, string> secrets,
+        CancellationToken cancellationToken)
+    {
+        await using var archive = RunnerSecretsFile.CreateArchive(secrets);
+
+        await _docker.Containers.ExtractArchiveToContainerAsync(
+            containerId,
+            new ContainerPathStatParameters { Path = RunnerSecretsFile.DirectoryPath },
+            archive,
+            cancellationToken);
+
+        _logger.LogInformation("Copied {SecretCount} secrets into runner container {ContainerId}.",
+            secrets.Count, containerId);
     }
 
     private async Task<ContainerWaitResponse?> WaitForExitAsync(

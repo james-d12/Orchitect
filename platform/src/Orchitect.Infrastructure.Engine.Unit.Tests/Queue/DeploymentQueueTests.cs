@@ -59,6 +59,27 @@ public sealed class DeploymentQueueTests
     }
 
     [Fact]
+    public async Task WorkItem_PassesTokenAndConfigurationAsSecrets()
+    {
+        var (deployment, _, services) = Setup();
+        var executor = new FakeExecutor();
+        var options = new ExecutorOptions
+        {
+            Image = "runner:test",
+            Configuration = new Dictionary<string, string> { ["ARM_CLIENT_SECRET"] = "s3cr3t" }
+        };
+        var tokenProvider = new StaticTokenProvider(new Dictionary<string, string> { ["TOKEN"] = "t0ken" });
+        var workItem = await QueueAsync(deployment, executor, options, tokenProvider);
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal("s3cr3t", executor.Context!.Secrets["ARM_CLIENT_SECRET"]);
+        Assert.Equal("t0ken", executor.Context.Secrets["TOKEN"]);
+        Assert.DoesNotContain("ARM_CLIENT_SECRET", executor.Context.Configuration.Keys);
+        Assert.DoesNotContain("TOKEN", executor.Context.Configuration.Keys);
+    }
+
+    [Fact]
     public async Task WorkItem_DeploymentMissing_ThrowsWithoutExecuting()
     {
         var (deployment, repository, services) = Setup();
@@ -84,12 +105,14 @@ public sealed class DeploymentQueueTests
     }
 
     private static async Task<Func<IServiceProvider, CancellationToken, ValueTask>> QueueAsync(
-        Deployment deployment, IExecutor executor)
+        Deployment deployment, IExecutor executor, ExecutorOptions? options = null,
+        IRunnerSecretTokenProvider? tokenProvider = null)
     {
         var processor = new CapturingQueueProcessor();
         var queue = new DeploymentQueue(processor, executor,
-            Options.Create(new ExecutorOptions { Image = "runner:test" }),
-            new EmptyTokenProvider(), NullLogger<DeploymentQueue>.Instance);
+            Options.Create(options ?? new ExecutorOptions { Image = "runner:test" }),
+            tokenProvider ?? new StaticTokenProvider(new Dictionary<string, string>()),
+            NullLogger<DeploymentQueue>.Instance);
 
         await queue.QueueDeploymentTaskAsync(new DeploymentQueueRequest(deployment.ApplicationId, deployment.Id));
 
@@ -116,11 +139,13 @@ public sealed class DeploymentQueueTests
         public Exception? Exception { get; init; }
         public Action? OnExecute { get; init; }
         public bool Executed { get; private set; }
+        public ExecutorContext? Context { get; private set; }
 
         public Task<ExecutorResult> ExecuteAsync(ExecutorContext context,
             CancellationToken cancellationToken = default)
         {
             Executed = true;
+            Context = context;
             OnExecute?.Invoke();
             if (cancellationToken.IsCancellationRequested)
             {
@@ -131,11 +156,11 @@ public sealed class DeploymentQueueTests
         }
     }
 
-    private sealed class EmptyTokenProvider : IRunnerSecretTokenProvider
+    private sealed class StaticTokenProvider(IReadOnlyDictionary<string, string> environment)
+        : IRunnerSecretTokenProvider
     {
         public Task<IReadOnlyDictionary<string, string>> GetEnvironmentAsync(SecretProviderOptions options,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>());
+            CancellationToken cancellationToken = default) => Task.FromResult(environment);
     }
 
     private sealed class RecordingDeploymentRepository : IDeploymentRepository

@@ -56,11 +56,6 @@ public sealed record ExecutorOptions
             environment[$"{SecretProviderOptions.SectionName}__Mappings__{key}"] = value;
         }
 
-        foreach (var (key, value) in Configuration)
-        {
-            environment[key] = value;
-        }
-
         return environment;
     }
 }

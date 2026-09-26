@@ -39,7 +39,8 @@ public sealed class ExecutorOptionsTests
         Assert.Equal("AzureKeyVault", environment["SecretProvider__Type"]);
         Assert.Equal("https://orchitect.vault.azure.net/", environment["SecretProvider__AzureKeyVault__VaultUri"]);
         Assert.Equal("arm-client-secret", environment["SecretProvider__Mappings__ARM_CLIENT_SECRET"]);
-        Assert.Equal(ClientSecret, environment["AZURE_CLIENT_SECRET"]);
+        Assert.DoesNotContain("AZURE_CLIENT_SECRET", environment.Keys);
+        Assert.DoesNotContain(ClientSecret, environment.Values);
     }
 
     [Fact]
@@ -78,7 +79,8 @@ public sealed class ExecutorOptionsTests
             Image = options.Image,
             RunId = "run",
             Arguments = [],
-            Configuration = options.ToEnvironment()
+            Configuration = options.ToEnvironment(),
+            Secrets = options.Configuration
         };
 
         Assert.DoesNotContain(ClientSecret, options.ToString());

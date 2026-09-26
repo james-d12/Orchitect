@@ -61,6 +61,41 @@ public sealed class DockerExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_CopiesSecretsBeforeStartAndKeepsThemOutOfEnv()
+    {
+        CreateContainerParameters? created = null;
+        Dictionary<string, string>? copied = null;
+        _ = _containers.CreateContainerAsync(Arg.Do<CreateContainerParameters>(p => created = p),
+            Arg.Any<CancellationToken>());
+        _ = _containers.ExtractArchiveToContainerAsync(ContainerId,
+            Arg.Is<ContainerPathStatParameters>(p => p.Path == RunnerSecretsFile.DirectoryPath),
+            Arg.Do<Stream>(archive => copied = ReadSecrets(archive)), Arg.Any<CancellationToken>());
+        SetWait(_ => Task.FromResult(new ContainerWaitResponse { StatusCode = 0 }));
+
+        await _executor.ExecuteAsync(new ExecutorContext
+        {
+            Image = "orchitect-runner:test",
+            RunId = "run-1",
+            Arguments = [],
+            Configuration = new Dictionary<string, string> { ["Logging__LogLevel__Default"] = "Information" },
+            Secrets = new Dictionary<string, string> { ["ARM_CLIENT_SECRET"] = "s3cr3t" }
+        }, _cancellation.Token);
+
+        Received.InOrder(() =>
+        {
+            _containers.ExtractArchiveToContainerAsync(ContainerId, Arg.Any<ContainerPathStatParameters>(),
+                Arg.Any<Stream>(), Arg.Any<CancellationToken>());
+            _containers.StartContainerAsync(ContainerId, Arg.Any<ContainerStartParameters>(),
+                Arg.Any<CancellationToken>());
+        });
+        Assert.Equal("s3cr3t", copied!["ARM_CLIENT_SECRET"]);
+        Assert.Contains("host.docker.internal", copied["ConnectionStrings__orchitect"]);
+        Assert.Contains("Logging__LogLevel__Default=Information", created!.Env);
+        Assert.DoesNotContain(created.Env, e => e.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
+        Assert.DoesNotContain(created.Env, e => e.Contains("s3cr3t", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_CancelledDuringStartWhileRunning_DetachesContainer()
     {
         SetRunning(true);
@@ -169,6 +204,13 @@ public sealed class DockerExecutorTests
             Timeout = timeout,
             StopGracePeriod = stopGracePeriod
         }, _cancellation.Token);
+
+    private static Dictionary<string, string> ReadSecrets(Stream archive)
+    {
+        using var reader = new System.Formats.Tar.TarReader(archive, leaveOpen: true);
+        var entry = reader.GetNextEntry(copyData: true)!;
+        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(entry.DataStream!)!;
+    }
 
     private void SetRunning(bool running) =>
         _containers.InspectContainerAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())

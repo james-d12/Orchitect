@@ -69,7 +69,8 @@ public sealed class DeploymentQueue : IDeploymentQueue
                     "--application-id", request.ApplicationId.Value.ToString(),
                     "--deployment-id", request.DeploymentId.Value.ToString()
                 ],
-                Configuration = _executorOptions.ToEnvironment().Concat(tokenEnvironment).ToDictionary(),
+                Configuration = _executorOptions.ToEnvironment(),
+                Secrets = _executorOptions.Configuration.Concat(tokenEnvironment).ToDictionary(),
                 Network = _executorOptions.Network,
                 DatabaseHost = _executorOptions.DatabaseHost,
                 DatabasePort = _executorOptions.DatabasePort,

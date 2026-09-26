@@ -10,6 +10,8 @@ public sealed record ExecutorContext
 
     public required IReadOnlyDictionary<string, string> Configuration { get; init; }
 
+    public IReadOnlyDictionary<string, string> Secrets { get; init; } = new Dictionary<string, string>();
+
     public string? Network { get; init; }
 
     public string? DatabaseHost { get; init; }

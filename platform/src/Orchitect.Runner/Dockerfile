@@ -111,6 +111,8 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 
+RUN mkdir -p /run/orchitect && chown $APP_UID:$APP_UID /run/orchitect && chmod 700 /run/orchitect
+
 USER $APP_UID
 
 ENTRYPOINT ["dotnet", "Orchitect.Runner.dll"]
