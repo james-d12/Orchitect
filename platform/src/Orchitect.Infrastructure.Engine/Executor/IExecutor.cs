@@ -23,6 +23,8 @@ public sealed record ExecutorContext
     public long? PidsLimit { get; init; }
 
     public TimeSpan? StopGracePeriod { get; init; }
+
+    public TimeSpan? Timeout { get; init; }
 }
 
 public sealed record ExecutorResult(long? ExitCode, Exception? Exception = null);

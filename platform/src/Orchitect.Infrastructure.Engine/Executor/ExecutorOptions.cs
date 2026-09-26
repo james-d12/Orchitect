@@ -19,6 +19,7 @@ public sealed record ExecutorOptions
     public long? NanoCpus { get; init; } = 2_000_000_000;
     public long? PidsLimit { get; init; } = 512;
     public TimeSpan StopGracePeriod { get; init; } = TimeSpan.FromMinutes(6);
+    public TimeSpan Timeout { get; init; } = TimeSpan.FromHours(1);
     public TerraformBackendOptions TerraformBackend { get; init; } = new();
     public SecretProviderOptions SecretProvider { get; init; } = new();
 

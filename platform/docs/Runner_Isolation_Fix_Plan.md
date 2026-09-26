@@ -156,7 +156,8 @@ Every phase ends with the same checks:
 - Add `ExecutorOptions.Timeout` (default 1h) and pass it through `ExecutorContext`.
 - `DockerExecutor`:
   - Link a timeout CTS with the caller's token for `WaitContainerAsync`.
-  - On timeout alone: `StopContainerAsync` with `WaitBeforeKillSeconds = StopGracePeriod`, drain the logs, then throw `TimeoutException`. The container is then removed.
+  - On timeout alone: send SIGTERM with `KillContainerAsync` and wait up to `StopGracePeriod` for the container to exit. Then drain the logs, throw `TimeoutException`, and force-remove the container. `StopContainerAsync` isn't used because Docker.DotNet's 100 s client timeout would cut a long grace period short.
+  - The `TimeoutException` comes back in `ExecutorResult.Exception`, and `ProcessDeploymentStatus` marks the deployment `Failed`.
 - Check: `Timeout=00:00:30` → the deployment is `Failed` and the container is gone.
 
 ## Phase 6 – M5: cancel race → review

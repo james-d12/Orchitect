@@ -76,7 +76,8 @@ public sealed class DeploymentQueue : IDeploymentQueue
                 MemoryBytes = _executorOptions.MemoryBytes,
                 NanoCpus = _executorOptions.NanoCpus,
                 PidsLimit = _executorOptions.PidsLimit,
-                StopGracePeriod = _executorOptions.StopGracePeriod
+                StopGracePeriod = _executorOptions.StopGracePeriod,
+                Timeout = _executorOptions.Timeout
             }, ct);
         }
         catch (Exception exception)

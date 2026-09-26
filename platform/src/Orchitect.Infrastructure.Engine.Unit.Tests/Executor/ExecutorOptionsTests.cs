@@ -51,6 +51,15 @@ public sealed class ExecutorOptionsTests
     }
 
     [Fact]
+    public void Timeout_DefaultsToOneHourAndOutlastsStopGracePeriod()
+    {
+        var options = CreateOptions();
+
+        Assert.Equal(TimeSpan.FromHours(1), options.Timeout);
+        Assert.True(options.Timeout > options.StopGracePeriod);
+    }
+
+    [Fact]
     public void ToEnvironment_LocalBackend_OnlySetsMode()
     {
         var options = CreateOptions() with { TerraformBackend = new TerraformBackendOptions() };

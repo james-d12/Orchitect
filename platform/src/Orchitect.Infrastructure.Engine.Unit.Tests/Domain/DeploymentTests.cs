@@ -53,6 +53,14 @@ public sealed class DeploymentTests
     }
 
     [Fact]
+    public void ProcessDeploymentStatus_TimedOut_Fails()
+    {
+        var processed = Deploying().ProcessDeploymentStatus(null, new TimeoutException("too slow"));
+
+        Assert.Equal(DeploymentStatus.Failed, processed.Status);
+    }
+
+    [Fact]
     public void ProcessDeploymentStatus_Cancelled_Unchanged()
     {
         var deploying = Deploying();

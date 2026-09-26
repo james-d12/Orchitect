@@ -68,6 +68,8 @@ public static class EngineInfrastructureExtensions
             .Validate(options => !string.IsNullOrWhiteSpace(options.Image), "ExecutorOptions:Image is required.")
             .Validate(options => options.StopGracePeriod > TimeSpan.Zero,
                 "ExecutorOptions:StopGracePeriod must be greater than zero.")
+            .Validate(options => options.Timeout > TimeSpan.Zero,
+                "ExecutorOptions:Timeout must be greater than zero.")
             .Validate(options => options.TerraformBackend.GetValidationError() is null,
                 "ExecutorOptions:TerraformBackend is invalid. Mode Remote needs Type and Config; Mode Local must not set them.")
             .Validate(options => options.SecretProvider.GetValidationError() is null,

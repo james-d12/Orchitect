@@ -10,6 +10,7 @@ namespace Orchitect.Infrastructure.Engine.Executor;
 
 public sealed class DockerExecutor : IExecutor
 {
+    private static readonly TimeSpan DefaultStopGracePeriod = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan RawOutputFlushInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan OutputRelayStopTimeout = TimeSpan.FromSeconds(2);
@@ -141,9 +142,14 @@ public sealed class DockerExecutor : IExecutor
 
             var stopwatch = Stopwatch.StartNew();
 
-            var wait = await _docker.Containers.WaitContainerAsync(
-                container.ID,
-                cancellationToken);
+            var wait = await WaitForExitAsync(container.ID, context.Timeout, cancellationToken);
+            if (wait is null)
+            {
+                activity?.AddEvent(new ActivityEvent("container.timed_out"));
+                await StopTimedOutContainerAsync(container.ID, context, logStreaming, logCancellation,
+                    cancellationToken);
+                throw new TimeoutException($"Runner '{context.RunId}' did not finish within {context.Timeout}.");
+            }
 
             stopwatch.Stop();
             activity?.SetTag("container.exit_code", wait.StatusCode);
@@ -287,6 +293,57 @@ public sealed class DockerExecutor : IExecutor
             throw new InvalidOperationException(
                 $"Runner image '{image}' does not exist.");
         }
+    }
+
+    private async Task<ContainerWaitResponse?> WaitForExitAsync(
+        string containerId,
+        TimeSpan? timeout,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (timeout is not null)
+        {
+            timeoutCancellation.CancelAfter(timeout.Value);
+        }
+
+        try
+        {
+            return await _docker.Containers.WaitContainerAsync(containerId, timeoutCancellation.Token);
+        }
+        catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested &&
+                                                  !cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
+    private async Task StopTimedOutContainerAsync(
+        string containerId,
+        ExecutorContext context,
+        Task logStreaming,
+        CancellationTokenSource logCancellation,
+        CancellationToken cancellationToken)
+    {
+        var gracePeriod = context.StopGracePeriod ?? DefaultStopGracePeriod;
+
+        _logger.LogWarning(
+            "Runner container {ContainerId} did not finish within {Timeout}. Stopping it with a grace period of {GracePeriod}.",
+            containerId, context.Timeout, gracePeriod);
+
+        await _docker.Containers.KillContainerAsync(
+            containerId,
+            new ContainerKillParameters { Signal = "SIGTERM" },
+            cancellationToken);
+
+        if (await WaitForExitAsync(containerId, gracePeriod, cancellationToken) is null)
+        {
+            _logger.LogWarning("Runner container {ContainerId} did not stop within {GracePeriod}; it will be killed.",
+                containerId, gracePeriod);
+            await logCancellation.CancelAsync();
+            return;
+        }
+
+        await WaitForOutputAsync(containerId, logStreaming, logCancellation);
     }
 
     private async Task WaitForOutputAsync(
