@@ -38,4 +38,45 @@ public sealed record Deployment
     {
         return Create(request.ApplicationId, request.EnvironmentId, request.CommitId);
     }
+
+    public Deployment Start()
+    {
+        if (Status != DeploymentStatus.Pending)
+        {
+            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot start while {Status}.");
+        }
+
+        return WithStatus(DeploymentStatus.Deploying);
+    }
+
+    public Deployment ProcessDeploymentStatus(long? exitCode, Exception? exception)
+    {
+        if (Status != DeploymentStatus.Deploying)
+        {
+            throw new InvalidOperationException(
+                $"Deployment '{Id.Value}' cannot process a run result while {Status}.");
+        }
+
+        if (exitCode is null && exception is null)
+        {
+            throw new ArgumentException("A run result needs an exit code or an exception.");
+        }
+
+        return exception switch
+        {
+            OperationCanceledException => this,
+            not null => WithStatus(DeploymentStatus.Failed),
+            null when exitCode == 0 => WithStatus(DeploymentStatus.Deployed),
+            null => WithStatus(DeploymentStatus.Failed)
+        };
+    }
+
+    private Deployment WithStatus(DeploymentStatus status)
+    {
+        return this with
+        {
+            Status = status,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
 }

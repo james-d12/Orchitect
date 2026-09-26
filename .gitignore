@@ -12,7 +12,7 @@ StrykerOutput/
 TestResults/
 *.bkp
 humanitec-openapi.json
-
+Local.bru
 
 # build output
 dist/

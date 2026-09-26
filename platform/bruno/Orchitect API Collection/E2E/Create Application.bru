@@ -1,0 +1,38 @@
+meta {
+  name: Create Application
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{API_BASE_URL}}/applications
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "name": "Orchitect Example",
+    "organisationId": "{{ORGANISATION_ID}}",
+    "repository": {
+      "name": "Orchitect Example",
+      "url": "https://github.com/james-d12/Orchitect-Example.git",
+      "provider": 1
+    }
+  }
+}
+
+script:post-response {
+  var id = res.body.id
+  
+  bru.setVar("APPLICATION_ID", id)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

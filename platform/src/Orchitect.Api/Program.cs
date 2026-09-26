@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -12,10 +13,11 @@ using Microsoft.OpenApi;
 using Microsoft.VisualStudio.Services.Common;
 using Orchitect.Api.Endpoints;
 using Orchitect.Api.Jobs;
-using Orchitect.Api.Queue;
 using Orchitect.Api.Settings;
-using Orchitect.Infrastructure;
-using Orchitect.Infrastructure.Core.Encryption;
+using Orchitect.Domain.Core.Credential;
+using Orchitect.Infrastructure.Engine;
+using Orchitect.Infrastructure.Engine.Encryption;
+using Orchitect.Infrastructure.Inventory;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
 
@@ -41,24 +43,23 @@ try
         options.ValidateOnBuild = true;
     });
 
-    builder.Services.AddHostedService<QueuedHostedService>();
-    builder.Services.AddSingleton<IBackgroundTaskQueueProcessor>(_ => new BackgroundTaskQueueProcessor(5));
-
     builder.Services.AddLogging();
     builder.Services.AddOpenApi()
         .AddEndpointsApiExplorer()
         .AddPersistenceServices()
-        .AddInfrastructureServices();
+        .AddInventoryInfrastructureServices()
+        .AddEngineInfrastructureServices(builder.Configuration);
+
+    builder.Services.TryAddSingleton<IEncryptionService, AesEncryptionService>();
+    builder.Services.AddOptions<EncryptionOptions>()
+            .Bind(builder.Configuration.GetSection(EncryptionOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
     builder.Services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<OrchitectDbContext>();
 
     builder.Services.AddOptions<JwtOptions>()
         .Bind(builder.Configuration.GetSection("JwtOptions"))
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
-
-    builder.Services.AddOptions<EncryptionOptions>()
-        .Bind(builder.Configuration.GetSection("EncryptionOptions"))
         .ValidateDataAnnotations()
         .ValidateOnStart();
 

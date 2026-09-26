@@ -7,13 +7,14 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8" />
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Orchitect.Infrastructure\Orchitect.Infrastructure.csproj" />
+      <ProjectReference Include="..\Orchitect.Infrastructure.Engine\Orchitect.Infrastructure.Engine.csproj" />
+      <ProjectReference Include="..\Orchitect.Infrastructure.Inventory\Orchitect.Infrastructure.Inventory.csproj" />
       <ProjectReference Include="..\Orchitect.Persistence\Orchitect.Persistence.csproj" />
       <ProjectReference Include="..\Orchitect.ServiceDefaults\Orchitect.ServiceDefaults.csproj" />
     </ItemGroup>
