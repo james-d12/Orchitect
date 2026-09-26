@@ -99,8 +99,8 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
 - [ ] Confirm the destroy command against real terraform. It now applies the saved destroy plan with `apply -auto-approve <plan>`, and so far only unit tests with a fake command line have exercised it.
 - [ ] API `DELETE /deployments/{id}` that queues a `--operation destroy` run.
 
-### 3. Deployment status is never updated
-- [ ] Set `Deployment.Status` to `Deployed` or `Failed` (`Runner_Isolation_Fix_Plan.md`, M3). Either the Runner does it after `StartAsync`, or the API does it from the `DockerExecutor` result. The API is the simpler option because it already knows the exit code.
+### 3. Deployment status
+- [x] `Deployment.Start()` moves a pending deployment to `Deploying`. `Deployment.ProcessDeploymentStatus(exitCode, exception)` takes the raw run result and decides the status: `Deployed`, `Failed`, or unchanged when the run was cancelled. `DeploymentQueue` only passes that data through, and `IExecutor` returns the runner's exit code instead of throwing on a non-zero exit (`Runner_Isolation_Fix_Plan.md`, M3).
 
 ### 4. Secrets baked into the API image
 - [x] Remove the `ARG`/`ENV ARM_*` block from `src/Orchitect.Api/Dockerfile`.

@@ -25,7 +25,12 @@ public sealed record ExecutorContext
     public TimeSpan? StopGracePeriod { get; init; }
 }
 
+public sealed record ExecutorResult(long? ExitCode, Exception? Exception = null);
+
 public interface IExecutor
 {
-    public Task ExecuteAsync(ExecutorContext context, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Runs the runner to completion and returns its exit code, or the exception when it could not be run.
+    /// </summary>
+    public Task<ExecutorResult> ExecuteAsync(ExecutorContext context, CancellationToken cancellationToken = default);
 }

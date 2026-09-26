@@ -140,13 +140,16 @@ Every phase ends with the same checks:
 
 ## Phase 4 – M3: deployment status → review
 - `DeploymentStatus`: add `Deploying`. It's stored as a string, so no migration is needed.
-- `Deployment.WithStatus(status)` returns `this with { Status, UpdatedAt }`, following the `Environment.Update` pattern.
+- `Deployment.Start()`: Pending → Deploying, otherwise throws.
+- `Deployment.ProcessDeploymentStatus(long? exitCode, Exception? exception)` owns the decision. It requires `Deploying`, and throws if both arguments are null.
+  - `OperationCanceledException` → unchanged (the outcome is unknown)
+  - any other exception → Failed
+  - exit code 0 → Deployed, otherwise Failed
+- `IExecutor.ExecuteAsync` returns an `ExecutorResult` with the exit code. It no longer throws on a non-zero exit.
 - `IDeploymentRepository.UpdateAsync`, implemented in `Orchitect.Persistence/Repositories/Engine/DeploymentRepository.cs` like `EnvironmentRepository.UpdateAsync`.
 - `DeploymentQueue` work item:
   - Resolve the repository from `sp`.
-  - Set `Deploying`, then `Deployed` on success.
-  - Set `Failed` on an exception, written with `CancellationToken.None`.
-  - Leave `Deploying` when the run is detached on shutdown.
+  - Call `Start()`, then pass the executor's exit code or the caught exception to `ProcessDeploymentStatus`.
 - Check: `GET /deployments/{id}` goes Pending → Deploying → Deployed, and Failed for an unknown resource type.
 
 ## Phase 5 – M4: runner timeout → review

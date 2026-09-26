@@ -30,4 +30,13 @@ public sealed class DeploymentRepository : IDeploymentRepository
         return _dbContext.Deployments.AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
     }
+
+    public async Task<Deployment?> UpdateAsync(Deployment deployment,
+        CancellationToken cancellationToken = default)
+    {
+        var entry = _dbContext.Deployments.Update(deployment);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        entry.State = EntityState.Detached;
+        return deployment;
+    }
 }

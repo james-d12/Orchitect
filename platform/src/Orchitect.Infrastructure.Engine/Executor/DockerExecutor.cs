@@ -28,9 +28,21 @@ public sealed class DockerExecutor : IExecutor
         _configuration = configuration;
     }
 
-    public async Task ExecuteAsync(
+    public async Task<ExecutorResult> ExecuteAsync(
         ExecutorContext context,
         CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await RunAsync(context, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            return new ExecutorResult(null, exception);
+        }
+    }
+
+    private async Task<ExecutorResult> RunAsync(ExecutorContext context, CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
         activity?.SetTag("orchitect.run.id", context.RunId);
@@ -151,11 +163,14 @@ public sealed class DockerExecutor : IExecutor
 
             if (wait.StatusCode != 0)
             {
-                throw new InvalidOperationException(
-                    $"Runner '{context.RunId}' failed with exit code {wait.StatusCode}.");
+                _logger.LogWarning("Run {RunId} failed with exit code {ExitCode}.", context.RunId, wait.StatusCode);
+            }
+            else
+            {
+                _logger.LogInformation("Run {RunId} completed successfully.", context.RunId);
             }
 
-            _logger.LogInformation("Run {RunId} completed successfully.", context.RunId);
+            return new ExecutorResult(wait.StatusCode);
         }
         catch (OperationCanceledException exception) when (started && cancellationToken.IsCancellationRequested)
         {
