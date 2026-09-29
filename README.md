@@ -25,8 +25,8 @@ and [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) insta
 
 1. You will need to clone the repository from the master branch.
 2. Next you will need to go the ```platform``` sub-folder.
-3. Now, run the ```setup.sh``` script inside the ```./scripts``` folder. This will install the required global dotnet
-   tools like efcore.
+3. Now, run ```dotnet tool restore```. This will install the local dotnet tools defined in ```.config/dotnet-tools.json```
+   (EF Core, Stryker, SonarScanner).
 4. Next you can run the Aspire project, which will spin up the required Databases and services, so you can browse locally.
 
 # License

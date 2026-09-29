@@ -1,0 +1,40 @@
+meta {
+  name: Create Deployment
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{API_BASE_URL}}/deployments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "applicationId": {
+      "value": "{{APPLICATION_ID}}"
+    },
+    "environmentId": {
+      "value": "{{ENVIRONMENT_ID}}"
+    },
+    "commitId": {
+      "value": "a3ce136a19022106a23a9b8e56768dcf18523396"
+    }
+  }
+}
+
+script:post-response {
+  var id = res.body.id
+  bru.setEnvVar("DEPLOYMENT_ID", id, {})
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}

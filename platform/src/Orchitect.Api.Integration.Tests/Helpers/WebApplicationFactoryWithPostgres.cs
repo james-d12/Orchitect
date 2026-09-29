@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orchitect.Engine.Dispatch.Executor;
 using Testcontainers.PostgreSql;
 
 namespace Orchitect.Api.Integration.Tests.Helpers;
@@ -21,6 +25,13 @@ public sealed class WebApplicationFactoryWithPostgres : WebApplicationFactory<Pr
                 ["JwtOptions:Secret"] = "integration-test-jwt-secret-key-orchitect-platform",
                 ["EncryptionOptions:Key"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
             });
+        });
+
+        builder.ConfigureTestServices(services =>
+        {
+            var sweep = services.Single(d => d.ServiceType == typeof(IHostedService) &&
+                                             d.ImplementationType == typeof(RunnerContainerSweepService));
+            services.Remove(sweep);
         });
     }
 

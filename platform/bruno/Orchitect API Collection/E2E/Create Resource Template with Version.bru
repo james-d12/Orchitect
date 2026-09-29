@@ -1,0 +1,46 @@
+meta {
+  name: Create Resource Template with Version
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{API_BASE_URL}}/resource-templates/with-version
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "OrganisationId": {
+      "Value": "{{ORGANISATION_ID}}"
+    },
+    "Name": "Azure Storage Account",
+    "Type": "azure.storage-account",
+    "Description": "Azure Storage Account Terraform Module",
+    "Provider": 0,
+    "Version": "1.0.0",
+    "Source": {
+      "BaseUrl": "https://github.com/aztfm/terraform-azurerm-storage-account.git",
+      "FolderPath": "",
+      "Tag": ""
+    },
+    "Notes": "",
+    "State": 0
+  }
+}
+
+script:post-response {
+  var id = res.body.id
+  console.log("Resource Template Id: ", id)
+  bru.setEnvVar("RESOURCE_TEMPLATE_ID", id, {})
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

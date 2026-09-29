@@ -3,13 +3,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
-using Orchitect.Api.Queue;
 using Orchitect.Api.Shared;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
-using Orchitect.Infrastructure.Engine;
+using Orchitect.Engine.Dispatch.Queue;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
 
@@ -21,7 +19,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
 
     private sealed record CreateDeploymentResponse(Guid Id, string Status, Uri Location);
 
-    private static async Task<Results<Accepted<CreateDeploymentResponse>, BadRequest<string>, InternalServerError>>
+    private static async Task<Results<Accepted<CreateDeploymentResponse>, BadRequest<string>, Conflict<string>, InternalServerError>>
         HandleAsync(
             [FromBody]
             CreateDeploymentRequest request,
@@ -32,9 +30,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             [FromServices]
             IEnvironmentRepository environmentRepository,
             [FromServices]
-            IEngineOrchestrator engineOrchestrator,
-            [FromServices]
-            IBackgroundTaskQueueProcessor backgroundTaskQueueProcessor,
+            IDeploymentQueue deploymentQueue,
             HttpContext httpContext,
             CancellationToken cancellationToken)
     {
@@ -52,36 +48,42 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             return TypedResults.BadRequest($"Environment with Id: {request.EnvironmentId} does not exist.");
         }
 
+        var latest = await repository.GetLatestAsync(request.ApplicationId, request.EnvironmentId, cancellationToken);
+
+        if (latest is { IsActive: true })
+        {
+            return TypedResults.Conflict(
+                $"Deployment with Id: {latest.Id.Value} is still {latest.Status} for this application and environment.");
+        }
+
         var deployment = Orchitect.Domain.Engine.Deployment.Deployment.Create(request);
-        var deploymentResponse = await repository.CreateAsync(deployment, cancellationToken);
+        Orchitect.Domain.Engine.Deployment.Deployment? deploymentResponse;
+
+        try
+        {
+            deploymentResponse = await repository.CreateAsync(deployment, cancellationToken);
+        }
+        catch (ActiveDeploymentExistsException exception)
+        {
+            return TypedResults.Conflict(exception.Message);
+        }
 
         if (deploymentResponse is null)
         {
             return TypedResults.InternalServerError();
         }
 
-        // Capture IDs to pass to background work item (avoiding captured scoped dependencies)
-        var deploymentId = deploymentResponse.Id;
-        var applicationId = application.Id;
+        var deploymentRequest = new DeploymentQueueRequest(application.Id, deploymentResponse.Id);
 
-        await backgroundTaskQueueProcessor.QueueBackgroundWorkItemAsync(async (sp, ct) =>
+        try
         {
-            // Resolve scoped dependencies within the background service scope
-            var deploymentRepo = sp.GetRequiredService<IDeploymentRepository>();
-            var appRepo = sp.GetRequiredService<IApplicationRepository>();
-            var provisioner = sp.GetRequiredService<IEngineOrchestrator>();
-
-            var deployment = await deploymentRepo.GetByIdAsync(deploymentId, ct);
-            var app = await appRepo.GetByIdAsync(applicationId, ct);
-
-            if (deployment is null || app is null)
-            {
-                throw new InvalidOperationException(
-                    $"Deployment {deploymentId.Value} or Application {applicationId.Value} not found");
-            }
-
-            await provisioner.StartAsync(app, deployment, ct);
-        });
+            await deploymentQueue.QueueDeploymentTaskAsync(deploymentRequest, cancellationToken);
+        }
+        catch
+        {
+            await repository.UpdateAsync(deploymentResponse.Interrupt(), CancellationToken.None);
+            throw;
+        }
 
         var locationUrl =
             new Uri(

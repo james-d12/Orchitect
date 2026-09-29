@@ -16,8 +16,12 @@ internal sealed class DeploymentConfiguration : IEntityTypeConfiguration<Deploym
 
         builder.HasKey(d => d.Id);
 
-        builder.HasIndex(d => new { d.ApplicationId, d.EnvironmentId, d.CommitId, d.Status })
-            .IsUnique();
+        builder.HasIndex(d => new { d.ApplicationId, d.EnvironmentId, d.CreatedAt });
+
+        builder.HasIndex(d => new { d.ApplicationId, d.EnvironmentId })
+            .IsUnique()
+            .HasFilter("\"Status\" IN ('Pending', 'Deploying', 'Destroying')")
+            .HasDatabaseName(DeploymentIndexes.ActiveRun);
 
         builder.Property(d => d.Id)
             .HasConversion(

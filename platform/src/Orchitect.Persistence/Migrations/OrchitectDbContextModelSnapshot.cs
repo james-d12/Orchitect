@@ -18,7 +18,7 @@ namespace Orchitect.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.7")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -412,8 +412,12 @@ namespace Orchitect.Persistence.Migrations
 
                     b.HasIndex("EnvironmentId");
 
-                    b.HasIndex("ApplicationId", "EnvironmentId", "CommitId", "Status")
-                        .IsUnique();
+                    b.HasIndex("ApplicationId", "EnvironmentId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Deployments_ActiveRun")
+                        .HasFilter("\"Status\" IN ('Pending', 'Deploying', 'Destroying')");
+
+                    b.HasIndex("ApplicationId", "EnvironmentId", "CreatedAt");
 
                     b.ToTable("Deployments", (string)null);
                 });

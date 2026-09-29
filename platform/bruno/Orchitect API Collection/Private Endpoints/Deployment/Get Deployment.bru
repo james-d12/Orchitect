@@ -1,0 +1,21 @@
+meta {
+  name: Get Deployment
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{API_BASE_URL}}/deployments/{{DEPLOYMENT_ID}}
+  body: none
+  auth: inherit
+}
+
+vars:pre-request {
+  DEPLOYMENT_ID: cb64cc30-c14c-44cf-977a-0fe8fe7903a7
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
