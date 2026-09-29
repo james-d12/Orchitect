@@ -38,22 +38,22 @@ public sealed class DeploymentQueueTests
     [Theory]
     [InlineData(0, DeploymentStatus.Destroyed)]
     [InlineData(1, DeploymentStatus.Failed)]
-    public async Task WorkItem_Destroy_SetsDestroyingThenResult(long exitCode, DeploymentStatus expected)
+    public async Task WorkItem_Destroy_SetsResult(long exitCode, DeploymentStatus expected)
     {
-        var (deployment, repository, services) = Setup(Deployed());
+        var (deployment, repository, services) = Setup(Deployed().StartDestroy());
         var executor = new FakeExecutor { ExitCode = exitCode };
         var workItem = await QueueAsync(deployment, executor, operation: DeploymentOperation.Destroy);
 
         await workItem(services, CancellationToken.None);
 
-        Assert.Equal([DeploymentStatus.Destroying, expected], repository.Statuses);
+        Assert.Equal([expected], repository.Statuses);
         Assert.Equal(["--operation", "Destroy"], executor.Context!.Arguments.TakeLast(2));
     }
 
     [Fact]
-    public async Task WorkItem_DestroyWhenNotDestroyable_ThrowsWithoutExecuting()
+    public async Task WorkItem_DestroyWhenNotDestroying_ThrowsWithoutExecuting()
     {
-        var (deployment, repository, services) = Setup();
+        var (deployment, repository, services) = Setup(Deployed());
         var executor = new FakeExecutor();
         var workItem = await QueueAsync(deployment, executor, operation: DeploymentOperation.Destroy);
 

@@ -39,10 +39,19 @@ public sealed class DeploymentQueue : IDeploymentQueue
                              ?? throw new InvalidOperationException(
                                  $"Deployment '{request.DeploymentId.Value}' was not found.");
 
-            deployment = request.Operation == DeploymentOperation.Destroy
-                ? deployment.StartDestroy()
-                : deployment.Start();
-            await repository.UpdateAsync(deployment, ct);
+            if (request.Operation == DeploymentOperation.Destroy)
+            {
+                if (deployment.Status != DeploymentStatus.Destroying)
+                {
+                    throw new InvalidOperationException(
+                        $"Deployment '{deployment.Id.Value}' must be Destroying to run a destroy, but is {deployment.Status}.");
+                }
+            }
+            else
+            {
+                deployment = deployment.Start();
+                await repository.UpdateAsync(deployment, ct);
+            }
 
             var result = await ExecuteAsync(request, ct);
 

@@ -52,14 +52,25 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
                 $"Deployment with Id: {id} is not the latest deployment of its application to its environment.");
         }
 
+        var destroying = deployment.StartDestroy();
+
+        try
+        {
+            await repository.UpdateAsync(destroying, cancellationToken);
+        }
+        catch (ActiveDeploymentExistsException exception)
+        {
+            return TypedResults.Conflict(exception.Message);
+        }
+
         await deploymentQueue.QueueDeploymentTaskAsync(
-            new DeploymentQueueRequest(deployment.ApplicationId, deployment.Id, DeploymentOperation.Destroy),
+            new DeploymentQueueRequest(destroying.ApplicationId, destroying.Id, DeploymentOperation.Destroy),
             cancellationToken);
 
         var locationUrl =
-            new Uri($"{httpContext.Request.Scheme}://{httpContext.Request.Host}/deployments/{deployment.Id.Value}");
+            new Uri($"{httpContext.Request.Scheme}://{httpContext.Request.Host}/deployments/{destroying.Id.Value}");
 
         return TypedResults.Accepted(locationUrl,
-            new DestroyDeploymentResponse(deployment.Id.Value, deployment.Status.ToString(), locationUrl));
+            new DestroyDeploymentResponse(destroying.Id.Value, destroying.Status.ToString(), locationUrl));
     }
 }

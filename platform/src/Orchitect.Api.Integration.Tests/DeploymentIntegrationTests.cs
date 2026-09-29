@@ -82,10 +82,47 @@ public sealed class DeploymentIntegrationTests
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.NotNull(body);
         Assert.Equal(deployment.Id.Value, body.Id);
+        Assert.Equal(nameof(DeploymentStatus.Destroying), body.Status);
+        Assert.Equal(DeploymentStatus.Destroying, (await GetDeploymentAsync(deployment.Id)).Status);
         Assert.EndsWith($"{DeploymentsUrl}/{deployment.Id.Value}", response.Headers.Location?.ToString());
         var request = Assert.Single(_queue.Requests);
         Assert.Equal(new DeploymentQueueRequest(deployment.ApplicationId, deployment.Id, DeploymentOperation.Destroy),
             request);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenDestroyingTwice_ShouldQueueOnceAndReturn409ConflictForSecond()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deployed);
+
+        // Act
+        var first = await client.DeleteAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+        var second = await client.DeleteAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Single(_queue.Requests);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenCreatingDeploymentAfterDestroyRequested_ShouldReturn409Conflict()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deployed);
+        await client.DeleteAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+
+        // Act
+        var response = await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(deployment.ApplicationId, deployment.EnvironmentId,
+                new CommitId(_fixture.Create<string>())));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Single(_queue.Requests);
     }
 
     [Fact]
