@@ -49,9 +49,21 @@ public sealed record Deployment
         return WithStatus(DeploymentStatus.Deploying);
     }
 
+    public bool CanDestroy => Status is DeploymentStatus.Deployed or DeploymentStatus.Failed;
+
+    public Deployment StartDestroy()
+    {
+        if (!CanDestroy)
+        {
+            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot be destroyed while {Status}.");
+        }
+
+        return WithStatus(DeploymentStatus.Destroying);
+    }
+
     public Deployment ProcessDeploymentStatus(long? exitCode, Exception? exception)
     {
-        if (Status != DeploymentStatus.Deploying)
+        if (Status is not (DeploymentStatus.Deploying or DeploymentStatus.Destroying))
         {
             throw new InvalidOperationException(
                 $"Deployment '{Id.Value}' cannot process a run result while {Status}.");
@@ -66,7 +78,9 @@ public sealed record Deployment
         {
             OperationCanceledException => this,
             not null => WithStatus(DeploymentStatus.Failed),
-            null when exitCode == 0 => WithStatus(DeploymentStatus.Deployed),
+            null when exitCode == 0 => WithStatus(Status == DeploymentStatus.Destroying
+                ? DeploymentStatus.Destroyed
+                : DeploymentStatus.Deployed),
             null => WithStatus(DeploymentStatus.Failed)
         };
     }

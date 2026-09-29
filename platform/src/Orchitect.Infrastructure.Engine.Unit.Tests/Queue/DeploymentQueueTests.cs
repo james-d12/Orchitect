@@ -24,6 +24,47 @@ public sealed class DeploymentQueueTests
     }
 
     [Fact]
+    public async Task WorkItem_Provision_PassesProvisionOperation()
+    {
+        var (deployment, _, services) = Setup();
+        var executor = new FakeExecutor();
+        var workItem = await QueueAsync(deployment, executor);
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal(["--operation", "Provision"], executor.Context!.Arguments.TakeLast(2));
+    }
+
+    [Theory]
+    [InlineData(0, DeploymentStatus.Destroyed)]
+    [InlineData(1, DeploymentStatus.Failed)]
+    public async Task WorkItem_Destroy_SetsDestroyingThenResult(long exitCode, DeploymentStatus expected)
+    {
+        var (deployment, repository, services) = Setup(Deployed());
+        var executor = new FakeExecutor { ExitCode = exitCode };
+        var workItem = await QueueAsync(deployment, executor, operation: DeploymentOperation.Destroy);
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Destroying, expected], repository.Statuses);
+        Assert.Equal(["--operation", "Destroy"], executor.Context!.Arguments.TakeLast(2));
+    }
+
+    [Fact]
+    public async Task WorkItem_DestroyWhenNotDestroyable_ThrowsWithoutExecuting()
+    {
+        var (deployment, repository, services) = Setup();
+        var executor = new FakeExecutor();
+        var workItem = await QueueAsync(deployment, executor, operation: DeploymentOperation.Destroy);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await workItem(services, CancellationToken.None));
+
+        Assert.False(executor.Executed);
+        Assert.Empty(repository.Statuses);
+    }
+
+    [Fact]
     public async Task WorkItem_RunnerExitsNonZero_SetsDeployingThenFailed()
     {
         var (deployment, repository, services) = Setup();
@@ -94,9 +135,15 @@ public sealed class DeploymentQueueTests
         Assert.Empty(repository.Statuses);
     }
 
-    private static (Deployment, RecordingDeploymentRepository, IServiceProvider) Setup()
+    private static Deployment Deployed() =>
+        Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"))
+            .Start()
+            .ProcessDeploymentStatus(0, null);
+
+    private static (Deployment, RecordingDeploymentRepository, IServiceProvider) Setup(Deployment? existing = null)
     {
-        var deployment = Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"));
+        var deployment = existing ??
+                         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"));
         var repository = new RecordingDeploymentRepository { Deployment = deployment };
         var services = new ServiceCollection()
             .AddSingleton<IDeploymentRepository>(repository)
@@ -106,7 +153,8 @@ public sealed class DeploymentQueueTests
 
     private static async Task<Func<IServiceProvider, CancellationToken, ValueTask>> QueueAsync(
         Deployment deployment, IExecutor executor, ExecutorOptions? options = null,
-        IRunnerSecretTokenProvider? tokenProvider = null)
+        IRunnerSecretTokenProvider? tokenProvider = null,
+        DeploymentOperation operation = DeploymentOperation.Provision)
     {
         var processor = new CapturingQueueProcessor();
         var queue = new DeploymentQueue(processor, executor,
@@ -114,7 +162,7 @@ public sealed class DeploymentQueueTests
             tokenProvider ?? new StaticTokenProvider(new Dictionary<string, string>()),
             NullLogger<DeploymentQueue>.Instance);
 
-        await queue.QueueDeploymentTaskAsync(new DeploymentQueueRequest(deployment.ApplicationId, deployment.Id));
+        await queue.QueueDeploymentTaskAsync(new DeploymentQueueRequest(deployment.ApplicationId, deployment.Id, operation));
 
         return processor.WorkItem!;
     }
@@ -182,5 +230,8 @@ public sealed class DeploymentQueueTests
             throw new NotSupportedException();
 
         public IEnumerable<Deployment> GetAll() => throw new NotSupportedException();
+
+        public Task<Deployment?> GetLatestAsync(ApplicationId applicationId, EnvironmentId environmentId,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

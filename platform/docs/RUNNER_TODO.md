@@ -10,7 +10,7 @@ Items left over after the Runner review (`REVIEW_CODE.md`) and the first pass of
   2. loads the mapped secrets into its environment (`ISecretEnvironmentLoader`)
   3. calls `IEngineOrchestrator.StartAsync` or `DestroyAsync`, depending on `--operation`
 - Only these cross the boundary: the IDs (and `--operation provision|destroy`) as container args, non-secret env vars built by `ExecutorOptions.ToEnvironment()`, and a `/run/orchitect/secrets.json` copied into the container before it starts (connection string, Key Vault token, `Configuration`). The runner loads that file into its environment and deletes it at startup. The Runner resolves every concrete implementation through its own DI root. It registers only `AddEngineProvisioningServices()` and `AddRunnerServices()`; the queue, the Docker client and `ExecutorOptions` come from `AddEngineExecutionServices()`, which only the API calls.
-- Destroy is Runner-side only for now: run the image with `--operation destroy`. There is no API endpoint yet.
+- `DELETE /deployments/{id}` queues a run with `--operation Destroy`. Terraform state is per application/environment, so destroy tears down everything in it; only the latest deployment of an application to an environment can be destroyed, and only while it is `Deployed` or `Failed` (409 otherwise). The deployment moves to `Destroying`, then `Destroyed` or `Failed` (a failed destroy can be retried). The row is kept. `GET /deployments/{id}` returns the status.
 
 ## Build
 
@@ -98,7 +98,8 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
   - redeploy: plan shows no changes, proving the state survived
   - destroy: resources gone, state blob still there, `terraform state list` empty
 - [ ] Confirm the destroy command against real terraform. It now applies the saved destroy plan with `apply -auto-approve <plan>`, and so far only unit tests with a fake command line have exercised it.
-- [ ] API `DELETE /deployments/{id}` that queues a `--operation destroy` run.
+- [x] API `DELETE /deployments/{id}` that queues a `--operation Destroy` run, plus `GET /deployments/{id}` for the status.
+- [ ] The unique index on `Deployments (ApplicationId, EnvironmentId, CommitId, Status)` rejects a second row with the same commit and status, e.g. destroying the same commit twice (two `Destroyed` rows) or two failed runs of one commit. The status update then fails with a DB error and the deployment stays `Destroying`/`Deploying`. Fix: a migration that replaces it with a non-unique index on `(ApplicationId, EnvironmentId, CreatedAt)`, which also serves the latest-deployment query.
 
 ### 3. Deployment status
 - [x] `Deployment.Start()` moves a pending deployment to `Deploying`. `Deployment.ProcessDeploymentStatus(exitCode, exception)` takes the raw run result and decides the status: `Deployed`, `Failed`, or unchanged when the run was cancelled. `DeploymentQueue` only passes that data through, and `IExecutor` returns the runner's exit code instead of throwing on a non-zero exit (`Runner_Isolation_Fix_Plan.md`, M3).

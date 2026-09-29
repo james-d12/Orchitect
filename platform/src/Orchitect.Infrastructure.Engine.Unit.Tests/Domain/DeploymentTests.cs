@@ -93,8 +93,55 @@ public sealed class DeploymentTests
         Assert.Throws<InvalidOperationException>(() => finished.Start());
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void StartDestroy_DeployedOrFailed_BecomesDestroying(long exitCode)
+    {
+        var finished = Deploying().ProcessDeploymentStatus(exitCode, null);
+
+        Assert.True(finished.CanDestroy);
+        Assert.Equal(DeploymentStatus.Destroying, finished.StartDestroy().Status);
+    }
+
+    [Fact]
+    public void StartDestroy_NotFinished_Throws()
+    {
+        Assert.False(NewDeployment().CanDestroy);
+        Assert.Throws<InvalidOperationException>(() => NewDeployment().StartDestroy());
+        Assert.Throws<InvalidOperationException>(() => Deploying().StartDestroy());
+        Assert.Throws<InvalidOperationException>(() => Destroying().StartDestroy());
+        Assert.Throws<InvalidOperationException>(() => Destroying().ProcessDeploymentStatus(0, null).StartDestroy());
+    }
+
+    [Theory]
+    [InlineData(0, DeploymentStatus.Destroyed)]
+    [InlineData(1, DeploymentStatus.Failed)]
+    public void ProcessDeploymentStatus_Destroying_DecidesStatus(long exitCode, DeploymentStatus expected)
+    {
+        Assert.Equal(expected, Destroying().ProcessDeploymentStatus(exitCode, null).Status);
+    }
+
+    [Fact]
+    public void ProcessDeploymentStatus_DestroyingCancelled_Unchanged()
+    {
+        var destroying = Destroying();
+
+        Assert.Same(destroying, destroying.ProcessDeploymentStatus(null, new OperationCanceledException()));
+    }
+
+    [Fact]
+    public void StartDestroy_AfterFailedDestroy_CanRetry()
+    {
+        var failed = Destroying().ProcessDeploymentStatus(1, null);
+
+        Assert.Equal(DeploymentStatus.Destroying, failed.StartDestroy().Status);
+    }
+
     private static Deployment NewDeployment() =>
         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"));
 
     private static Deployment Deploying() => NewDeployment().Start();
+
+    private static Deployment Destroying() => Deploying().ProcessDeploymentStatus(0, null).StartDestroy();
 }

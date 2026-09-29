@@ -6,5 +6,7 @@ public enum DeploymentStatus
     Deploying,
     Deployed,
     Failed,
-    RolledBack
+    RolledBack,
+    Destroying,
+    Destroyed
 }

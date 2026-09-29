@@ -39,7 +39,9 @@ public sealed class DeploymentQueue : IDeploymentQueue
                              ?? throw new InvalidOperationException(
                                  $"Deployment '{request.DeploymentId.Value}' was not found.");
 
-            deployment = deployment.Start();
+            deployment = request.Operation == DeploymentOperation.Destroy
+                ? deployment.StartDestroy()
+                : deployment.Start();
             await repository.UpdateAsync(deployment, ct);
 
             var result = await ExecuteAsync(request, ct);
@@ -67,7 +69,8 @@ public sealed class DeploymentQueue : IDeploymentQueue
                 Arguments =
                 [
                     "--application-id", request.ApplicationId.Value.ToString(),
-                    "--deployment-id", request.DeploymentId.Value.ToString()
+                    "--deployment-id", request.DeploymentId.Value.ToString(),
+                    "--operation", request.Operation.ToString()
                 ],
                 Configuration = _executorOptions.ToEnvironment(),
                 Secrets = _executorOptions.Configuration.Concat(tokenEnvironment).ToDictionary(),

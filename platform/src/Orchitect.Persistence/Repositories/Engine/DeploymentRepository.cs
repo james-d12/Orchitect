@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Orchitect.Domain.Engine.Deployment;
+using Orchitect.Domain.Engine.Environment;
+using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Persistence.Repositories.Engine;
 
@@ -29,6 +31,15 @@ public sealed class DeploymentRepository : IDeploymentRepository
     {
         return _dbContext.Deployments.AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken: cancellationToken);
+    }
+
+    public Task<Deployment?> GetLatestAsync(ApplicationId applicationId, EnvironmentId environmentId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Deployments.AsNoTracking()
+            .Where(d => d.ApplicationId == applicationId && d.EnvironmentId == environmentId)
+            .OrderByDescending(d => d.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<Deployment?> UpdateAsync(Deployment deployment,
