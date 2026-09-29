@@ -1,3 +1,15 @@
+---
+title: "Runner review prompt"
+status: done
+workstream: runner
+milestone: "Runner Isolation"
+issues: []
+superseded_by: runner/Runner_Isolation_Branch_Review.md
+last_reviewed: 2026-09-29
+---
+
+> **Done: this prompt produced the reviews in `runner/`.**
+
 I want you to review the current Orchitect repository and reconstruct the architecture around the Runner system before suggesting any code changes.
 
 Do NOT assume the architecture from this prompt is complete. The repository is the source of truth.

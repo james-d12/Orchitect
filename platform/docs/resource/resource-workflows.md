@@ -1,3 +1,13 @@
+---
+title: "Resource lifecycle workflows"
+status: reference
+workstream: resource
+milestone: "Resource Domain"
+issues: [151, 152, 153, 154, 155, 156]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
 # Domain Models
 
 ## Resource

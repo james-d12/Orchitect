@@ -1,3 +1,13 @@
+---
+title: "High-level architecture"
+status: reference
+workstream: architecture
+milestone: "Docs & Architecture"
+issues: [180, 181, 182, 183]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
 # Orchitect Platform – High‑Level Architecture
 
 ## Overview

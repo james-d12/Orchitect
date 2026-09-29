@@ -1,3 +1,15 @@
+---
+title: "Resource domain – Phase 1 persistence gaps"
+status: done
+workstream: resource
+milestone: "Resource Domain"
+issues: [136, 137, 138, 139, 140]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
+> **Done: items 1–6 landed in `fdbdb89`. §7a, §7b, §8 and the Option B edges table are tracked as issues.**
+
 # Outstanding Work: Resource Domain — Persistence & Domain Gaps (Phase 1)
 
 ## Context

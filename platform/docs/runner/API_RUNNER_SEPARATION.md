@@ -1,3 +1,13 @@
+---
+title: "API / runner separation (target design)"
+status: active
+workstream: runner
+milestone: "Runner Isolation"
+issues: [102, 103, 105, 106]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
 # Orchitect Runner Architecture
 
 ## 1. Purpose
@@ -130,3 +140,4 @@ A Runner should have a simple lifecycle.
                        │
               ┌────────┴────────┐
 ```
+> **Incomplete:** the sections after the lifecycle diagram (auth, run manifest schema, status-reporting contract) are still to be written. See the Runner Isolation milestone.

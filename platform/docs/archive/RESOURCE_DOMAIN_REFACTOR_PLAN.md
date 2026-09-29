@@ -1,3 +1,15 @@
+---
+title: "Resource domain – Phase 1"
+status: done
+workstream: resource
+milestone: "Resource Domain"
+issues: [134, 135]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
+> **Done in `fdbdb89` (#88). The remaining items (ScoreDriver integration, tests) are tracked as issues.**
+
 # Plan: Refactor Engine Domain Models for Platform Orchestrator
 
 ## Context

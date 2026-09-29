@@ -1,3 +1,15 @@
+---
+title: "Early resource models"
+status: superseded
+workstream: resource
+milestone: "Resource Domain"
+issues: [157]
+superseded_by: resource/resource-workflows.md
+last_reviewed: 2026-09-29
+---
+
+> **Superseded: replaced by the Phase 1 Resource/ResourceInstance split; the content is duplicated in `resource/resource-workflows.md`.**
+
 # Domain Models
 
 ## Resource

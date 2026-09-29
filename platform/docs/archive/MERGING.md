@@ -1,3 +1,15 @@
+---
+title: "Product split idea (Platform / Inventory / Intelligence)"
+status: superseded
+workstream: architecture
+milestone: "Docs & Architecture"
+issues: []
+superseded_by: architecture/HIGH_LEVEL_ARCHITECTURE.md
+last_reviewed: 2026-09-29
+---
+
+> **Superseded (and unfinished): contradicts the Core + capabilities model in `architecture/HIGH_LEVEL_ARCHITECTURE.md`.**
+
 # Orchitect Architecture Summary
 
 This document summarizes the architectural insights and direction discussed regarding the evolution of Orchitect and related tooling.

@@ -1,3 +1,15 @@
+---
+title: "Resource provisioning isolation architecture"
+status: superseded
+workstream: runner
+milestone: "Runner Isolation"
+issues: [111, 112, 113, 121, 133]
+superseded_by: runner/API_RUNNER_SEPARATION.md
+last_reviewed: 2026-09-29
+---
+
+> **Superseded: the branch moved to one Docker container per run through `IExecutor`. The remaining ideas (cancel, logs, metrics, durable queue) are tracked as issues.**
+
 # Resource Provisioning Isolation Architecture
 
 **Date:** 2025-11-26

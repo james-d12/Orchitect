@@ -1,3 +1,13 @@
+---
+title: "Runner isolation branch review (code)"
+status: active
+workstream: runner
+milestone: "Runner Isolation"
+issues: [102, 104, 105, 108, 111, 114, 123, 124]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
 # Runner Isolation Branch Review
 
 Review of `feature/runner_isolation` against `master`, 2026-09-25.
@@ -14,37 +24,37 @@ Each finding also has a severity: 🔴 high, 🟡 medium, 🟢 low.
 
 ## Summary
 
-| # | Finding | Effort | Severity |
-|---|---|---|---|
-| E1 | Unknown `terraform plan` exit codes treated as success | Easy | 🔴 |
-| E2 | Resources silently skipped in the orchestrator, so Terraform plans to destroy them | Easy | 🔴 |
-| E3 | `terraform-config-inspect` diagnostics discarded; JSON parsing unguarded | Easy | 🔴 |
-| E4 | Runner log level hardcoded to Debug, leaking inputs into API logs | Easy | 🟡 |
-| E5 | Plan/apply arguments built by string interpolation (paths with spaces break) | Easy | 🟡 |
-| E6 | No `-lock-timeout`; `apply` missing `-input=false`; duplicate `RunDestroyAsync` | Easy | 🟢 |
-| E7 | `PreValidationFailed` exception drops the per-template reasons | Easy | 🟢 |
-| E8 | No container hardening (caps, no-new-privileges, limits, init) | Easy | 🟡 |
-| E9 | Container name collides after a detached run | Easy | 🟡 |
-| E10 | Connection string read from process env only; Npgsql aliases not handled | Easy | 🟡 |
-| E11 | Log streaming noise and an unawaited relay task | Easy | 🟢 |
-| E12 | Missing/empty score file exits 0 | Easy | 🟢 |
-| E13 | Validator: case-insensitive input names, recursive `variables.tf` search | Easy | 🟢 |
-| E14 | Stale names in validation messages and `RUNNER_TODO.md`; `Image` not validated | Easy | 🟢 |
-| E15 | Dockerfile: floating base tags, unsigned checksums, stages that fail on the legacy builder | Easy | 🟢 |
-| M1 | HCL injection through score-file values in `TerraformRenderer` | Medium | 🔴 |
-| M2 | No cancellation or SIGINT forwarding to Terraform (state locks left held) | Medium | 🟡 |
-| M3 | Deployment status never updated | Medium | 🟡 |
-| M4 | No overall timeout on runner containers | Medium | 🟡 |
-| M5 | Cancel race in `DockerExecutor` can kill Terraform mid-run or leak containers | Medium | 🟡 |
-| M6 | Backend config (possibly secrets) passed as CLI args | Medium | 🟡 |
-| M7 | Secrets passed as container env vars, readable via `docker inspect` | Medium | 🔴 |
-| M8 | Runner registers API-only services (queue, Docker client, executor options) | Medium | 🟢 |
-| M9 | No sweep for leftover `orchitect-runner-*` containers | Medium | 🟢 |
-| M10 | No Terraform provider plugin cache | Medium | 🟢 |
-| H1 | Runner holds the API's full DB credentials while running untrusted Terraform | Hard | 🔴 |
-| H2 | Key Vault token covers all of Key Vault, not just the mapped secrets | Hard | 🔴 |
-| H3 | Deployment queue is serial, blocking and in-memory | Hard | 🟡 |
-| H4 | Containerised API can't reach Docker; socket access is root-equivalent | Hard | 🟡 |
+| # | Finding | Effort | Severity | Status |
+|---|---|---|---|---|
+| E1 | Unknown `terraform plan` exit codes treated as success | Easy | 🔴 | Fixed (`214a3c0`) |
+| E2 | Resources silently skipped in the orchestrator, so Terraform plans to destroy them | Easy | 🔴 | Fixed (`214a3c0`) |
+| E3 | `terraform-config-inspect` diagnostics discarded; JSON parsing unguarded | Easy | 🔴 | Fixed (`214a3c0`) |
+| E4 | Runner log level hardcoded to Debug, leaking inputs into API logs | Easy | 🟡 | Fixed (`214a3c0`) |
+| E5 | Plan/apply arguments built by string interpolation (paths with spaces break) | Easy | 🟡 | Fixed (`214a3c0`) |
+| E6 | No `-lock-timeout`; `apply` missing `-input=false`; duplicate `RunDestroyAsync` | Easy | 🟢 | Fixed (`214a3c0`) |
+| E7 | `PreValidationFailed` exception drops the per-template reasons | Easy | 🟢 | Fixed (`214a3c0`) |
+| E8 | No container hardening (caps, no-new-privileges, limits, init) | Easy | 🟡 | Fixed (`214a3c0`) |
+| E9 | Container name collides after a detached run | Easy | 🟡 | Fixed (`214a3c0`) |
+| E10 | Connection string read from process env only; Npgsql aliases not handled | Easy | 🟡 | Fixed (`214a3c0`) |
+| E11 | Log streaming noise and an unawaited relay task | Easy | 🟢 | Fixed (`214a3c0`) |
+| E12 | Missing/empty score file exits 0 | Easy | 🟢 | Fixed (`214a3c0`) |
+| E13 | Validator: case-insensitive input names, recursive `variables.tf` search | Easy | 🟢 | Fixed (`214a3c0`) |
+| E14 | Stale names in validation messages and `RUNNER_TODO.md`; `Image` not validated | Easy | 🟢 | Fixed (`214a3c0`) |
+| E15 | Dockerfile: floating base tags, unsigned checksums, stages that fail on the legacy builder | Easy | 🟢 | Fixed (`214a3c0`) |
+| M1 | HCL injection through score-file values in `TerraformRenderer` | Medium | 🔴 | Fixed (see fix plan) |
+| M2 | No cancellation or SIGINT forwarding to Terraform (state locks left held) | Medium | 🟡 | Fixed (see fix plan) |
+| M3 | Deployment status never updated | Medium | 🟡 | Fixed (see fix plan) |
+| M4 | No overall timeout on runner containers | Medium | 🟡 | Fixed (see fix plan) |
+| M5 | Cancel race in `DockerExecutor` can kill Terraform mid-run or leak containers | Medium | 🟡 | Fixed (see fix plan) |
+| M6 | Backend config (possibly secrets) passed as CLI args | Medium | 🟡 | Fixed (see fix plan) |
+| M7 | Secrets passed as container env vars, readable via `docker inspect` | Medium | 🔴 | Fixed (see fix plan) |
+| M8 | Runner registers API-only services (queue, Docker client, executor options) | Medium | 🟢 | Fixed (see fix plan) |
+| M9 | No sweep for leftover `orchitect-runner-*` containers | Medium | 🟢 | Fixed (see fix plan) |
+| M10 | No Terraform provider plugin cache | Medium | 🟢 | Dropped (`624cccd`), #124 |
+| H1 | Runner holds the API's full DB credentials while running untrusted Terraform | Hard | 🔴 | Open, #102, #104, #105 |
+| H2 | Key Vault token covers all of Key Vault, not just the mapped secrets | Hard | 🔴 | Open, #108 |
+| H3 | Deployment queue is serial, blocking and in-memory | Hard | 🟡 | Partial (`73c8716`, `f53a43c`), #110, #111 |
+| H4 | Containerised API can't reach Docker; socket access is root-equivalent | Hard | 🟡 | Open, #114 |
 
 **Suggested order before merge:** E1, E2, E3, E4 and the rest of the Easy list, then M1 and M3. H1 and H2 need a design decision and can be tracked in `RUNNER_TODO.md`. Until then, don't point the runner at untrusted template repos or score files.
 
@@ -154,7 +164,7 @@ When the score file can't be parsed or has no resources, the orchestrator logs a
 
 ### E14. 🟢 Stale names and missing validation
 - `EngineInfrastructureExtensions.cs:69,71`: the validation messages say `RunnerOptions:`, but the section is now `ExecutorOptions`.
-- `docs/RUNNER_TODO.md` still refers to `DockerRunner`, `RunnerOptions`, `docker-configure.sh`, `ORCHITECT_CLOUD_PROVIDER` and the `orchitect-runner:azure-terraform` tag, which this branch removed or renamed. Several items in its §7 (Image) are now done: the separate Go stage and the pinned tool versions.
+- `docs/runner/RUNNER_TODO.md` still refers to `DockerRunner`, `RunnerOptions`, `docker-configure.sh`, `ORCHITECT_CLOUD_PROVIDER` and the `orchitect-runner:azure-terraform` tag, which this branch removed or renamed. Several items in its §7 (Image) are now done: the separate Go stage and the pinned tool versions.
 - `ExecutorOptions.Image` is `required`, but the configuration binder ignores `required` and there's no `[Required]`. A missing image is caught only when Docker is called. Add `[Required]`, or a `.Validate(o => !string.IsNullOrWhiteSpace(o.Image))`.
 
 ### E15. 🟢 Dockerfile tidy-ups

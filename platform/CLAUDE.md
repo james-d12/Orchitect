@@ -60,7 +60,7 @@ Stryker.NET is configured for mutation testing (see stryker-config.json). Bruno 
 
 ## Architecture
 
-The platform follows a hub-and-spoke model: **Core** at the center, **capabilities** radiate outward. See `docs/HIGH_LEVEL_ARCHITECTURE.md` for the full design rationale.
+The platform follows a hub-and-spoke model: **Core** at the center, **capabilities** radiate outward. See `docs/architecture/HIGH_LEVEL_ARCHITECTURE.md` for the full design rationale.
 
 ```
           Inventory
@@ -149,6 +149,10 @@ extension(IServiceCollection services)
 **Repository pattern**: Core and Engine use `IRepository<T, TId>` with concrete implementations. Inventory uses direct DbContext access (query-focused).
 
 **Endpoint groups**: `MapPrivateGroup()` for authenticated endpoints, `MapPublicGroup()` for anonymous.
+
+## Documentation
+
+Design docs live in `docs/`, grouped by workstream (`runner/`, `resource/`, `architecture/`), with finished or superseded docs in `docs/archive/`. `docs/README.md` is the index. Outstanding work is tracked as GitHub issues on `james-d12/Orchitect` (one milestone per workstream), and each doc lists its issues in YAML front matter. Use the `/orchitect-docs` skill to read, create or update docs so the docs, the index and the issues stay consistent.
 
 ## Development Patterns
 

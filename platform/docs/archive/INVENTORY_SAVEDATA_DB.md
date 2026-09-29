@@ -1,3 +1,15 @@
+---
+title: "Inventory discovery data persistence"
+status: done
+workstream: inventory
+milestone: "Inventory Discovery"
+issues: [160, 163, 168, 169, 170, 171, 172, 173]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
+> **Done (2dd7dcc, b1fe2e3 and later); the "Planning" status and checkboxes below are stale. Remaining gaps (org-scoped keys, teams, users, removals, tests) are tracked as issues.**
+
 # Inventory Discovery Data Persistence Plan
 
 **Status:** Planning

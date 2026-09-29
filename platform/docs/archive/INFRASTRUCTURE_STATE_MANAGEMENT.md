@@ -1,3 +1,15 @@
+---
+title: "Infrastructure state management & shared resources"
+status: superseded
+workstream: resource
+milestone: "Resource Domain"
+issues: [147, 148, 149, 150, 151]
+superseded_by: resource/RESOURCE_DOMAIN_REFACTOR_PLAN_PHASE_2.md
+last_reviewed: 2026-09-29
+---
+
+> **Superseded by the Phase 1/Phase 2 resource domain plans. The ideas they don't cover (output capture and substitution, resource endpoints, DAG teardown) are tracked as issues.**
+
 # Infrastructure State Management & Shared Resources
 
 **Date:** 2025-11-26

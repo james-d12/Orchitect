@@ -1,3 +1,15 @@
+---
+title: "Inventory integration configuration plan"
+status: superseded
+workstream: inventory
+milestone: "Inventory Discovery"
+issues: [162, 163, 164, 165, 166, 167]
+superseded_by: archive/DISCOVERY_CREDENTIAL_INTEGRATION_PLAN.md
+last_reviewed: 2026-09-29
+---
+
+> **Superseded by the discovery credential integration plan. The ideas still wanted (schedules, run history, overlap locking) are tracked as issues.**
+
 # Inventory Integration Configuration Plan
 
 ## Overview

@@ -1,3 +1,15 @@
+---
+title: "Credentials feature"
+status: done
+workstream: resource
+milestone: "Resource Domain"
+issues: [116, 158, 159]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
+> **Done for Core and Inventory. Using credentials in the Engine/Terraform is tracked as issues.**
+
 # Credentials Feature - Implementation Plan
 
 ## Context

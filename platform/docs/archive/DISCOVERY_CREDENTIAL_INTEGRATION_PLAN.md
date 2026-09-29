@@ -1,3 +1,15 @@
+---
+title: "Discovery credential integration"
+status: done
+workstream: inventory
+milestone: "Inventory Discovery"
+issues: [161, 173, 174, 175]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
+> **Done (581abad … 7b05242). The remaining items (trigger endpoint, tests, manual checks) are tracked as issues.**
+
 # Discovery Credential Integration Plan
 
 ## Overview

@@ -1,3 +1,15 @@
+---
+title: "Platform orchestrator conversation summary"
+status: superseded
+workstream: resource
+milestone: "Resource Domain"
+issues: []
+superseded_by: resource/RESOURCE_DOMAIN_REFACTOR_PLAN_PHASE_2.md
+last_reviewed: 2026-09-29
+---
+
+> **Superseded: Phase 1 deliberately removed StateLocation/Consumers.**
+
 Platform Orchestrator – Conversation Summary
 Goal
 

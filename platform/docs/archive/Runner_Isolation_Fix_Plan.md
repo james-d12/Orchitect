@@ -1,3 +1,15 @@
+---
+title: "Runner isolation fix plan (Easy + Medium)"
+status: done
+workstream: runner
+milestone: "Runner Isolation"
+issues: [124]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
+> **Done: E1–E15 and M1–M9 are fixed, M10 was dropped. The remaining findings (H1–H4, A1–A10) are tracked as issues from `runner/`.**
+
 # Runner Isolation – Fix Plan (Easy + Medium)
 
 ## Context

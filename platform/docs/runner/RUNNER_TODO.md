@@ -1,6 +1,16 @@
+---
+title: "Runner – outstanding work and operator guide"
+status: active
+workstream: runner
+milestone: "Runner Isolation"
+issues: [100, 104, 108, 111, 114, 125, 126, 127, 128, 129, 130, 131, 132]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
 # Runner – Outstanding Work
 
-Items left over after the Runner review (`REVIEW_CODE.md`) and the first pass of fixes on 2026-09-22. A second pass on 2026-09-23 added remote Terraform state, Runner-side secrets, Runner-side destroy and error reporting.
+Items left over after the Runner review (`../archive/REVIEW_CODE.md`) and the first pass of fixes on 2026-09-22. A second pass on 2026-09-23 added remote Terraform state, Runner-side secrets, Runner-side destroy and error reporting.
 
 ## Where things are
 
@@ -80,29 +90,29 @@ The Azure SDK never reads `ARM_*`, and Terraform never reads `AZURE_*`.
 
 ### 1. End-to-end run
 Setup is described in [Runner configuration](#runner-configuration). A real run needs `TerraformBackend:Mode = Remote`. With `Local`, the Runner logs a warning and the state is lost when the container is removed.
-- [ ] Set the user-secrets from the Azure example. The container reaches a host-local database through the `host-gateway` mapping that `DockerExecutor` adds.
-- [ ] Run a real deployment through Aspire (`dotnet run --project src/Orchitect.AppHost`, then POST a deployment via Bruno). Check that:
+- [ ] Set the user-secrets from the Azure example. The container reaches a host-local database through the `host-gateway` mapping that `DockerExecutor` adds. (#125)
+- [ ] Run a real deployment through Aspire (`dotnet run --project src/Orchitect.AppHost`, then POST a deployment via Bruno). Check that: (#125)
   - the runner output (relayed into the API logs by `DockerExecutor`) shows `terraform init` succeeding against the backend, which checks **backend auth** on its own
   - `plan`/`apply` succeed, which checks **provider auth** separately
   - `docker ps -a` has no leftover `orchitect-runner-*` containers
-- [ ] Run a failing deployment (bad commit, missing template or failing apply). The container should exit non-zero, and `DockerExecutor` should log the error and throw.
-- [ ] Point a `SecretProvider:Mappings` entry at a missing secret. The Runner should exit non-zero with an error naming the secret.
+- [ ] Run a failing deployment (bad commit, missing template or failing apply). The container should exit non-zero, and `DockerExecutor` should log the error and throw. (#126)
+- [ ] Point a `SecretProvider:Mappings` entry at a missing secret. The Runner should exit non-zero with an error naming the secret. (#126)
 
 ### 2. Terraform state persistence
 - [x] Render a partial `backend "<type>" {}` and pass `TerraformBackend:Config` via `terraform init -backend-config`. Works for any backend.
-- [x] Backend settings go in a 0600 `backend.tfbackend` file instead of `-backend-config=key=value` arguments, so secrets such as `access_key` or `sas_token` aren't visible in `ps` (`Runner_Isolation_Fix_Plan.md`, M6).
+- [x] Backend settings go in a 0600 `backend.tfbackend` file instead of `-backend-config=key=value` arguments, so secrets such as `access_key` or `sas_token` aren't visible in `ps` (`../archive/Runner_Isolation_Fix_Plan.md`, M6).
 - [x] Remove the "remnant files" check. With a remote backend the working directory (`/tmp/orchitect/terraform/<applicationId>/<environmentId>`) is recreated. Without one it is kept, because it holds the local state.
 - [x] Runner-side destroy (`--operation destroy`). It builds the same project and backend config as provision, so it uses the same state. Destroy never deletes the state itself.
-- [ ] End-to-end check against real Azure:
+- [ ] End-to-end check against real Azure: (#127)
   - deploy
   - redeploy: plan shows no changes, proving the state survived
   - destroy: resources gone, state blob still there, `terraform state list` empty
-- [ ] Confirm the destroy command against real terraform. It now applies the saved destroy plan with `apply -auto-approve <plan>`, and so far only unit tests with a fake command line have exercised it.
+- [ ] Confirm the destroy command against real terraform. It now applies the saved destroy plan with `apply -auto-approve <plan>`, and so far only unit tests with a fake command line have exercised it. (#127)
 - [x] API `DELETE /deployments/{id}` that queues a `--operation Destroy` run, plus `GET /deployments/{id}` for the status.
 - [x] The unique index on `Deployments (ApplicationId, EnvironmentId, CommitId, Status)` is gone, so a failed commit can be retried and the same commit destroyed twice. A partial unique index (`IX_Deployments_ActiveRun`) now allows only one `Pending`, `Deploying` or `Destroying` deployment per application/environment. `POST /deployments` returns 409 while one is active, and a race that gets past that check is caught from the index as `ActiveDeploymentExistsException`. A plain `(ApplicationId, EnvironmentId, CreatedAt)` index serves the latest-deployment query.
 
 ### 3. Deployment status
-- [x] `Deployment.Start()` moves a pending deployment to `Deploying`. `Deployment.ProcessDeploymentStatus(exitCode, exception)` takes the raw run result and decides the status: `Deployed`, `Failed`, or unchanged when the run was cancelled. `DeploymentQueue` only passes that data through, and `IExecutor` returns the runner's exit code instead of throwing on a non-zero exit (`Runner_Isolation_Fix_Plan.md`, M3).
+- [x] `Deployment.Start()` moves a pending deployment to `Deploying`. `Deployment.ProcessDeploymentStatus(exitCode, exception)` takes the raw run result and decides the status: `Deployed`, `Failed`, or unchanged when the run was cancelled. `DeploymentQueue` only passes that data through, and `IExecutor` returns the runner's exit code instead of throwing on a non-zero exit (`../archive/Runner_Isolation_Fix_Plan.md`, M3).
 
 ### 4. Secrets baked into the API image
 - [x] Remove the `ARG`/`ENV ARM_*` block from `src/Orchitect.Api/Dockerfile`.
@@ -112,28 +122,28 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
 - [x] `TerraformDriver.ApplyAsync`/`DestroyAsync` throw on a failed plan state or a non-zero terraform exit code, so the runner exits non-zero. Plan failures now carry terraform's stderr.
 - [x] `EngineOrchestrator` throws when the score file is missing, has no resources, or references a resource type with no template, so the run exits non-zero. A resource dropping out silently would otherwise be planned for destruction.
 - [x] When the API shuts down mid-run, `DockerExecutor` leaves the running container alone instead of force-removing it. SIGKILL would stop terraform mid-apply. The container now runs with an init process (`Init = true`). On SIGTERM the runner cancels its token and sends terraform SIGINT, giving it 5 minutes to exit before killing it. `ExecutorOptions:StopGracePeriod` (default 6 min) sets the container's stop timeout. The warning includes the container ID.
-- [x] On cancellation the executor inspects the container instead of trusting a `started` flag. It detaches only if the container is still running, and otherwise removes it. A run that exits just before shutdown keeps its exit code (`Runner_Isolation_Fix_Plan.md`, M5).
-- [x] Runs have an overall `ExecutorOptions:Timeout` (default 1h). On timeout the executor sends SIGTERM, waits up to `StopGracePeriod` for Terraform to shut down, removes the container, and the deployment becomes `Failed` (`Runner_Isolation_Fix_Plan.md`, M4).
-- [x] `RunnerContainerSweepService` in the API removes finished containers labelled `orchitect.runner=true` at startup and every 10 minutes, including the ones left running by a cancelled run once they exit. It only removes containers from an earlier API process or older than `Timeout + StopGracePeriod`, and it warns about running ones past that limit (`Runner_Isolation_Fix_Plan.md`, M9).
+- [x] On cancellation the executor inspects the container instead of trusting a `started` flag. It detaches only if the container is still running, and otherwise removes it. A run that exits just before shutdown keeps its exit code (`../archive/Runner_Isolation_Fix_Plan.md`, M5).
+- [x] Runs have an overall `ExecutorOptions:Timeout` (default 1h). On timeout the executor sends SIGTERM, waits up to `StopGracePeriod` for Terraform to shut down, removes the container, and the deployment becomes `Failed` (`../archive/Runner_Isolation_Fix_Plan.md`, M4).
+- [x] `RunnerContainerSweepService` in the API removes finished containers labelled `orchitect.runner=true` at startup and every 10 minutes, including the ones left running by a cancelled run once they exit. It only removes containers from an earlier API process or older than `Timeout + StopGracePeriod`, and it warns about running ones past that limit (`../archive/Runner_Isolation_Fix_Plan.md`, M9).
 - [x] Deployments left active by an earlier API process are reconciled by `RunnerContainerSweepService` at startup and every 10 minutes, before it removes containers. `Pending` becomes `Failed`, because its queued work was lost. `Deploying`/`Destroying` takes the exit code of its runner container (label `orchitect.run-id`) once that container has exited, stays active while it is still running, and becomes `Failed` when there is no container or it never exited cleanly. Only deployments last updated before the API started are touched, so runs this process owns are left alone. It assumes a single API instance (H3).
 - [x] The Engine now uses `Docker.DotNet.Enhanced` 4.3 (the maintained fork, and the one Testcontainers uses) instead of `Docker.DotNet` 3.125, which clashed with it in the integration-test host because both ship an assembly named `Docker.DotNet`. The client is built with `DockerClientBuilder`, which resolves the endpoint like the `docker` CLI (`DOCKER_HOST`, then the current context). The integration-test host removes `RunnerContainerSweepService`, so a test run never touches runner containers on the developer's Docker daemon.
-- [ ] `--help` fails without a connection string, because `AddPersistenceServices` reads it eagerly. Invalid `SecretProvider` config also fails it, because `AddRunnerServices` validates at startup. This is minor. Defer the reads, or accept it.
+- [ ] `--help` fails without a connection string, because `AddPersistenceServices` reads it eagerly. Invalid `SecretProvider` config also fails it, because `AddRunnerServices` validates at startup. This is minor. Defer the reads, or accept it. (#128)
 
 ### 6. Unused abstractions (decide: wire up or delete)
 - [x] `ISecretProvider` / `AzureKeyVaultSecretProvider`: registered in the Runner only, through `AddRunnerServices`, and selected by `SecretProvider:Type`. Adding a provider means a new `SecretProviderType` value, its options section and a `case` in `AddRunnerServices`.
-- [ ] `IStorageProvider` / `FileSystemStorageProvider` (deferred): the plan is a stream-based `IStorageProvider` with a Blob implementation for plan artifacts. It is not needed for state, because Terraform's backend owns that. Plan files can contain secrets, so decide on retention and access first. `GetAsync<TOut>` still returns `Task`, not `Task<TOut>`.
-- [ ] Helm driver/validator/parser are registered, but there is no Helm `IProvisioner`.
+- [ ] `IStorageProvider` / `FileSystemStorageProvider` (deferred): the plan is a stream-based `IStorageProvider` with a Blob implementation for plan artifacts. It is not needed for state, because Terraform's backend owns that. Plan files can contain secrets, so decide on retention and access first. `GetAsync<TOut>` still returns `Task`, not `Task<TOut>`. (#129)
+- [ ] Helm driver/validator/parser are registered, but there is no Helm `IProvisioner`. (#100)
 
 ### 7. Image (optional)
 - [x] Build `terraform-config-inspect` in a separate Go stage and copy the binary across.
 - [x] Pin tool versions (Terraform, Helm, `terraform-config-inspect`) and base images, with checksum and signature verification.
-- [ ] Fill in the `iac-opentofu` and `iac-pulumi` stages in the Dockerfile. They are stubs that fail the build when selected.
-- [ ] Image selection is a single `ExecutorOptions:Image`. When more cloud/IaC combinations are needed, derive the tag from the environment/templates.
+- [ ] Fill in the `iac-opentofu` and `iac-pulumi` stages in the Dockerfile. They are stubs that fail the build when selected. (#130, #131)
+- [ ] Image selection is a single `ExecutorOptions:Image`. When more cloud/IaC combinations are needed, derive the tag from the environment/templates. (#132)
 
 ### 8. Design issues (Hard, from `Runner_Isolation_Branch_Review.md`)
-- [ ] **H1** The runner holds the API's full DB credentials while running untrusted Terraform. First step: a dedicated Postgres role with `SELECT` on the engine tables. Proper fix: the API passes a run manifest and the runner never touches the database.
-- [ ] **H2** The Key Vault token covers every vault and secret the API's identity can read. Resolve only the mapped secrets in the API, use a runner-only vault, or give the runner its own least-privilege identity.
-- [ ] **H3** The deployment queue is serial, blocking and in-memory. Needs a durable queue, bounded concurrency and non-blocking enqueue. One run per application/environment is already enforced by `IX_Deployments_ActiveRun`. Queued work is still lost on restart: `RunnerContainerSweepService` marks those deployments `Failed` instead of running them.
-- [ ] **H4** A containerised API can't reach Docker, and mounting the socket is root-equivalent. Options: rootless Docker/Podman, a remote Docker host, a small job-launcher service, or a platform-native `IExecutor` (Kubernetes Jobs, Container Apps Jobs, ECS).
+- [ ] **H1** The runner holds the API's full DB credentials while running untrusted Terraform. First step: a dedicated Postgres role with `SELECT` on the engine tables. Proper fix: the API passes a run manifest and the runner never touches the database. (#102, #104, #105)
+- [ ] **H2** The Key Vault token covers every vault and secret the API's identity can read. Resolve only the mapped secrets in the API, use a runner-only vault, or give the runner its own least-privilege identity. (#108)
+- [ ] **H3** The deployment queue is serial, blocking and in-memory. Needs a durable queue, bounded concurrency and non-blocking enqueue. One run per application/environment is already enforced by `IX_Deployments_ActiveRun`. Queued work is still lost on restart: `RunnerContainerSweepService` marks those deployments `Failed` instead of running them. (#110, #111)
+- [ ] **H4** A containerised API can't reach Docker, and mounting the socket is root-equivalent. Options: rootless Docker/Podman, a remote Docker host, a small job-launcher service, or a platform-native `IExecutor` (Kubernetes Jobs, Container Apps Jobs, ECS). (#114)
 
 Until H1 and H2 are fixed, don't point the runner at untrusted template repositories or score files.
