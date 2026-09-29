@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orchitect.Domain.Engine.Deployment;
 
 namespace Orchitect.Infrastructure.Engine.Executor;
 
@@ -11,6 +12,7 @@ public sealed class RunnerContainerSweepService : BackgroundService
 {
     private static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(10);
     private static readonly string[] FinishedStates = ["exited", "created", "dead"];
+    private const string ExitedState = "exited";
 
     private readonly IServiceProvider _serviceProvider;
     private readonly ExecutorOptions _options;
@@ -63,6 +65,8 @@ public sealed class RunnerContainerSweepService : BackgroundService
             },
             cancellationToken);
 
+        var unreconciled = await ReconcileDeploymentsAsync(docker, containers, cancellationToken);
+
         var limit = _options.Timeout + _options.StopGracePeriod;
         var overdueBefore = DateTime.UtcNow - limit;
         var removeBefore = overdueBefore > _startedAt ? overdueBefore : _startedAt;
@@ -75,7 +79,8 @@ public sealed class RunnerContainerSweepService : BackgroundService
 
             if (FinishedStates.Contains(container.State, StringComparer.OrdinalIgnoreCase))
             {
-                if (created < removeBefore && await RemoveAsync(docker, container.ID, cancellationToken))
+                if (created < removeBefore && !unreconciled.Contains(GetRunId(container) ?? string.Empty) &&
+                    await RemoveAsync(docker, container.ID, cancellationToken))
                 {
                     removed++;
                 }
@@ -97,6 +102,73 @@ public sealed class RunnerContainerSweepService : BackgroundService
                 "Runner container sweep removed {RemovedCount} containers and found {OverrunCount} still running past their timeout.",
                 removed, overrun);
         }
+    }
+
+    private async Task<HashSet<string>> ReconcileDeploymentsAsync(
+        IDockerClient docker,
+        IList<ContainerListResponse> containers,
+        CancellationToken cancellationToken)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
+        var deployments = await repository.GetActiveAsync(_startedAt, cancellationToken);
+        var unreconciled = new HashSet<string>();
+
+        foreach (var deployment in deployments)
+        {
+            var runId = deployment.Id.Value.ToString();
+            var container = containers.Where(c => GetRunId(c) == runId).MaxBy(c => c.Created);
+
+            try
+            {
+                var reconciled = await ReconcileAsync(docker, deployment, container, cancellationToken);
+
+                if (reconciled is null)
+                {
+                    unreconciled.Add(runId);
+                    continue;
+                }
+
+                await repository.UpdateAsync(reconciled, cancellationToken);
+
+                _logger.LogInformation(
+                    "Deployment {DeploymentId} was left {PreviousStatus} by an earlier API process and is now {Status}.",
+                    runId, deployment.Status, reconciled.Status);
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                unreconciled.Add(runId);
+                _logger.LogWarning(exception, "Failed to reconcile deployment {DeploymentId} left {Status}.",
+                    runId, deployment.Status);
+            }
+        }
+
+        return unreconciled;
+    }
+
+    private static async Task<Deployment?> ReconcileAsync(
+        IDockerClient docker,
+        Deployment deployment,
+        ContainerListResponse? container,
+        CancellationToken cancellationToken)
+    {
+        if (deployment.Status == DeploymentStatus.Pending || container is null)
+        {
+            return deployment.Interrupt();
+        }
+
+        if (!FinishedStates.Contains(container.State, StringComparer.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (!string.Equals(container.State, ExitedState, StringComparison.OrdinalIgnoreCase))
+        {
+            return deployment.Interrupt();
+        }
+
+        var inspect = await docker.Containers.InspectContainerAsync(container.ID, cancellationToken);
+        return deployment.ProcessDeploymentStatus(inspect.State.ExitCode, null);
     }
 
     private static string? GetRunId(ContainerListResponse container) =>

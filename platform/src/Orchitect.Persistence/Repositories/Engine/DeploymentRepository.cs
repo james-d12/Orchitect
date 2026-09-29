@@ -54,6 +54,15 @@ public sealed class DeploymentRepository : IDeploymentRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Deployment>> GetActiveAsync(DateTime updatedBefore,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Deployments.AsNoTracking()
+            .Where(d => (d.Status == DeploymentStatus.Pending || d.Status == DeploymentStatus.Deploying ||
+                         d.Status == DeploymentStatus.Destroying) && d.UpdatedAt < updatedBefore)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Deployment?> UpdateAsync(Deployment deployment,
         CancellationToken cancellationToken = default)
     {

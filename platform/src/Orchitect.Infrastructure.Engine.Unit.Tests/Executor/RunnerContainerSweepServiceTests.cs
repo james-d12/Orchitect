@@ -5,7 +5,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using Orchitect.Domain.Engine.Deployment;
+using Orchitect.Domain.Engine.Environment;
 using Orchitect.Infrastructure.Engine.Executor;
+using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Infrastructure.Engine.Unit.Tests.Executor;
 
@@ -15,6 +18,7 @@ public sealed class RunnerContainerSweepServiceTests
     private static readonly TimeSpan StopGracePeriod = TimeSpan.FromMinutes(6);
 
     private readonly IContainerOperations _containers = Substitute.For<IContainerOperations>();
+    private readonly IDeploymentRepository _deployments = Substitute.For<IDeploymentRepository>();
     private readonly RunnerContainerSweepService _service;
 
     public RunnerContainerSweepServiceTests()
@@ -23,7 +27,7 @@ public sealed class RunnerContainerSweepServiceTests
         docker.Containers.Returns(_containers);
 
         _service = new RunnerContainerSweepService(
-            new ServiceCollection().AddSingleton(docker).BuildServiceProvider(),
+            new ServiceCollection().AddSingleton(docker).AddSingleton(_deployments).BuildServiceProvider(),
             Options.Create(new ExecutorOptions
             {
                 Image = "orchitect-runner:test",
@@ -31,6 +35,118 @@ public sealed class RunnerContainerSweepServiceTests
                 StopGracePeriod = StopGracePeriod
             }),
             NullLogger<RunnerContainerSweepService>.Instance);
+
+        SetActiveDeployments();
+    }
+
+    [Fact]
+    public async Task SweepAsync_ReadsDeploymentsLeftActiveBeforeStartup()
+    {
+        var before = DateTime.UtcNow;
+        SetContainers();
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await _deployments.Received(1).GetActiveAsync(Arg.Is<DateTime>(d => d <= before), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SweepAsync_PendingDeploymentFromEarlierProcess_IsFailed()
+    {
+        var deployment = NewDeployment();
+        SetActiveDeployments(deployment);
+        SetContainers();
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Failed);
+    }
+
+    [Theory]
+    [InlineData(0, DeploymentStatus.Deployed)]
+    [InlineData(1, DeploymentStatus.Failed)]
+    public async Task SweepAsync_DeployingWithExitedContainer_AppliesExitCodeThenRemovesContainer(long exitCode,
+        DeploymentStatus expected)
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), deployment.Id));
+        _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
+            .Returns(new ContainerInspectResponse { State = new ContainerState { ExitCode = exitCode } });
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, expected);
+        await AssertRemovedAsync("old");
+    }
+
+    [Fact]
+    public async Task SweepAsync_DestroyingWithExitedContainer_BecomesDestroyed()
+    {
+        var deployment = NewDeployment().Start().ProcessDeploymentStatus(0, null).StartDestroy();
+        SetActiveDeployments(deployment);
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), deployment.Id));
+        _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
+            .Returns(new ContainerInspectResponse { State = new ContainerState { ExitCode = 0 } });
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Destroyed);
+    }
+
+    [Theory]
+    [InlineData("created")]
+    [InlineData("dead")]
+    public async Task SweepAsync_DeployingWithContainerThatNeverExitedCleanly_IsFailed(string state)
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers(Container("old", state, DateTime.UtcNow.AddMinutes(-1), deployment.Id));
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Failed);
+        await _containers.DidNotReceive().InspectContainerAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SweepAsync_DeployingWithoutContainer_IsFailed()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers();
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Failed);
+    }
+
+    [Fact]
+    public async Task SweepAsync_DeployingWithRunningContainer_IsLeftActive()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers(Container("running", "running", DateTime.UtcNow.AddMinutes(-1), deployment.Id));
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await _deployments.DidNotReceive().UpdateAsync(Arg.Any<Deployment>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SweepAsync_ReconcileFails_KeepsContainerAndContinues()
+    {
+        var failing = NewDeployment().Start();
+        var pending = NewDeployment();
+        SetActiveDeployments(failing, pending);
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), failing.Id));
+        _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
+            .ThrowsAsync(new DockerApiException(System.Net.HttpStatusCode.InternalServerError, "boom"));
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertNotRemovedAsync();
+        await AssertUpdatedAsync(pending.Id, DeploymentStatus.Failed);
     }
 
     [Theory]
@@ -111,13 +227,29 @@ public sealed class RunnerContainerSweepServiceTests
         await AssertRemovedAsync("old");
     }
 
-    private static ContainerListResponse Container(string id, string state, DateTime created) => new()
+    private static ContainerListResponse Container(string id, string state, DateTime created,
+        DeploymentId? runId = null) => new()
     {
         ID = id,
         State = state,
         Created = created,
-        Labels = new Dictionary<string, string> { ["orchitect.runner"] = "true", ["orchitect.run-id"] = "run-1" }
+        Labels = new Dictionary<string, string>
+        {
+            ["orchitect.runner"] = "true",
+            ["orchitect.run-id"] = runId?.Value.ToString() ?? "run-1"
+        }
     };
+
+    private static Deployment NewDeployment() =>
+        Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"));
+
+    private void SetActiveDeployments(params Deployment[] deployments) =>
+        _deployments.GetActiveAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(deployments);
+
+    private Task AssertUpdatedAsync(DeploymentId id, DeploymentStatus status) =>
+        _deployments.Received(1).UpdateAsync(Arg.Is<Deployment>(d => d.Id == id && d.Status == status),
+            Arg.Any<CancellationToken>());
 
     private void SetContainers(params ContainerListResponse[] containers) =>
         _containers.ListContainersAsync(Arg.Any<ContainersListParameters>(), Arg.Any<CancellationToken>())

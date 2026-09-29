@@ -149,6 +149,21 @@ public sealed class DeploymentTests
         Assert.False(Destroying().ProcessDeploymentStatus(0, null).IsActive);
     }
 
+    [Fact]
+    public void Interrupt_Active_BecomesFailed()
+    {
+        Assert.Equal(DeploymentStatus.Failed, NewDeployment().Interrupt().Status);
+        Assert.Equal(DeploymentStatus.Failed, Deploying().Interrupt().Status);
+        Assert.Equal(DeploymentStatus.Failed, Destroying().Interrupt().Status);
+    }
+
+    [Fact]
+    public void Interrupt_Finished_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => Deploying().ProcessDeploymentStatus(0, null).Interrupt());
+        Assert.Throws<InvalidOperationException>(() => Deploying().ProcessDeploymentStatus(1, null).Interrupt());
+    }
+
     private static Deployment NewDeployment() =>
         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"));
 

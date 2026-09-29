@@ -13,4 +13,10 @@ public interface IDeploymentRepository : IRepository<Deployment, DeploymentId>
     /// </summary>
     Task<Deployment?> GetLatestAsync(ApplicationId applicationId, EnvironmentId environmentId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the deployments that are pending or running and were last updated before a point in time.
+    /// </summary>
+    Task<IReadOnlyList<Deployment>> GetActiveAsync(DateTime updatedBefore,
+        CancellationToken cancellationToken = default);
 }

@@ -228,6 +228,36 @@ public sealed class DeploymentIntegrationTests
             UpdateDeploymentAsync(deployed.StartDestroy()));
     }
 
+    [Fact]
+    public async Task DeploymentRepository_WhenGettingActive_ShouldReturnOnlyActiveUpdatedBefore()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var pending = await SeedDeploymentAsync(client, DeploymentStatus.Pending);
+        var deploying = await SeedDeploymentAsync(client, DeploymentStatus.Deploying);
+        var destroying = await SeedDeploymentAsync(client, DeploymentStatus.Destroying);
+        var deployed = await SeedDeploymentAsync(client, DeploymentStatus.Deployed);
+        var failed = await SeedDeploymentAsync(client, DeploymentStatus.Failed);
+        var cutoff = DateTime.UtcNow;
+        var later = await SeedDeploymentAsync(client, DeploymentStatus.Pending);
+
+        // Act
+        IReadOnlyList<Deployment> active;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            active = await scope.ServiceProvider.GetRequiredService<IDeploymentRepository>().GetActiveAsync(cutoff);
+        }
+
+        // Assert
+        var ids = active.Select(d => d.Id).ToHashSet();
+        Assert.Contains(pending.Id, ids);
+        Assert.Contains(deploying.Id, ids);
+        Assert.Contains(destroying.Id, ids);
+        Assert.DoesNotContain(deployed.Id, ids);
+        Assert.DoesNotContain(failed.Id, ids);
+        Assert.DoesNotContain(later.Id, ids);
+    }
+
     private async Task<(ApplicationId, EnvironmentId)> SeedApplicationAndEnvironmentAsync(HttpClient client)
     {
         var organisation = await client.CreateOrganisationAsync();

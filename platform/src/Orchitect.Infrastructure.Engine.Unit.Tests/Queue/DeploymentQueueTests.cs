@@ -233,5 +233,8 @@ public sealed class DeploymentQueueTests
 
         public Task<Deployment?> GetLatestAsync(ApplicationId applicationId, EnvironmentId environmentId,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Deployment>> GetActiveAsync(DateTime updatedBefore,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

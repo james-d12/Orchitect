@@ -64,6 +64,16 @@ public sealed record Deployment
         return WithStatus(DeploymentStatus.Destroying);
     }
 
+    public Deployment Interrupt()
+    {
+        if (!IsActive)
+        {
+            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot be interrupted while {Status}.");
+        }
+
+        return WithStatus(DeploymentStatus.Failed);
+    }
+
     public Deployment ProcessDeploymentStatus(long? exitCode, Exception? exception)
     {
         if (Status is not (DeploymentStatus.Deploying or DeploymentStatus.Destroying))
