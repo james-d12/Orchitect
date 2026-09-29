@@ -9,7 +9,7 @@ using Orchitect.Infrastructure.Engine.Executor;
 
 namespace Orchitect.Infrastructure.Engine.Unit.Tests.Executor;
 
-public sealed class DockerExecutorTests
+public sealed class DockerExecutorTests : IDisposable
 {
     private const string ContainerId = "0123456789abcdef";
 
@@ -45,6 +45,8 @@ public sealed class DockerExecutorTests
 
         _executor = new DockerExecutor(NullLogger<DockerExecutor>.Instance, docker, configuration);
     }
+
+    public void Dispose() => _cancellation.Dispose();
 
     [Theory]
     [InlineData(0)]
@@ -105,7 +107,7 @@ public sealed class DockerExecutorTests
 
         var result = await ExecuteAsync();
 
-        Assert.IsAssignableFrom<OperationCanceledException>(result.Exception);
+        Assert.IsType<OperationCanceledException>(result.Exception, exactMatch: false);
         await AssertNotRemovedAsync();
     }
 
@@ -118,7 +120,7 @@ public sealed class DockerExecutorTests
 
         var result = await ExecuteAsync();
 
-        Assert.IsAssignableFrom<OperationCanceledException>(result.Exception);
+        Assert.IsType<OperationCanceledException>(result.Exception, exactMatch: false);
         await AssertRemovedAsync();
     }
 
@@ -130,7 +132,7 @@ public sealed class DockerExecutorTests
 
         var result = await ExecuteAsync();
 
-        Assert.IsAssignableFrom<OperationCanceledException>(result.Exception);
+        Assert.IsType<OperationCanceledException>(result.Exception, exactMatch: false);
         await AssertNotRemovedAsync();
     }
 
@@ -190,7 +192,7 @@ public sealed class DockerExecutorTests
 
         var result = await ExecuteAsync();
 
-        Assert.IsAssignableFrom<OperationCanceledException>(result.Exception);
+        Assert.IsType<OperationCanceledException>(result.Exception, exactMatch: false);
         await AssertNotRemovedAsync();
     }
 
@@ -249,6 +251,13 @@ public sealed class DockerExecutorTests
 
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count,
             CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return 0;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
         {
             await Task.Delay(Timeout.Infinite, cancellationToken);
             return 0;

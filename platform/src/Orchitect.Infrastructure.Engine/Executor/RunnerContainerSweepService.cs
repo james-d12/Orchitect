@@ -190,9 +190,9 @@ public sealed class RunnerContainerSweepService : BackgroundService
             _logger.LogInformation("Removed leftover runner container {ContainerId}.", containerId);
             return true;
         }
-        catch (DockerContainerNotFoundException)
+        catch (DockerContainerNotFoundException exception)
         {
-            _logger.LogDebug("Leftover runner container {ContainerId} was already removed.", containerId);
+            _logger.LogDebug(exception, "Leftover runner container {ContainerId} was already removed.", containerId);
             return false;
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)

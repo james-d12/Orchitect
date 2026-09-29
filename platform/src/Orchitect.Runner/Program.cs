@@ -93,7 +93,7 @@ rootCommand.SetAction(async (parseResult, cancellationToken) =>
             await orchestrator.DestroyAsync(application, deployment, cancellationToken);
             break;
         default:
-            throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unsupported runner operation.");
+            throw new InvalidOperationException($"Unsupported runner operation '{operation}'.");
     }
 });
 

@@ -106,8 +106,8 @@ public sealed class TerraformProjectBuilderTests
         Assert.True(File.Exists(Path.Combine(second.WorkingDirectory, "main.tf.json")));
     }
 
-    public static TheoryData<TerraformBackendOptions> InvalidBackends => new()
-    {
+    public static TheoryData<TerraformBackendOptions> InvalidBackends =>
+    [
         new TerraformBackendOptions { Mode = TerraformBackendMode.Remote, Type = "s3" },
         new TerraformBackendOptions
         {
@@ -120,10 +120,10 @@ public sealed class TerraformProjectBuilderTests
             Mode = TerraformBackendMode.Local,
             Config = new Dictionary<string, string> { ["key"] = "state" }
         }
-    };
+    ];
 
     [Theory]
-    [MemberData(nameof(InvalidBackends))]
+    [MemberData(nameof(InvalidBackends), DisableDiscoveryEnumeration = true)]
     public async Task BuildProjectAsync_InvalidBackend_Throws(TerraformBackendOptions backendOptions)
     {
         var builder = CreateBuilder(backendOptions);

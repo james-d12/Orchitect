@@ -94,7 +94,7 @@ public sealed record Deployment
             null when exitCode == 0 => WithStatus(Status == DeploymentStatus.Destroying
                 ? DeploymentStatus.Destroyed
                 : DeploymentStatus.Deployed),
-            null => WithStatus(DeploymentStatus.Failed)
+            _ => WithStatus(DeploymentStatus.Failed)
         };
     }
 

@@ -7,9 +7,18 @@ DOCS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../docs" && pwd)"
 README="$DOCS_DIR/README.md"
 problems=0
 
-report() { echo "  - $1"; problems=$((problems + 1)); }
+report() {
+  local message="$1"
+  echo "  - $message"
+  problems=$((problems + 1))
+  return 0
+}
 
-field() { awk -v k="$2" 'NR==1&&$0!="---"{exit} NR>1&&$0=="---"{exit} NR>1{ if (index($0, k":")==1) { sub(k":[ ]*",""); print; exit } }' "$1"; }
+field() {
+  local file="$1" key="$2"
+  awk -v k="$key" 'NR==1&&$0!="---"{exit} NR>1&&$0=="---"{exit} NR>1{ if (index($0, k":")==1) { sub(k":[ ]*",""); print; exit } }' "$file"
+  return $?
+}
 
 declare -A doc_issues doc_status
 echo "Front matter:"

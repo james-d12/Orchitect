@@ -247,7 +247,7 @@ public sealed class RunnerContainerSweepServiceTests
         _deployments.GetActiveAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(deployments);
 
-    private Task AssertUpdatedAsync(DeploymentId id, DeploymentStatus status) =>
+    private Task<Deployment?> AssertUpdatedAsync(DeploymentId id, DeploymentStatus status) =>
         _deployments.Received(1).UpdateAsync(Arg.Is<Deployment>(d => d.Id == id && d.Status == status),
             Arg.Any<CancellationToken>());
 

@@ -15,7 +15,7 @@ FROM golang:1.27.1-alpine3.24 AS config-inspect
 ARG TF_CONFIG_INSPECT_REF=75d64de68c31445dbe4ee8308350e0b6dda1571d
 
 RUN CGO_ENABLED=0 GOBIN=/out go install -trimpath -ldflags="-s -w" \
-    github.com/hashicorp/terraform-config-inspect@${TF_CONFIG_INSPECT_REF}
+    github.com/hashicorp/terraform-config-inspect@"${TF_CONFIG_INSPECT_REF}"
 
 FROM alpine:3.24 AS helm
 

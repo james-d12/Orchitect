@@ -71,7 +71,7 @@ public sealed partial class TerraformRenderer : ITerraformRenderer
                 }
 
                 variables[variableName] = variableType is null
-                    ? new JsonObject()
+                    ? []
                     : new JsonObject { ["type"] = variableType };
                 module[inputName] = $"${{var.{variableName}}}";
                 tfVars[variableName] = value;

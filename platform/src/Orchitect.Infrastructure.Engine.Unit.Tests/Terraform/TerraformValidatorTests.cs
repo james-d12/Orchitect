@@ -108,7 +108,7 @@ public sealed class TerraformValidatorTests : IDisposable
         var validator = CreateValidator(new TerraformModuleDownloaderTests.FakeGitCommandLine(),
             new InspectingTerraformCommandLine(_ => new CommandLineResult(diagnosticsJson, string.Empty, 1)));
         var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
-            new Dictionary<string, string>(), "paymentstorage");
+            [], "paymentstorage");
 
         var results = await validator.ValidateAsync([input]);
 
@@ -126,7 +126,7 @@ public sealed class TerraformValidatorTests : IDisposable
                 """{"variables":{"name":{"name":"name","type":"string","required":true}}}""", string.Empty, 0));
         var validator = CreateValidator(git, commandLine);
         var broken = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform, "broken"),
-            new Dictionary<string, string>(), "broken");
+            [], "broken");
         var healthy = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
             new Dictionary<string, string> { ["name"] = "payments" }, "healthy");
 
@@ -207,30 +207,30 @@ public sealed class TerraformValidatorTests : IDisposable
         public int InspectCount => _inspectCount;
 
         public Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref _inspectCount);
             return Task.FromResult(_inspect(executeDirectory));
         }
 
         public Task<CommandLineResult> RunInitAsync(string executeDirectory,
-            string? backendConfigFile, CancellationToken cancellationToken) =>
+            string? backendConfigFile, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<CommandLineResult> RunValidateAsync(string executeDirectory,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<CommandLineResult> RunPlanAsync(string executeDirectory, string planFileOutput,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 }

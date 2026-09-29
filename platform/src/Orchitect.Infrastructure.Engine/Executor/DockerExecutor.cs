@@ -292,7 +292,7 @@ public sealed class DockerExecutor : IExecutor
 
     private async Task CopySecretsAsync(
         string containerId,
-        IReadOnlyDictionary<string, string> secrets,
+        Dictionary<string, string> secrets,
         CancellationToken cancellationToken)
     {
         await using var archive = RunnerSecretsFile.CreateArchive(secrets);

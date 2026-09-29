@@ -21,6 +21,8 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
 {
     private const string TerraformCommand = "terraform";
     private const string LockTimeout = "-lock-timeout=5m";
+    private const string NoInput = "-input=false";
+    private const string NoColor = "-no-color";
 
     public async Task<CommandLineResult> RunTerraformJsonOutput(string executeDirectory, CancellationToken cancellationToken = default) =>
         await new CommandLineBuilder("terraform-config-inspect")
@@ -33,8 +35,8 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
         await new CommandLineBuilder(TerraformCommand)
             .WithArguments([
                 "init",
-                "-input=false",
-                "-no-color",
+                NoInput,
+                NoColor,
                 ..(backendConfigFile is null ? Array.Empty<string>() : [$"-backend-config={backendConfigFile}"])
             ])
             .WithWorkingDirectory(executeDirectory)
@@ -42,14 +44,14 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
 
     public async Task<CommandLineResult> RunValidateAsync(string executeDirectory, CancellationToken cancellationToken = default) =>
         await new CommandLineBuilder(TerraformCommand)
-            .WithArguments(["validate", "-no-color"])
+            .WithArguments(["validate", NoColor])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteAsync(cancellationToken);
 
     public async Task<CommandLineResult> RunPlanDestroyAsync(string executeDirectory, string planFileOutput, CancellationToken cancellationToken = default) =>
         await new CommandLineBuilder(TerraformCommand)
             .WithArguments([
-                "plan", "-detailed-exitcode", "-input=false", "-no-color", LockTimeout, "-destroy",
+                "plan", "-detailed-exitcode", NoInput, NoColor, LockTimeout, "-destroy",
                 $"-out={planFileOutput}"
             ])
             .WithWorkingDirectory(executeDirectory)
@@ -58,14 +60,14 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
     public async Task<CommandLineResult> RunPlanAsync(string executeDirectory, string planFileOutput, CancellationToken cancellationToken = default) =>
         await new CommandLineBuilder(TerraformCommand)
             .WithArguments([
-                "plan", "-detailed-exitcode", "-input=false", "-no-color", LockTimeout, $"-out={planFileOutput}"
+                "plan", "-detailed-exitcode", NoInput, NoColor, LockTimeout, $"-out={planFileOutput}"
             ])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteStreamAsync(cancellationToken);
 
     public async Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile, CancellationToken cancellationToken = default) =>
         await new CommandLineBuilder(TerraformCommand)
-            .WithArguments(["apply", "-auto-approve", "-input=false", "-no-color", LockTimeout, planFile])
+            .WithArguments(["apply", "-auto-approve", NoInput, NoColor, LockTimeout, planFile])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteStreamAsync(cancellationToken);
 }
