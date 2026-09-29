@@ -100,6 +100,18 @@ public sealed class DeploymentQueueTests
     }
 
     [Fact]
+    public async Task WorkItem_CancelledWithoutShutdown_SetsDeployingThenFailed()
+    {
+        var (deployment, repository, services) = Setup();
+        var workItem = await QueueAsync(deployment,
+            new FakeExecutor { Exception = new TaskCanceledException("HTTP request timed out.") });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, DeploymentStatus.Failed], repository.Statuses);
+    }
+
+    [Fact]
     public async Task WorkItem_PassesTokenAndConfigurationAsSecrets()
     {
         var (deployment, _, services) = Setup();

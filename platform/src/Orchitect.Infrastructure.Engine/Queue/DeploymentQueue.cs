@@ -54,8 +54,13 @@ public sealed class DeploymentQueue : IDeploymentQueue
             }
 
             var result = await ExecuteAsync(request, ct);
+            var exception = result.Exception is OperationCanceledException && !ct.IsCancellationRequested
+                ? new TimeoutException(
+                    $"Deployment '{deployment.Id.Value}' was cancelled without the API shutting down.",
+                    result.Exception)
+                : result.Exception;
 
-            var processed = deployment.ProcessDeploymentStatus(result.ExitCode, result.Exception);
+            var processed = deployment.ProcessDeploymentStatus(result.ExitCode, exception);
             if (processed != deployment)
             {
                 await repository.UpdateAsync(processed, CancellationToken.None);
