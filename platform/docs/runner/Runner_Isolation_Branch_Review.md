@@ -55,6 +55,10 @@ Each finding also has a severity: 🔴 high, 🟡 medium, 🟢 low.
 | H2 | Key Vault token covers all of Key Vault, not just the mapped secrets | Hard | 🔴 | Open, #108 |
 | H3 | Deployment queue is serial, blocking and in-memory | Hard | 🟡 | Partial (`73c8716`, `f53a43c`), #110, #111 |
 | H4 | Containerised API can't reach Docker; socket access is root-equivalent | Hard | 🟡 | Open, #114 |
+| N1 | A destroy could be accepted with 202 and then never run | Medium | 🟡 | Fixed (`57aaf23`) |
+| N2 | A run cancelled without an API shutdown left its deployment active | Easy | 🟡 | Fixed (`4f1203e`) |
+| N3 | A failed work item or enqueue left its deployment active | Easy | 🟢 | Fixed (`97ce0e5`) |
+| N4 | The setup script gives template code Contributor on the whole subscription and piles up client secrets | Easy | 🟡 | Fixed (`8621e9d`) |
 
 **Suggested order before merge:** E1, E2, E3, E4 and the rest of the Easy list, then M1 and M3. H1 and H2 need a design decision and can be tracked in `RUNNER_TODO.md`. Until then, don't point the runner at untrusted template repos or score files.
 
@@ -328,3 +332,37 @@ Mounting `/var/run/docker.sock` makes the API root-equivalent on the host, which
 - a platform-native executor (Kubernetes Jobs, Azure Container Apps Jobs, ECS tasks) behind `IExecutor`
 
 `IExecutor` is already the right seam for this. The hard part is the hosting and infrastructure decision.
+
+---
+
+## Found on re-review (2026-09-29)
+
+These came from a second pass over the newer deployment status, destroy and reconcile code, which the first review didn't cover.
+
+### N1. 🟡 A destroy could be accepted with 202 and then never run
+`Api/Endpoints/Engine/Deployment/DestroyDeploymentEndpoint.cs`, `Queue/DeploymentQueue.cs`
+
+The endpoint queued the destroy but left the deployment `Deployed`/`Failed`. If a `POST /deployments` for the same application and environment arrived before the work item ran, the destroy's move to `Destroying` then broke `IX_Deployments_ActiveRun` and failed in the background after a 202. Two `DELETE`s in a row also both got 202.
+
+**Fixed:** the endpoint moves the deployment to `Destroying` before queuing, so both cases get a 409 straight away. The work item expects `Destroying` and doesn't change the status itself.
+
+### N2. 🟡 A run cancelled without an API shutdown left its deployment active
+`Queue/DeploymentQueue.cs`, `Orchitect.Domain/Engine/Deployment/Deployment.cs`
+
+`ProcessDeploymentStatus` leaves the status unchanged for any `OperationCanceledException`. That includes a `TaskCanceledException` from a Docker or Azure HTTP timeout, so the deployment stayed `Deploying`/`Destroying`, and the active-run index blocked its application and environment until the API restarted.
+
+**Fixed:** the queue treats a cancellation as "outcome unknown" only when the stopping token was cancelled. Anything else becomes a `TimeoutException`, which fails the deployment.
+
+### N3. 🟢 A failed work item or enqueue left its deployment active
+`Queue/DeploymentQueue.cs`, `CreateDeploymentEndpoint.cs`, `DestroyDeploymentEndpoint.cs`, `Persistence/Repositories/Engine/DeploymentRepository.cs`
+
+A database error while loading or saving the deployment, or a failure to queue after the row was saved, left it `Pending`/`Deploying`/`Destroying` until restart, with the same lock-up as N2.
+
+**Fixed:** the work item fails the deployment it owns and rethrows. On shutdown it leaves the deployment for the startup reconcile. Both endpoints fail the deployment if queuing throws. `DeploymentRepository.CreateAsync` now detaches the saved entity, so a later update in the same scope doesn't hit a tracking conflict.
+
+### N4. 🟡 The setup script gives template code broad Azure access
+`scripts/setup-terraform-sp.sh`
+
+The script assigned `Contributor` over the whole subscription, and while H1 and H2 are open, template Terraform runs with those credentials. Each run also added another 1-year client secret.
+
+**Fixed:** a new `--scope` option (the default is still the subscription, with a warning), and the previous `orchitect-terraform` secrets are removed once the new one is stored in Key Vault.

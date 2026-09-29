@@ -18,18 +18,18 @@ Severity: 🔴 high, 🟡 medium, 🟢 low.
 
 ## Summary
 
-| # | Finding | Severity | Issues |
-|---|---|---|---|
-| A1 | The branch works against the target architecture in `API_RUNNER_SEPARATION.md` (runner has DB access) | 🔴 | #102, #105 |
-| A2 | No "Run" concept in the domain | 🔴 | #110, #113 |
-| A3 | `Orchitect.Infrastructure.Engine` mixes the control plane and the data plane | 🟡 | #115, #116 |
-| A4 | The API–runner contract is implicit and untested | 🟡 | #117, #118 |
-| A5 | The executor knows about the database | 🟡 | #107 |
-| A6 | Adding a secret provider means editing switches in separate places | 🟡 | #109 |
-| A7 | Local state mode is the default but broken in this topology | 🟡 | #119 |
-| A8 | Runner observability: no trace propagation, no per-run logs | 🟡 | #120, #121 |
-| A9 | An architecture guard test was silently broken | 🟢 | #122 |
-| A10 | Docs have drifted | 🟢 | #180 |
+| # | Finding | Severity | Status | Issues |
+|---|---|---|---|---|
+| A1 | The branch works against the target architecture in `API_RUNNER_SEPARATION.md` (runner has DB access) | 🔴 | Open | #102, #105 |
+| A2 | No "Run" concept in the domain | 🔴 | Open | #110, #113 |
+| A3 | `Orchitect.Infrastructure.Engine` mixes the control plane and the data plane | 🟡 | Open | #115, #116 |
+| A4 | The API–runner contract is implicit and untested | 🟡 | Partial: round-trip test added (`db5994b`) | #117, #118 |
+| A5 | The executor knows about the database | 🟡 | Open | #107 |
+| A6 | Adding a secret provider means editing switches in separate places | 🟡 | Open | #109 |
+| A7 | Local state mode is the default but broken in this topology | 🟡 | Open | #119 |
+| A8 | Runner observability: no trace propagation, no per-run logs | 🟡 | Open | #120, #121 |
+| A9 | An architecture guard test was silently broken | 🟢 | Partial: Inventory guard fixed (`129e3b2`); Engine layering tests wait for A3 | #122 |
+| A10 | Docs have drifted | 🟢 | Fixed (`766b1d8`) | #180 |
 
 ## What the branch gets right
 
