@@ -157,10 +157,14 @@ jobs:
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.qualitygate.wait=false \
             /d:sonar.exclusions="**/bin/**,**/obj/**,**/Orchitect.Persistence/Migrations/**,**/Orchitect.Playground/**" \
-            /d:sonar.cs.cobertura.reportsPaths="coverage/**/coverage.cobertura.xml" \
+            /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.xml" \
             /d:sonar.coverage.exclusions="**/Orchitect.Playground/Program.cs,**/Orchitect.Persistence/Migrations/**"
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+          dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build \
+            --collect:"XPlat Code Coverage;Format=opencover" \
+            --results-directory coverage
 
           dotnet tool run dotnet-sonarscanner end \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
@@ -174,9 +178,6 @@ jobs:
 
       - name: Format Check
         run: dotnet format ${{ env.SOLUTION_FILE }} --verify-no-changes --verbosity diagnostic
-
-      - name: Run Tests
-        run: dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --collect:"XPlat Code Coverage"
 
       - name: Run Mutation Tests
         run: dotnet stryker --solution ${{ env.SOLUTION_FILE }}
