@@ -7,9 +7,12 @@
 - **Phase 1** fixes all the Easy findings (E1–E15). Then it **stops for review**.
 - **Phases 2–11** fix one Medium finding each (M1–M10), in order. Each phase is one commit and **stops for review** before the next one starts.
 
+**Status:** Phases 1–10 (E1–E15, M1–M9) are done. Phase 11 (M10) was dropped; see below.
+
 Decisions made:
 - **M1** uses root variables plus `terraform.tfvars.json`, so values are never evaluated as code.
 - **M7** copies a secrets file into the container with put-archive before it starts.
+- **M10** is dropped. A shared writable plugin cache would let one run plant a provider that later runs use unchecked.
 
 Paths are relative to `platform/src/Orchitect.Infrastructure.Engine/` unless they say otherwise.
 
@@ -208,9 +211,12 @@ Every phase ends with the same checks:
 - Tests: finished containers from a previous process are removed, recent ones from this process are kept, overdue ones are removed, running ones never are, the list filters on the label, and one failed remove doesn't stop the rest.
 - Check: against the local Docker daemon, the sweep removed an exited labelled container and kept a running labelled one and an unlabelled one.
 
-## Phase 11 – M10: provider plugin cache → review
-- Add `ExecutorOptions.PluginCacheVolume` (default `orchitect-terraform-plugin-cache`, null disables it).
-- When it's set, mount the volume at `/var/cache/terraform-plugins` and set `TF_PLUGIN_CACHE_DIR`.
-- Dockerfile: create the directory, owned by `$APP_UID`.
-- `RUNNER_TODO.md`: note that the cache assumes serial runs (H3).
-- Check: the second run reuses the cached providers.
+## Phase 11 – M10: provider plugin cache → dropped
+Not implemented. Terraform 1.4+ reads `TF_PLUGIN_CACHE_DIR` only when the working directory has a `.terraform.lock.hcl`, and the runner recreates its working directory on every run, so it never has one. A shared volume therefore fills up but is never read.
+
+Checked with Terraform 1.16.4 in the runner image, sharing a named volume between two runs:
+- Without a lock file, the second `terraform init` downloaded `hashicorp/null` again.
+- With `TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE=true`, it used the cache. But the lock file then held only the local `h1:` hash and none of the registry's signed `zh:` checksums, so cached providers aren't checked against the registry. Every run can write to the volume and runs execute template Terraform, so one run could plant a provider for later runs of other applications.
+
+If download time becomes a problem, a read-only `filesystem_mirror` baked into the image at build time avoids this, at the cost of image size and a pinned provider list.
+
