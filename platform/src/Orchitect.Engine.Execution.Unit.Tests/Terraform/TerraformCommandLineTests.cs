@@ -143,7 +143,7 @@ public sealed class TerraformCommandLineTests : IDisposable
     private void AssertInvocation(CommandLineResult result, params string[] expectedArguments)
     {
         Assert.Equal(0, result.ExitCode);
-        Assert.Equal([WorkingDirectory, ..expectedArguments],
+        Assert.Equal([WorkingDirectory, .. expectedArguments],
             result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries));
     }
 }
