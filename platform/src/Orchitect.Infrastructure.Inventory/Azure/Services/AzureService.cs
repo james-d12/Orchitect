@@ -93,7 +93,7 @@ public sealed class AzureService : IAzureService
                 var vaultUri = new Uri($"https://{vault.Id.Value}.vault.azure.net/");
                 var client = new SecretClient(vaultUri, new DefaultAzureCredential());
 
-                foreach (var secret in client.GetPropertiesOfSecrets())
+                foreach (var secret in client.GetPropertiesOfSecrets(cancellationToken))
                 {
                     // Generate unique ID from vault URI + secret name
                     var secretId = $"{secret.VaultUri}/{secret.Name}";

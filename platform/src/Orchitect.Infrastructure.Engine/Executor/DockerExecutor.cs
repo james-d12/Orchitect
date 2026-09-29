@@ -367,9 +367,9 @@ public sealed class DockerExecutor : IExecutor
         {
             await logStreaming.WaitAsync(OutputDrainTimeout, logCancellation.Token);
         }
-        catch (OperationCanceledException) when (logCancellation.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (logCancellation.IsCancellationRequested)
         {
-            _logger.LogDebug("Stopped waiting for output from runner container {ContainerId} after cancellation.",
+            _logger.LogInformation(exception, "Stopped waiting for output from runner container {ContainerId} after cancellation.",
                 containerId);
         }
         catch (TimeoutException exception)
@@ -381,11 +381,11 @@ public sealed class DockerExecutor : IExecutor
 
             try
             {
-                await logStreaming.WaitAsync(OutputRelayStopTimeout);
+                await logStreaming.WaitAsync(OutputRelayStopTimeout, logCancellation.Token);
             }
-            catch (TimeoutException)
+            catch (TimeoutException innerITimeoutException)
             {
-                _logger.LogWarning("Output relay for runner container {ContainerId} did not stop after cancellation.",
+                _logger.LogWarning(innerITimeoutException, "Output relay for runner container {ContainerId} did not stop after cancellation.",
                     containerId);
             }
         }
@@ -441,9 +441,9 @@ public sealed class DockerExecutor : IExecutor
                 read = stream.ReadOutputAsync(buffer, 0, buffer.Length, cancellationToken);
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogDebug("Stopped streaming output from runner container {ContainerId} after cancellation.",
+            _logger.LogInformation(exception, "Stopped streaming output from runner container {ContainerId} after cancellation.",
                 containerId);
         }
         catch (Exception exception)

@@ -65,8 +65,8 @@ public sealed class CommandLineBuilder
         process.StartInfo = _startInfo;
         process.Start();
 
-        var stdOutTask = process.StandardOutput.ReadToEndAsync();
-        var stdErrTask = process.StandardError.ReadToEndAsync();
+        var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
         await WaitForExitAsync(process, cancellationToken);
 
@@ -89,7 +89,7 @@ public sealed class CommandLineBuilder
         var stdOut = new StringBuilder();
         var stdErr = new StringBuilder();
 
-        process.OutputDataReceived += (sender, args) =>
+        process.OutputDataReceived += (_, args) =>
         {
             if (args.Data != null)
             {
@@ -98,7 +98,7 @@ public sealed class CommandLineBuilder
             }
         };
 
-        process.ErrorDataReceived += (sender, args) =>
+        process.ErrorDataReceived += (_, args) =>
         {
             if (args.Data != null)
             {
@@ -135,7 +135,7 @@ public sealed class CommandLineBuilder
             if (!process.HasExited)
             {
                 process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync();
+                await process.WaitForExitAsync(gracePeriod.Token);
             }
         }
 

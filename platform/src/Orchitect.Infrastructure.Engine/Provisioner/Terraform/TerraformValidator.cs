@@ -51,7 +51,8 @@ public sealed class TerraformValidator : ITerraformValidator
             versions[planInput] = version;
         }
 
-        var downloads = await _moduleDownloader.DownloadAsync(versions.Values.Select(v => v.Source));
+        var downloads = await _moduleDownloader
+            .DownloadAsync(versions.Values.Select(v => v.Source), cancellationToken);
 
         var modules = await InspectModulesAsync(downloads.Values
             .Where(download => download.IsSuccess)

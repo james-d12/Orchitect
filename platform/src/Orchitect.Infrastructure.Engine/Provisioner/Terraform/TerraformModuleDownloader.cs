@@ -96,9 +96,9 @@ public sealed class TerraformModuleDownloader : ITerraformModuleDownloader
             {
                 Directory.Move(stagingDirectory, directory);
             }
-            catch (IOException) when (Directory.Exists(directory))
+            catch (IOException ioException) when (Directory.Exists(directory))
             {
-                _logger.LogDebug("Repository {Url}@{Tag} was downloaded concurrently, using the existing copy.",
+                _logger.LogDebug(ioException, "Repository {Url}@{Tag} was downloaded concurrently, using the existing copy.",
                     repository.BaseUrl, repository.Tag);
             }
 
