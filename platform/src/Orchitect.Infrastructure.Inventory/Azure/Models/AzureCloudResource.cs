@@ -1,7 +1,9 @@
-﻿using Orchitect.Domain.Inventory.Cloud;
+﻿using System.Diagnostics.CodeAnalysis;
+using Orchitect.Domain.Inventory.Cloud;
 
 namespace Orchitect.Infrastructure.Inventory.Azure.Models;
 
+[ExcludeFromCodeCoverage]
 public sealed record AzureCloudResource : CloudResource
 {
     public required string TenantName { get; init; }

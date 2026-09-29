@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using NGitLab.Models;
 using Orchitect.Common.Observability;
@@ -7,6 +8,7 @@ using Orchitect.Infrastructure.Inventory.GitLab.Models;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class GitLabService : IGitLabService
 {
     private readonly ILogger<GitLabService> _logger;

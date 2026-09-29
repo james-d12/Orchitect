@@ -1,9 +1,11 @@
-﻿using Microsoft.VisualStudio.Services.Common;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
 using Orchitect.Domain.Core.Credential;
 
 namespace Orchitect.Infrastructure.Inventory.AzureDevOps.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class AzureDevOpsConnectionService : IAzureDevOpsConnectionService
 {
     private readonly VssConnection _connection;

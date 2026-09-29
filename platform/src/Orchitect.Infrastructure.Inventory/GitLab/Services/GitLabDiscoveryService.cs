@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
@@ -10,6 +11,7 @@ using Orchitect.Infrastructure.Inventory.Shared;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class GitLabDiscoveryService : DiscoveryService
 {
     private readonly ILogger<GitLabDiscoveryService> _logger;

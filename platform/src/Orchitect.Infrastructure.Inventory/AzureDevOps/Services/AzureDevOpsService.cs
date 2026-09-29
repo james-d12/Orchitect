@@ -1,4 +1,5 @@
-﻿using Microsoft.TeamFoundation.Build.WebApi;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
@@ -10,6 +11,7 @@ using Orchitect.Infrastructure.Inventory.AzureDevOps.Models;
 
 namespace Orchitect.Infrastructure.Inventory.AzureDevOps.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class AzureDevOpsService : IAzureDevOpsService
 {
     private readonly IAzureDevOpsConnectionService _azureDevOpsConnectionService;

@@ -1,8 +1,10 @@
-﻿using Octokit;
+﻿using System.Diagnostics.CodeAnalysis;
+using Octokit;
 using Orchitect.Domain.Core.Credential;
 
 namespace Orchitect.Infrastructure.Inventory.GitHub.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class GitHubConnectionService : IGitHubConnectionService
 {
     public GitHubClient Client { get; }

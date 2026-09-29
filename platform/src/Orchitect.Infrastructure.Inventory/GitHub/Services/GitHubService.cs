@@ -1,10 +1,12 @@
-﻿using Orchitect.Common.Observability;
+﻿using System.Diagnostics.CodeAnalysis;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Infrastructure.Inventory.GitHub.Extensions;
 using Orchitect.Infrastructure.Inventory.GitHub.Models;
 
 namespace Orchitect.Infrastructure.Inventory.GitHub.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class GitHubService : IGitHubService
 {
     private readonly IGitHubConnectionService _gitHubConnectionService;

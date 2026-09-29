@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using Azure.Identity;
 using Azure.ResourceManager;
 using Orchitect.Domain.Core.Credential;
 
 namespace Orchitect.Infrastructure.Inventory.Azure.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class AzureConnectionService : IAzureConnectionService
 {
     public ArmClient Client { get; }

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
@@ -7,6 +8,7 @@ using Orchitect.Infrastructure.Inventory.Azure.Services;
 
 namespace Orchitect.Infrastructure.Inventory.Azure.Extensions;
 
+[ExcludeFromCodeCoverage]
 public static class AzureExtensions
 {
     internal static IServiceCollection RegisterAzure(this IServiceCollection services)

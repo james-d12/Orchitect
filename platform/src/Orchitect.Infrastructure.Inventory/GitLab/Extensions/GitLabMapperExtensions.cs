@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using NGitLab.Models;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Organisation;
@@ -11,6 +12,7 @@ using User = Orchitect.Domain.Inventory.Identity.User;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Extensions;
 
+[ExcludeFromCodeCoverage]
 public static class GitLabMapperExtensions
 {
     public static GitLabPullRequest MapToGitLabPullRequest(this MergeRequest mergeRequest, OrganisationId organisationId)

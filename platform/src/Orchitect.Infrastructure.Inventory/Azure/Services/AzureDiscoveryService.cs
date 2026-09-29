@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Cloud.Services;
@@ -7,6 +8,7 @@ using Orchitect.Infrastructure.Inventory.Shared;
 
 namespace Orchitect.Infrastructure.Inventory.Azure.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class AzureDiscoveryService : DiscoveryService
 {
     private readonly ILogger<AzureDiscoveryService> _logger;

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orchitect.Common.Observability;
@@ -7,6 +8,7 @@ using Orchitect.Infrastructure.Inventory.GitLab.Services;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Extensions;
 
+[ExcludeFromCodeCoverage]
 public static class GitLabExtensions
 {
     internal static IServiceCollection RegisterGitLab(this IServiceCollection services)

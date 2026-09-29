@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Octokit;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Organisation;
@@ -10,6 +11,7 @@ using User = Orchitect.Domain.Inventory.Identity.User;
 
 namespace Orchitect.Infrastructure.Inventory.GitHub.Extensions;
 
+[ExcludeFromCodeCoverage]
 public static class GitHubMapperExtensions
 {
     public static GitHubRepository MapToGitHubRepository(this Octokit.Repository repository, OrganisationId organisationId)

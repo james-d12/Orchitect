@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
@@ -12,6 +13,7 @@ using Orchitect.Infrastructure.Inventory.Azure.Models;
 
 namespace Orchitect.Infrastructure.Inventory.Azure.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class AzureService : IAzureService
 {
     private readonly ArmClient _client;

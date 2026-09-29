@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
@@ -7,6 +8,7 @@ using Orchitect.Domain.Inventory.Discovery.Services;
 
 namespace Orchitect.Infrastructure.Inventory.Shared;
 
+[ExcludeFromCodeCoverage]
 public abstract class DiscoveryService : IDiscoveryService
 {
     private readonly ILogger<DiscoveryService> _logger;

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
@@ -10,6 +11,7 @@ using Orchitect.Infrastructure.Inventory.Shared;
 
 namespace Orchitect.Infrastructure.Inventory.GitHub.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class GitHubDiscoveryService : DiscoveryService
 {
     private readonly ILogger<GitHubDiscoveryService> _logger;

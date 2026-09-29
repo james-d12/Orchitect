@@ -1,5 +1,6 @@
 ﻿using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
@@ -15,6 +16,7 @@ using WorkItem = Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models.WorkIte
 
 namespace Orchitect.Infrastructure.Inventory.AzureDevOps.Extensions;
 
+[ExcludeFromCodeCoverage]
 public static class AzureDevOpsMappingExtensions
 {
     public static AzureDevOpsPipeline MapToAzureDevOpsPipeline(this BuildDefinitionReference buildDefinitionReference,

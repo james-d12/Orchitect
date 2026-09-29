@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using NGitLab;
 using Orchitect.Domain.Core.Credential;
 
 namespace Orchitect.Infrastructure.Inventory.GitLab.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class GitLabConnectionService : IGitLabConnectionService
 {
     public GitLabClient Client { get; }
