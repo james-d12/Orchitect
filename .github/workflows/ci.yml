@@ -158,7 +158,7 @@ jobs:
             /d:sonar.qualitygate.wait=false \
             /d:sonar.exclusions="**/bin/**,**/obj/**,**/Orchitect.Persistence/Migrations/**,**/Orchitect.Playground/**" \
             /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.xml" \
-            /d:sonar.coverage.exclusions="**/Orchitect.Playground/Program.cs,**/Orchitect.Persistence/Migrations/**"
+            /d:sonar.coverage.exclusions="**/Orchitect.Playground/Program.cs,**/Orchitect.Runner/Program.cs,**/Orchitect.AppHost/Program.cs,**/Orchitect.Engine.Contracts/Runner/RunnerEnvironment.cs,**/Orchitect.Persistence/Migrations/**"
 
           dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 

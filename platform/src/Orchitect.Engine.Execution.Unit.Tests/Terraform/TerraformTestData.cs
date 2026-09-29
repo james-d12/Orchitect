@@ -11,19 +11,18 @@ internal static class TerraformTestData
     public static ProvisionContext NewContext() =>
         new("orders", Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
 
-    public static TerraformPlanInput PlanInput()
-    {
-        var template = ResourceTemplate.Create(new CreateResourceTemplateRequest
+    public static ResourceTemplate Template(ResourceTemplateProvider provider = ResourceTemplateProvider.Terraform) =>
+        ResourceTemplate.Create(new CreateResourceTemplateRequest
         {
             OrganisationId = new OrganisationId(),
             Name = "Storage Account",
             Type = "azure-storage-account",
             Description = "A storage account.",
-            Provider = ResourceTemplateProvider.Terraform
+            Provider = provider
         });
 
-        return new TerraformPlanInput(template, new Dictionary<string, string> { ["name"] = "orders" }, "storage");
-    }
+    public static TerraformPlanInput PlanInput() =>
+        new(Template(), new Dictionary<string, string> { ["name"] = "orders" }, "storage");
 
     public static TerraformValidationResult.ValidResult ValidResult() =>
         TerraformValidationResult.Valid(new TerraformConfig
