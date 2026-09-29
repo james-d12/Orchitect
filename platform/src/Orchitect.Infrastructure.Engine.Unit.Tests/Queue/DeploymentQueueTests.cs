@@ -112,6 +112,36 @@ public sealed class DeploymentQueueTests
     }
 
     [Fact]
+    public async Task WorkItem_FailsBeforeRun_FailsDeploymentAndRethrows()
+    {
+        var (deployment, repository, services) = Setup();
+        repository.FailingUpdates = 1;
+        var executor = new FakeExecutor();
+        var workItem = await QueueAsync(deployment, executor);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await workItem(services, CancellationToken.None));
+
+        Assert.False(executor.Executed);
+        Assert.Equal([DeploymentStatus.Failed], repository.Statuses);
+    }
+
+    [Fact]
+    public async Task WorkItem_FailsOnShutdown_LeavesDeploymentForReconcile()
+    {
+        var (deployment, repository, services) = Setup();
+        repository.FailingUpdates = 1;
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        var workItem = await QueueAsync(deployment, new FakeExecutor());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await workItem(services, cancellation.Token));
+
+        Assert.Empty(repository.Statuses);
+    }
+
+    [Fact]
     public async Task WorkItem_PassesTokenAndConfigurationAsSecrets()
     {
         var (deployment, _, services) = Setup();
@@ -226,6 +256,7 @@ public sealed class DeploymentQueueTests
     private sealed class RecordingDeploymentRepository : IDeploymentRepository
     {
         public Deployment? Deployment { get; set; }
+        public int FailingUpdates { get; set; }
         public List<DeploymentStatus> Statuses { get; } = [];
 
         public Task<Deployment?> GetByIdAsync(DeploymentId id, CancellationToken cancellationToken = default) =>
@@ -233,6 +264,12 @@ public sealed class DeploymentQueueTests
 
         public Task<Deployment?> UpdateAsync(Deployment deployment, CancellationToken cancellationToken = default)
         {
+            if (FailingUpdates > 0)
+            {
+                FailingUpdates--;
+                throw new InvalidOperationException("Database unavailable.");
+            }
+
             Statuses.Add(deployment.Status);
             Deployment = deployment;
             return Task.FromResult<Deployment?>(deployment);

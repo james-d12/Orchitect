@@ -25,10 +25,9 @@ public sealed class DeploymentRepository : IDeploymentRepository
         {
             await SaveChangesAsync(deployment, cancellationToken);
         }
-        catch
+        finally
         {
             result.State = EntityState.Detached;
-            throw;
         }
 
         return result.Entity;

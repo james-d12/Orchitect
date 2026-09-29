@@ -63,9 +63,17 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
             return TypedResults.Conflict(exception.Message);
         }
 
-        await deploymentQueue.QueueDeploymentTaskAsync(
-            new DeploymentQueueRequest(destroying.ApplicationId, destroying.Id, DeploymentOperation.Destroy),
-            cancellationToken);
+        try
+        {
+            await deploymentQueue.QueueDeploymentTaskAsync(
+                new DeploymentQueueRequest(destroying.ApplicationId, destroying.Id, DeploymentOperation.Destroy),
+                cancellationToken);
+        }
+        catch
+        {
+            await repository.UpdateAsync(destroying.Interrupt(), CancellationToken.None);
+            throw;
+        }
 
         var locationUrl =
             new Uri($"{httpContext.Request.Scheme}://{httpContext.Request.Host}/deployments/{destroying.Id.Value}");

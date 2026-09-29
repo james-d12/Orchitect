@@ -74,7 +74,16 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
         }
 
         var deploymentRequest = new DeploymentQueueRequest(application.Id, deploymentResponse.Id);
-        await deploymentQueue.QueueDeploymentTaskAsync(deploymentRequest, cancellationToken);
+
+        try
+        {
+            await deploymentQueue.QueueDeploymentTaskAsync(deploymentRequest, cancellationToken);
+        }
+        catch
+        {
+            await repository.UpdateAsync(deploymentResponse.Interrupt(), CancellationToken.None);
+            throw;
+        }
 
         var locationUrl =
             new Uri(

@@ -126,6 +126,40 @@ public sealed class DeploymentIntegrationTests
     }
 
     [Fact]
+    public async Task DeploymentApi_WhenQueuingDeploymentFails_ShouldReturn500AndFailDeployment()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
+        _queue.Fail = true;
+
+        // Act
+        var response = await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(applicationId, environmentId, new CommitId(_fixture.Create<string>())));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        var latest = await GetLatestDeploymentAsync(applicationId, environmentId);
+        Assert.Equal(DeploymentStatus.Failed, latest.Status);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenQueuingDestroyFails_ShouldReturn500AndFailDeployment()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deployed);
+        _queue.Fail = true;
+
+        // Act
+        var response = await client.DeleteAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Equal(DeploymentStatus.Failed, (await GetDeploymentAsync(deployment.Id)).Status);
+    }
+
+    [Fact]
     public async Task DeploymentApi_WhenDestroyingNonExistentDeployment_ShouldReturn404NotFound()
     {
         // Arrange
@@ -317,6 +351,15 @@ public sealed class DeploymentIntegrationTests
         return deployment;
     }
 
+    private async Task<Deployment> GetLatestDeploymentAsync(ApplicationId applicationId, EnvironmentId environmentId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var deployment = await scope.ServiceProvider.GetRequiredService<IDeploymentRepository>()
+            .GetLatestAsync(applicationId, environmentId);
+        ArgumentNullException.ThrowIfNull(deployment);
+        return deployment;
+    }
+
     private async Task UpdateDeploymentAsync(Deployment deployment)
     {
         using var scope = _factory.Services.CreateScope();
@@ -365,9 +408,15 @@ public sealed class DeploymentIntegrationTests
     private sealed class CapturingDeploymentQueue : IDeploymentQueue
     {
         public List<DeploymentQueueRequest> Requests { get; } = [];
+        public bool Fail { get; set; }
 
         public Task QueueDeploymentTaskAsync(DeploymentQueueRequest request, CancellationToken token = default)
         {
+            if (Fail)
+            {
+                throw new InvalidOperationException("Queue unavailable.");
+            }
+
             Requests.Add(request);
             return Task.CompletedTask;
         }

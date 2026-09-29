@@ -35,39 +35,79 @@ public sealed class DeploymentQueue : IDeploymentQueue
         {
             var repository = sp.GetRequiredService<IDeploymentRepository>();
 
-            var deployment = await repository.GetByIdAsync(request.DeploymentId, ct)
-                             ?? throw new InvalidOperationException(
-                                 $"Deployment '{request.DeploymentId.Value}' was not found.");
-
-            if (request.Operation == DeploymentOperation.Destroy)
+            try
             {
-                if (deployment.Status != DeploymentStatus.Destroying)
-                {
-                    throw new InvalidOperationException(
-                        $"Deployment '{deployment.Id.Value}' must be Destroying to run a destroy, but is {deployment.Status}.");
-                }
+                await RunAsync(repository, request, ct);
             }
-            else
+            catch (Exception) when (!ct.IsCancellationRequested)
             {
-                deployment = deployment.Start();
-                await repository.UpdateAsync(deployment, ct);
+                await FailOwnedDeploymentAsync(repository, request);
+                throw;
             }
-
-            var result = await ExecuteAsync(request, ct);
-            var exception = result.Exception is OperationCanceledException && !ct.IsCancellationRequested
-                ? new TimeoutException(
-                    $"Deployment '{deployment.Id.Value}' was cancelled without the API shutting down.",
-                    result.Exception)
-                : result.Exception;
-
-            var processed = deployment.ProcessDeploymentStatus(result.ExitCode, exception);
-            if (processed != deployment)
-            {
-                await repository.UpdateAsync(processed, CancellationToken.None);
-            }
-
-            _logger.LogInformation("Deployment {DeploymentId} is {Status}.", processed.Id.Value, processed.Status);
         });
+    }
+
+    private async Task RunAsync(IDeploymentRepository repository, DeploymentQueueRequest request,
+        CancellationToken ct)
+    {
+        var deployment = await repository.GetByIdAsync(request.DeploymentId, ct)
+                         ?? throw new InvalidOperationException(
+                             $"Deployment '{request.DeploymentId.Value}' was not found.");
+
+        if (request.Operation == DeploymentOperation.Destroy)
+        {
+            if (deployment.Status != DeploymentStatus.Destroying)
+            {
+                throw new InvalidOperationException(
+                    $"Deployment '{deployment.Id.Value}' must be Destroying to run a destroy, but is {deployment.Status}.");
+            }
+        }
+        else
+        {
+            deployment = deployment.Start();
+            await repository.UpdateAsync(deployment, ct);
+        }
+
+        var result = await ExecuteAsync(request, ct);
+        var exception = result.Exception is OperationCanceledException && !ct.IsCancellationRequested
+            ? new TimeoutException(
+                $"Deployment '{deployment.Id.Value}' was cancelled without the API shutting down.",
+                result.Exception)
+            : result.Exception;
+
+        var processed = deployment.ProcessDeploymentStatus(result.ExitCode, exception);
+        if (processed != deployment)
+        {
+            await repository.UpdateAsync(processed, CancellationToken.None);
+        }
+
+        _logger.LogInformation("Deployment {DeploymentId} is {Status}.", processed.Id.Value, processed.Status);
+    }
+
+    private async Task FailOwnedDeploymentAsync(IDeploymentRepository repository, DeploymentQueueRequest request)
+    {
+        try
+        {
+            var deployment = await repository.GetByIdAsync(request.DeploymentId, CancellationToken.None);
+            var owned = request.Operation == DeploymentOperation.Destroy
+                ? deployment?.Status == DeploymentStatus.Destroying
+                : deployment?.Status is DeploymentStatus.Pending or DeploymentStatus.Deploying;
+
+            if (deployment is null || !owned)
+            {
+                return;
+            }
+
+            await repository.UpdateAsync(deployment.Interrupt(), CancellationToken.None);
+            _logger.LogWarning("Deployment {DeploymentId} was {Status} when its work item failed and is now Failed.",
+                deployment.Id.Value, deployment.Status);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception,
+                "Could not fail deployment {DeploymentId} after its work item failed. It is reconciled on the next API start.",
+                request.DeploymentId.Value);
+        }
     }
 
     private async Task<ExecutorResult> ExecuteAsync(DeploymentQueueRequest request, CancellationToken ct)
