@@ -95,7 +95,7 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
   - the runner output (relayed into the API logs by `DockerExecutor`) shows `terraform init` succeeding against the backend, which checks **backend auth** on its own
   - `plan`/`apply` succeed, which checks **provider auth** separately
   - `docker ps -a` has no leftover `orchitect-runner-*` containers
-- [ ] Run a failing deployment (bad commit, missing template or failing apply). The container should exit non-zero, and `DockerExecutor` should log the error and throw. (#126)
+- [ ] Run a failing deployment (bad commit, missing template or failing apply). The container should exit non-zero, `DockerExecutor` should log the error and return the exit code, and `GET /deployments/{id}` should show `Failed`. (#126)
 - [ ] Point a `SecretProvider:Mappings` entry at a missing secret. The Runner should exit non-zero with an error naming the secret. (#126)
 
 ### 2. Terraform state persistence

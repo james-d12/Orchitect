@@ -13,7 +13,7 @@ last_reviewed: 2026-09-29
 # Runner Isolation – Fix Plan (Easy + Medium)
 
 ## Context
-`platform/docs/Runner_Isolation_Branch_Review.md` reviewed `feature/runner_isolation` and found 15 Easy and 10 Medium issues. They cover Terraform error handling, HCL injection, secrets exposure, container lifecycle and deployment status. The Hard items (H1–H4) are out of scope and will be tracked in `docs/RUNNER_TODO.md`.
+`platform/docs/runner/Runner_Isolation_Branch_Review.md` reviewed `feature/runner_isolation` and found 15 Easy and 10 Medium issues. They cover Terraform error handling, HCL injection, secrets exposure, container lifecycle and deployment status. The Hard items (H1–H4) are out of scope and will be tracked in `docs/runner/RUNNER_TODO.md`.
 
 **How the work is delivered:**
 - **Phase 1** fixes all the Easy findings (E1–E15). Then it **stops for review**.
@@ -90,7 +90,7 @@ Every phase ends with the same checks:
 - E14 (`EngineInfrastructureExtensions.cs`):
   - Change `RunnerOptions:` to `ExecutorOptions:` in the validation messages.
   - Add `[Required]` and a non-blank `.Validate` for `Image`.
-- E14 (`docs/RUNNER_TODO.md`):
+- E14 (`docs/runner/RUNNER_TODO.md`):
   - Rename `DockerRunner`/`RunnerOptions` to the current names.
   - Remove `docker-configure.sh` and `ORCHITECT_CLOUD_PROVIDER`.
   - Fix the build command and tag.
