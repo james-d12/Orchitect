@@ -86,10 +86,10 @@ public sealed class DeploymentRepository : IDeploymentRepository
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException
-                                                  {
-                                                      SqlState: PostgresErrorCodes.UniqueViolation,
-                                                      ConstraintName: DeploymentIndexes.ActiveRun
-                                                  })
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: DeploymentIndexes.ActiveRun
+        })
         {
             throw new ActiveDeploymentExistsException(deployment.ApplicationId, deployment.EnvironmentId, exception);
         }

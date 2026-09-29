@@ -42,13 +42,13 @@ public sealed class TerraformRendererTests
     public void RenderModules_TypedVariables_RendersTypedTfVars()
     {
         var plans = Plans(new Dictionary<string, string>
-            {
-                ["replicas"] = "3",
-                ["enabled"] = "true",
-                ["zones"] = "['1','2']",
-                ["tags"] = """{"team":"payments"}""",
-                ["untyped"] = "42"
-            },
+        {
+            ["replicas"] = "3",
+            ["enabled"] = "true",
+            ["zones"] = "['1','2']",
+            ["tags"] = """{"team":"payments"}""",
+            ["untyped"] = "42"
+        },
             ("replicas", "number"), ("enabled", "bool"), ("zones", "list(string)"), ("tags", "map(string)"),
             ("untyped", null));
 

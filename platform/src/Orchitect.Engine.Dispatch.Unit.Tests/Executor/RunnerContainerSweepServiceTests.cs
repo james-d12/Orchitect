@@ -229,16 +229,16 @@ public sealed class RunnerContainerSweepServiceTests
 
     private static ContainerListResponse Container(string id, string state, DateTime created,
         DeploymentId? runId = null) => new()
-    {
-        ID = id,
-        State = state,
-        Created = created,
-        Labels = new Dictionary<string, string>
         {
-            ["orchitect.runner"] = "true",
-            ["orchitect.run-id"] = runId?.Value.ToString() ?? "run-1"
-        }
-    };
+            ID = id,
+            State = state,
+            Created = created,
+            Labels = new Dictionary<string, string>
+            {
+                ["orchitect.runner"] = "true",
+                ["orchitect.run-id"] = runId?.Value.ToString() ?? "run-1"
+            }
+        };
 
     private static Deployment NewDeployment() =>
         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"));
