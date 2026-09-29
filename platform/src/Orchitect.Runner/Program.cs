@@ -5,12 +5,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Infrastructure.Engine;
-using Orchitect.Infrastructure.Engine.Executor;
-using Orchitect.Infrastructure.Engine.Provisioner.Terraform.Models;
-using Orchitect.Infrastructure.Engine.Secret;
+using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Contracts.Terraform;
+using Orchitect.Engine.Execution;
+using Orchitect.Engine.Execution.Secret;
 using Orchitect.Persistence;
-using Orchitect.Runner;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 RunnerSecretsFile.LoadIntoEnvironment();
@@ -28,19 +27,19 @@ using var host = builder.Build();
 
 var rootCommand = new RootCommand("Self contained Runner for Orchitect that provisions resources.");
 
-var applicationIdOption = new Option<Guid>("--application-id")
+var applicationIdOption = new Option<Guid>(RunnerArguments.ApplicationId)
 {
     Description = "The application id to provision resources.",
     Required = true
 };
 
-var deploymentIdOption = new Option<Guid>("--deployment-id")
+var deploymentIdOption = new Option<Guid>(RunnerArguments.DeploymentId)
 {
     Description = "The deployment id to provision resources.",
     Required = true
 };
 
-var operationOption = new Option<RunnerOperation>("--operation")
+var operationOption = new Option<RunnerOperation>(RunnerArguments.Operation)
 {
     Description = "Whether to provision or destroy the deployment's resources.",
     DefaultValueFactory = _ => RunnerOperation.Provision
@@ -99,12 +98,3 @@ rootCommand.SetAction(async (parseResult, cancellationToken) =>
 
 return await rootCommand.Parse(args)
     .InvokeAsync(new InvocationConfiguration { ProcessTerminationTimeout = Timeout.InfiniteTimeSpan });
-
-namespace Orchitect.Runner
-{
-    internal enum RunnerOperation
-    {
-        Provision,
-        Destroy
-    }
-}

@@ -7,7 +7,7 @@ using Orchitect.Api.Shared;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
-using Orchitect.Infrastructure.Engine.Queue;
+using Orchitect.Engine.Dispatch.Queue;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
 

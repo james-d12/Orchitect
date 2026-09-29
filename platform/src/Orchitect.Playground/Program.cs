@@ -9,7 +9,7 @@ using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceDependency;
 using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Domain.Engine.ResourceTemplate;
-using Orchitect.Infrastructure.Engine;
+using Orchitect.Engine.Execution;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
 using Environment = Orchitect.Domain.Engine.Environment.Environment;

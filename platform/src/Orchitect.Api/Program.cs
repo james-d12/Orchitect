@@ -11,12 +11,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Microsoft.VisualStudio.Services.Common;
+using Orchitect.Api.Encryption;
 using Orchitect.Api.Endpoints;
 using Orchitect.Api.Jobs;
 using Orchitect.Api.Settings;
 using Orchitect.Domain.Core.Credential;
-using Orchitect.Infrastructure.Engine;
-using Orchitect.Infrastructure.Engine.Encryption;
+using Orchitect.Engine.Dispatch;
 using Orchitect.Infrastructure.Inventory;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
@@ -48,8 +48,7 @@ try
         .AddEndpointsApiExplorer()
         .AddPersistenceServices()
         .AddInventoryInfrastructureServices()
-        .AddEngineProvisioningServices()
-        .AddEngineExecutionServices(builder.Configuration);
+        .AddEngineDispatchServices(builder.Configuration);
 
     builder.Services.TryAddSingleton<IEncryptionService, AesEncryptionService>();
     builder.Services.AddOptions<EncryptionOptions>()

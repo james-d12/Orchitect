@@ -10,7 +10,8 @@ using Orchitect.Api.Integration.Tests.Helpers;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
-using Orchitect.Infrastructure.Engine.Queue;
+using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Dispatch.Queue;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Api.Integration.Tests;
@@ -86,7 +87,7 @@ public sealed class DeploymentIntegrationTests
         Assert.Equal(DeploymentStatus.Destroying, (await GetDeploymentAsync(deployment.Id)).Status);
         Assert.EndsWith($"{DeploymentsUrl}/{deployment.Id.Value}", response.Headers.Location?.ToString());
         var request = Assert.Single(_queue.Requests);
-        Assert.Equal(new DeploymentQueueRequest(deployment.ApplicationId, deployment.Id, DeploymentOperation.Destroy),
+        Assert.Equal(new DeploymentQueueRequest(deployment.ApplicationId, deployment.Id, RunnerOperation.Destroy),
             request);
     }
 
@@ -223,7 +224,7 @@ public sealed class DeploymentIntegrationTests
         // Assert
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var request = Assert.Single(_queue.Requests);
-        Assert.Equal(DeploymentOperation.Provision, request.Operation);
+        Assert.Equal(RunnerOperation.Provision, request.Operation);
     }
 
     [Theory]

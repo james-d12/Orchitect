@@ -23,7 +23,7 @@
 
 
     <ItemGroup>
-      <ProjectReference Include="..\Orchitect.Infrastructure.Engine\Orchitect.Infrastructure.Engine.csproj" />
+      <ProjectReference Include="..\Orchitect.Engine.Execution\Orchitect.Engine.Execution.csproj" />
       <ProjectReference Include="..\Orchitect.Persistence\Orchitect.Persistence.csproj" />
     </ItemGroup>
 

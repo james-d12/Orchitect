@@ -52,13 +52,15 @@ The API applies pending migrations on startup (`ApplyMigrations()` in `Orchitect
 dotnet test
 
 # Run a single test project
-dotnet test src/Orchitect.Infrastructure.Engine.Unit.Tests
+dotnet test src/Orchitect.Engine.Execution.Unit.Tests
 ```
 
 Test projects:
 - `Orchitect.Api.Integration.Tests`: endpoints and repositories against Postgres in Testcontainers (needs Docker)
 - `Orchitect.Domain.Unit.Tests`: domain entity behaviour (e.g. deployment status transitions)
-- `Orchitect.Infrastructure.Engine.Unit.Tests`, `Orchitect.Infrastructure.Inventory.Unit.Tests`, `Orchitect.Common.Unit.Tests`
+- `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue and token minting, plus the API-to-runner contract round-trip and the Engine layering guard tests
+- `Orchitect.Engine.Execution.Unit.Tests`: orchestrator, drivers and runner secret loading
+- `Orchitect.Infrastructure.Inventory.Unit.Tests`, `Orchitect.Common.Unit.Tests`
 
 Stryker.NET is configured for mutation testing (see stryker-config.json). Bruno API tests are in `bruno/Orchitect API Collection` (the `E2E` folder runs a full deployment flow).
 
@@ -88,7 +90,9 @@ Each capability is a namespace folder (`Core`, `Engine`, `Inventory`) inside the
 | `Orchitect.Api` | The single ASP.NET API. Minimal-API endpoints in `Endpoints/{Core,Engine,Inventory}/`, plus `Jobs/DiscoveryHostedService` for periodic Inventory discovery |
 | `Orchitect.Domain` | Entities, strongly-typed IDs and repository interfaces, in `Core/`, `Engine/` and `Inventory/` |
 | `Orchitect.Persistence` | `OrchitectDbContext`, EF configurations, repositories and migrations for all contexts |
-| `Orchitect.Infrastructure.Engine` | Provisioning (Score, Terraform, Helm drivers, `EngineOrchestrator`) used by the runner, and execution (`IExecutor`/`DockerExecutor`, deployment queue, runner container sweep) used by the API |
+| `Orchitect.Engine.Contracts` | What the API and the runner must agree on: runner arguments and environment keys, `RunnerOperation`, `TerraformBackendOptions`, `SecretProviderOptions`, the secrets file. No Orchitect references |
+| `Orchitect.Engine.Dispatch` | Control plane, used by the API only: `IExecutor`/`DockerExecutor`, deployment queue, runner container sweep, Key Vault token minting |
+| `Orchitect.Engine.Execution` | Data plane, used by the runner and the Playground: `EngineOrchestrator`, Score, Terraform and Helm drivers, secret providers |
 | `Orchitect.Infrastructure.Inventory` | Discovery integrations for Azure, Azure DevOps, GitHub and GitLab, one folder per provider plus `Shared` |
 | `Orchitect.Runner` | Console app packaged as the runner image. Runs one provision or destroy for a deployment, then exits |
 | `Orchitect.Common` | Shared helpers (observability, query, extensions) |
@@ -137,7 +141,7 @@ public sealed class CreateOrganisationEndpoint : IEndpoint
 ```csharp
 public static IServiceCollection AddPersistenceServices(this IServiceCollection services) { /* ... */ }
 ```
-`Orchitect.Infrastructure.Engine` has two sets: `AddEngineProvisioningServices()` for the runner and the playground, and `AddEngineExecutionServices(configuration)` for the API only.
+`Orchitect.Engine.Execution` has `AddEngineProvisioningServices()` and `AddRunnerServices(configuration)` for the runner and the playground. `Orchitect.Engine.Dispatch` has `AddEngineDispatchServices(configuration)` for the API. Dispatch and Execution must not reference each other.
 
 **Repository pattern**: repository interfaces live in `Orchitect.Domain` (Core and Engine extend `IRepository<T, TId>`), with implementations in `Orchitect.Persistence/Repositories/{Context}/`.
 

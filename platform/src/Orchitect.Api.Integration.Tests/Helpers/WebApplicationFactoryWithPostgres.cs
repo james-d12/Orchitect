@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orchitect.Infrastructure.Engine.Executor;
+using Orchitect.Engine.Dispatch.Executor;
 using Testcontainers.PostgreSql;
 
 namespace Orchitect.Api.Integration.Tests.Helpers;

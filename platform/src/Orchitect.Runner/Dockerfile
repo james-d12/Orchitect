@@ -80,7 +80,8 @@ WORKDIR /src
 COPY global.json Directory.Build.props ./
 COPY src/Orchitect.Common/Orchitect.Common.csproj src/Orchitect.Common/
 COPY src/Orchitect.Domain/Orchitect.Domain.csproj src/Orchitect.Domain/
-COPY src/Orchitect.Infrastructure.Engine/Orchitect.Infrastructure.Engine.csproj src/Orchitect.Infrastructure.Engine/
+COPY src/Orchitect.Engine.Contracts/Orchitect.Engine.Contracts.csproj src/Orchitect.Engine.Contracts/
+COPY src/Orchitect.Engine.Execution/Orchitect.Engine.Execution.csproj src/Orchitect.Engine.Execution/
 COPY src/Orchitect.Persistence/Orchitect.Persistence.csproj src/Orchitect.Persistence/
 COPY src/Orchitect.Runner/Orchitect.Runner.csproj src/Orchitect.Runner/
 

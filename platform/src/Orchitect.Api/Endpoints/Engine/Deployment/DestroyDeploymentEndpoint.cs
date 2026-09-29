@@ -5,7 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
 using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Infrastructure.Engine.Queue;
+using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Dispatch.Queue;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
 
@@ -66,7 +67,7 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
         try
         {
             await deploymentQueue.QueueDeploymentTaskAsync(
-                new DeploymentQueueRequest(destroying.ApplicationId, destroying.Id, DeploymentOperation.Destroy),
+                new DeploymentQueueRequest(destroying.ApplicationId, destroying.Id, RunnerOperation.Destroy),
                 cancellationToken);
         }
         catch
