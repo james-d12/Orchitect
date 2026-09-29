@@ -26,6 +26,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{CC0A1FCB
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Common.Unit.Tests", "src\Orchitect.Common.Unit.Tests\Orchitect.Common.Unit.Tests.csproj", "{74EE9A69-EA6A-44C0-8471-AF5B509A5E46}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Domain.Unit.Tests", "src\Orchitect.Domain.Unit.Tests\Orchitect.Domain.Unit.Tests.csproj", "{C59149B2-D803-46FF-8F2B-A78A3C351E11}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Runner", "src\Orchitect.Runner\Orchitect.Runner.csproj", "{F4145D1B-D812-4DC1-9D43-EE6F35E0FD2D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Infrastructure.Engine", "src\Orchitect.Infrastructure.Engine\Orchitect.Infrastructure.Engine.csproj", "{7C585B88-7799-4CF3-926E-92587F3B7DB7}"
@@ -38,6 +40,10 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11}.Release|Any CPU.Build.0 = Release|Any CPU
 		{0E8A91D2-E999-4D7C-9984-2B04118A9604}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0E8A91D2-E999-4D7C-9984-2B04118A9604}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0E8A91D2-E999-4D7C-9984-2B04118A9604}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -96,6 +102,7 @@ Global
 		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{5AA7C306-0E96-4A54-A8DD-1A2F4CA2C0DC} = {39DC69B3-EE8D-4C43-B6FA-B69DEF7B77F2}
 		{67F547C0-B70F-437B-98BA-2A51C39D6642} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{08425FD5-B210-4332-9E50-A6E52E92E37A} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}

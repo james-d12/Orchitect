@@ -2,7 +2,7 @@ using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
-namespace Orchitect.Infrastructure.Engine.Unit.Tests.Domain;
+namespace Orchitect.Domain.Unit.Tests.Engine;
 
 public sealed class DeploymentTests
 {

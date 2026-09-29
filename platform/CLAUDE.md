@@ -57,6 +57,7 @@ dotnet test src/Orchitect.Infrastructure.Engine.Unit.Tests
 
 Test projects:
 - `Orchitect.Api.Integration.Tests`: endpoints and repositories against Postgres in Testcontainers (needs Docker)
+- `Orchitect.Domain.Unit.Tests`: domain entity behaviour (e.g. deployment status transitions)
 - `Orchitect.Infrastructure.Engine.Unit.Tests`, `Orchitect.Infrastructure.Inventory.Unit.Tests`, `Orchitect.Common.Unit.Tests`
 
 Stryker.NET is configured for mutation testing (see stryker-config.json). Bruno API tests are in `bruno/Orchitect API Collection` (the `E2E` folder runs a full deployment flow).
