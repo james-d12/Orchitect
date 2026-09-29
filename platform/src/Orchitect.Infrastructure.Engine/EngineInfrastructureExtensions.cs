@@ -85,6 +85,7 @@ public static class EngineInfrastructureExtensions
 
         services.TryAddSingleton<IDockerClient>(_ => new DockerClientConfiguration().CreateClient());
         services.TryAddSingleton<IExecutor, DockerExecutor>();
+        services.AddHostedService<RunnerContainerSweepService>();
         services.TryAddSingleton<IRunnerSecretTokenProvider>(_ =>
             new KeyVaultRunnerTokenProvider(new DefaultAzureCredential()));
     }

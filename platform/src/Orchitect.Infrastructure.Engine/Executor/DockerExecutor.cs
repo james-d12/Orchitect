@@ -15,9 +15,6 @@ public sealed class DockerExecutor : IExecutor
     private static readonly TimeSpan RawOutputFlushInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan OutputRelayStopTimeout = TimeSpan.FromSeconds(2);
 
-    private const string RunnerLabel = "orchitect.runner";
-    private const string RunIdLabel = "orchitect.run-id";
-
     private readonly ILogger<DockerExecutor> _logger;
     private readonly IDockerClient _docker;
     private readonly IConfiguration _configuration;
@@ -78,8 +75,8 @@ public sealed class DockerExecutor : IExecutor
                     Image = context.Image,
                     Labels = new Dictionary<string, string>
                     {
-                        [RunnerLabel] = "true",
-                        [RunIdLabel] = context.RunId
+                        [RunnerContainerLabels.Runner] = "true",
+                        [RunnerContainerLabels.RunId] = context.RunId
                     },
                     Cmd = context.Arguments.ToList(),
                     StopTimeout = context.StopGracePeriod,
@@ -479,7 +476,7 @@ public sealed class DockerExecutor : IExecutor
         {
             _logger.LogWarning(
                 "Run {RunId} was cancelled while runner container {ContainerId} was running. The container was " +
-                "left running so terraform can finish. Check its logs and remove it once it has exited.",
+                "left running so terraform can finish. The runner container sweep removes it once it has exited.",
                 runId, containerId);
             return true;
         }
