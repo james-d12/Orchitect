@@ -1,0 +1,25 @@
+meta {
+  name: Get Deployment
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{API_BASE_URL}}/deployments/{{DEPLOYMENT_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+vars:pre-request {
+  DEPLOYMENT_ID: 7f728498-0c62-41bc-8b44-e67472919985
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
