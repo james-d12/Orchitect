@@ -49,6 +49,9 @@ public sealed record Deployment
         return WithStatus(DeploymentStatus.Deploying);
     }
 
+    public bool IsActive => Status is DeploymentStatus.Pending or DeploymentStatus.Deploying
+        or DeploymentStatus.Destroying;
+
     public bool CanDestroy => Status is DeploymentStatus.Deployed or DeploymentStatus.Failed;
 
     public Deployment StartDestroy()

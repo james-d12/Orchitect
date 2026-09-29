@@ -138,6 +138,17 @@ public sealed class DeploymentTests
         Assert.Equal(DeploymentStatus.Destroying, failed.StartDestroy().Status);
     }
 
+    [Fact]
+    public void IsActive_OnlyWhilePendingOrRunning()
+    {
+        Assert.True(NewDeployment().IsActive);
+        Assert.True(Deploying().IsActive);
+        Assert.True(Destroying().IsActive);
+        Assert.False(Deploying().ProcessDeploymentStatus(0, null).IsActive);
+        Assert.False(Deploying().ProcessDeploymentStatus(1, null).IsActive);
+        Assert.False(Destroying().ProcessDeploymentStatus(0, null).IsActive);
+    }
+
     private static Deployment NewDeployment() =>
         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"));
 

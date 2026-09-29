@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
+using Orchitect.Persistence.Configurations.Engine;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Persistence.Repositories.Engine;
@@ -18,7 +20,17 @@ public sealed class DeploymentRepository : IDeploymentRepository
         CancellationToken cancellationToken = default)
     {
         var result = await _dbContext.Deployments.AddAsync(deployment, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await SaveChangesAsync(deployment, cancellationToken);
+        }
+        catch
+        {
+            result.State = EntityState.Detached;
+            throw;
+        }
+
         return result.Entity;
     }
 
@@ -46,8 +58,32 @@ public sealed class DeploymentRepository : IDeploymentRepository
         CancellationToken cancellationToken = default)
     {
         var entry = _dbContext.Deployments.Update(deployment);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        entry.State = EntityState.Detached;
+
+        try
+        {
+            await SaveChangesAsync(deployment, cancellationToken);
+        }
+        finally
+        {
+            entry.State = EntityState.Detached;
+        }
+
         return deployment;
+    }
+
+    private async Task SaveChangesAsync(Deployment deployment, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+                                                  {
+                                                      SqlState: PostgresErrorCodes.UniqueViolation,
+                                                      ConstraintName: DeploymentIndexes.ActiveRun
+                                                  })
+        {
+            throw new ActiveDeploymentExistsException(deployment.ApplicationId, deployment.EnvironmentId, exception);
+        }
     }
 }

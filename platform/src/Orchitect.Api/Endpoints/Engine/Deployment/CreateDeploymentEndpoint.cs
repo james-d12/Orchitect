@@ -19,7 +19,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
 
     private sealed record CreateDeploymentResponse(Guid Id, string Status, Uri Location);
 
-    private static async Task<Results<Accepted<CreateDeploymentResponse>, BadRequest<string>, InternalServerError>>
+    private static async Task<Results<Accepted<CreateDeploymentResponse>, BadRequest<string>, Conflict<string>, InternalServerError>>
         HandleAsync(
             [FromBody]
             CreateDeploymentRequest request,
@@ -48,8 +48,25 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             return TypedResults.BadRequest($"Environment with Id: {request.EnvironmentId} does not exist.");
         }
 
+        var latest = await repository.GetLatestAsync(request.ApplicationId, request.EnvironmentId, cancellationToken);
+
+        if (latest is { IsActive: true })
+        {
+            return TypedResults.Conflict(
+                $"Deployment with Id: {latest.Id.Value} is still {latest.Status} for this application and environment.");
+        }
+
         var deployment = Orchitect.Domain.Engine.Deployment.Deployment.Create(request);
-        var deploymentResponse = await repository.CreateAsync(deployment, cancellationToken);
+        Orchitect.Domain.Engine.Deployment.Deployment? deploymentResponse;
+
+        try
+        {
+            deploymentResponse = await repository.CreateAsync(deployment, cancellationToken);
+        }
+        catch (ActiveDeploymentExistsException exception)
+        {
+            return TypedResults.Conflict(exception.Message);
+        }
 
         if (deploymentResponse is null)
         {

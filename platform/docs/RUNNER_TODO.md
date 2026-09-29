@@ -99,7 +99,7 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
   - destroy: resources gone, state blob still there, `terraform state list` empty
 - [ ] Confirm the destroy command against real terraform. It now applies the saved destroy plan with `apply -auto-approve <plan>`, and so far only unit tests with a fake command line have exercised it.
 - [x] API `DELETE /deployments/{id}` that queues a `--operation Destroy` run, plus `GET /deployments/{id}` for the status.
-- [ ] The unique index on `Deployments (ApplicationId, EnvironmentId, CommitId, Status)` rejects a second row with the same commit and status, e.g. destroying the same commit twice (two `Destroyed` rows) or two failed runs of one commit. The status update then fails with a DB error and the deployment stays `Destroying`/`Deploying`. Fix: a migration that replaces it with a non-unique index on `(ApplicationId, EnvironmentId, CreatedAt)`, which also serves the latest-deployment query.
+- [x] The unique index on `Deployments (ApplicationId, EnvironmentId, CommitId, Status)` is gone, so a failed commit can be retried and the same commit destroyed twice. A partial unique index (`IX_Deployments_ActiveRun`) now allows only one `Pending`, `Deploying` or `Destroying` deployment per application/environment. `POST /deployments` returns 409 while one is active, and a race that gets past that check is caught from the index as `ActiveDeploymentExistsException`. A plain `(ApplicationId, EnvironmentId, CreatedAt)` index serves the latest-deployment query.
 
 ### 3. Deployment status
 - [x] `Deployment.Start()` moves a pending deployment to `Deploying`. `Deployment.ProcessDeploymentStatus(exitCode, exception)` takes the raw run result and decides the status: `Deployed`, `Failed`, or unchanged when the run was cancelled. `DeploymentQueue` only passes that data through, and `IExecutor` returns the runner's exit code instead of throwing on a non-zero exit (`Runner_Isolation_Fix_Plan.md`, M3).
@@ -132,7 +132,7 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
 ### 8. Design issues (Hard, from `Runner_Isolation_Branch_Review.md`)
 - [ ] **H1** The runner holds the API's full DB credentials while running untrusted Terraform. First step: a dedicated Postgres role with `SELECT` on the engine tables. Proper fix: the API passes a run manifest and the runner never touches the database.
 - [ ] **H2** The Key Vault token covers every vault and secret the API's identity can read. Resolve only the mapped secrets in the API, use a runner-only vault, or give the runner its own least-privilege identity.
-- [ ] **H3** The deployment queue is serial, blocking and in-memory. Needs a durable queue, bounded concurrency with one run per application/environment, and non-blocking enqueue.
+- [ ] **H3** The deployment queue is serial, blocking and in-memory. Needs a durable queue, bounded concurrency and non-blocking enqueue. One run per application/environment is already enforced by `IX_Deployments_ActiveRun`, but a deployment left `Pending`/`Deploying` by an API restart now blocks new ones for that application/environment until it is fixed by hand.
 - [ ] **H4** A containerised API can't reach Docker, and mounting the socket is root-equivalent. Options: rootless Docker/Podman, a remote Docker host, a small job-launcher service, or a platform-native `IExecutor` (Kubernetes Jobs, Container Apps Jobs, ECS).
 
 Until H1 and H2 are fixed, don't point the runner at untrusted template repositories or score files.

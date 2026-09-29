@@ -138,7 +138,97 @@ public sealed class DeploymentIntegrationTests
         Assert.Empty(_queue.Requests);
     }
 
-    private async Task<Deployment> SeedDeploymentAsync(HttpClient client, DeploymentStatus status)
+    [Fact]
+    public async Task DeploymentApi_WhenCreatingDeployment_ShouldReturn202AcceptedAndQueueProvision()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
+
+        // Act
+        var response = await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(applicationId, environmentId, new CommitId("abc123")));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var request = Assert.Single(_queue.Requests);
+        Assert.Equal(DeploymentOperation.Provision, request.Operation);
+    }
+
+    [Theory]
+    [InlineData(DeploymentStatus.Pending)]
+    [InlineData(DeploymentStatus.Deploying)]
+    [InlineData(DeploymentStatus.Destroying)]
+    public async Task DeploymentApi_WhenCreatingDeploymentWhileOneIsActive_ShouldReturn409Conflict(
+        DeploymentStatus status)
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var active = await SeedDeploymentAsync(client, status);
+
+        // Act
+        var response = await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(active.ApplicationId, active.EnvironmentId, new CommitId("abc123")));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Empty(_queue.Requests);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenRetryingFailedCommit_ShouldAllowSecondFailure()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var commitId = new CommitId("abc123");
+        var first = await SeedDeploymentAsync(client, DeploymentStatus.Failed);
+        await CreateDeploymentAsync(first.ApplicationId, first.EnvironmentId, DeploymentStatus.Failed, commitId);
+
+        // Act
+        var response = await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(first.ApplicationId, first.EnvironmentId, commitId));
+        var created = await response.ReadFromJsonAsync<GetDeploymentEndpoint.GetDeploymentResponse>();
+        Assert.NotNull(created);
+        var retry = await GetDeploymentAsync(new DeploymentId(created.Id));
+        await UpdateDeploymentAsync(retry.Start().ProcessDeploymentStatus(1, null));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(DeploymentStatus.Failed, (await GetDeploymentAsync(retry.Id)).Status);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenSameCommitIsDestroyedTwice_ShouldKeepBothDestroyed()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var commitId = new CommitId("abc123");
+        var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
+        await CreateDeploymentAsync(applicationId, environmentId, DeploymentStatus.Destroyed, commitId);
+
+        // Act
+        var second = await CreateDeploymentAsync(applicationId, environmentId, DeploymentStatus.Destroyed, commitId);
+
+        // Assert
+        Assert.Equal(DeploymentStatus.Destroyed, (await GetDeploymentAsync(second.Id)).Status);
+    }
+
+    [Fact]
+    public async Task DeploymentRepository_WhenSecondRunBecomesActive_ShouldThrowActiveDeploymentExists()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployed = await SeedDeploymentAsync(client, DeploymentStatus.Deployed);
+        await CreateDeploymentAsync(deployed.ApplicationId, deployed.EnvironmentId, DeploymentStatus.Pending);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ActiveDeploymentExistsException>(() =>
+            CreateDeploymentAsync(deployed.ApplicationId, deployed.EnvironmentId, DeploymentStatus.Pending));
+        await Assert.ThrowsAsync<ActiveDeploymentExistsException>(() =>
+            UpdateDeploymentAsync(deployed.StartDestroy()));
+    }
+
+    private async Task<(ApplicationId, EnvironmentId)> SeedApplicationAndEnvironmentAsync(HttpClient client)
     {
         var organisation = await client.CreateOrganisationAsync();
         var application = await client.CreateApplicationAsync(organisation.Id);
@@ -149,18 +239,38 @@ public sealed class DeploymentIntegrationTests
             await environmentResponse.ReadFromJsonAsync<CreateEnvironmentEndpoint.CreateEnvironmentResponse>();
         ArgumentNullException.ThrowIfNull(environment);
 
-        return await CreateDeploymentAsync(new ApplicationId(application.Id), new EnvironmentId(environment.Id),
-            status);
+        return (new ApplicationId(application.Id), new EnvironmentId(environment.Id));
+    }
+
+    private async Task<Deployment> GetDeploymentAsync(DeploymentId id)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var deployment = await scope.ServiceProvider.GetRequiredService<IDeploymentRepository>().GetByIdAsync(id);
+        ArgumentNullException.ThrowIfNull(deployment);
+        return deployment;
+    }
+
+    private async Task UpdateDeploymentAsync(Deployment deployment)
+    {
+        using var scope = _factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IDeploymentRepository>().UpdateAsync(deployment);
+    }
+
+    private async Task<Deployment> SeedDeploymentAsync(HttpClient client, DeploymentStatus status)
+    {
+        var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
+
+        return await CreateDeploymentAsync(applicationId, environmentId, status);
     }
 
     private async Task<Deployment> CreateDeploymentAsync(ApplicationId applicationId, EnvironmentId environmentId,
-        DeploymentStatus status)
+        DeploymentStatus status, CommitId? commitId = null)
     {
         Deployment? created;
         using (var createScope = _factory.Services.CreateScope())
         {
             created = await createScope.ServiceProvider.GetRequiredService<IDeploymentRepository>().CreateAsync(
-                Deployment.Create(applicationId, environmentId, new CommitId(_fixture.Create<string>())));
+                Deployment.Create(applicationId, environmentId, commitId ?? new CommitId(_fixture.Create<string>())));
         }
 
         ArgumentNullException.ThrowIfNull(created);
@@ -179,8 +289,7 @@ public sealed class DeploymentIntegrationTests
 
         if (deployment != created)
         {
-            using var updateScope = _factory.Services.CreateScope();
-            await updateScope.ServiceProvider.GetRequiredService<IDeploymentRepository>().UpdateAsync(deployment);
+            await UpdateDeploymentAsync(deployment);
         }
 
         return deployment;
