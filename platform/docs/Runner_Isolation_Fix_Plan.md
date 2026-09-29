@@ -194,8 +194,9 @@ Every phase ends with the same checks:
 - Replace `AddEngineInfrastructureServices` with two methods:
   - `AddEngineProvisioningServices()` (shared, score, Helm, Terraform) for the Runner and the Playground
   - `AddEngineExecutionServices(IConfiguration)` (executor, Docker client, token provider, queue) for the API
+- Both return `IServiceCollection`. The API chains both; the Runner and the Playground call only `AddEngineProvisioningServices()`. The Runner keeps `AddRunnerServices` for its secret provider.
 - Update `Orchitect.Api/Program.cs`, `Orchitect.Runner/Program.cs` and `Orchitect.Playground/Program.cs`.
-- Update `RunnerServicesTests` if needed.
+- Tests: `EngineInfrastructureExtensionsTests` checks that the provisioning set registers no executor, Docker client, queue, hosted service or `ExecutorOptions`, and that the execution set does.
 
 ## Phase 10 – M9: leftover container sweep → review
 - Add a new `Executor/RunnerContainerSweepService` (`BackgroundService`), registered with the execution services. It runs at startup and every 10 minutes.

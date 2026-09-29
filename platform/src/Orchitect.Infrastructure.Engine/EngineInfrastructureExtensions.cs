@@ -19,14 +19,21 @@ namespace Orchitect.Infrastructure.Engine;
 
 public static class EngineInfrastructureExtensions
 {
-    public static void AddEngineInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddEngineProvisioningServices(this IServiceCollection services)
     {
         services.AddSharedServices();
         services.AddScoreServices();
         services.AddHelmServices();
         services.AddTerraformServices();
+        return services;
+    }
+
+    public static IServiceCollection AddEngineExecutionServices(this IServiceCollection services,
+        IConfiguration configuration)
+    {
         services.AddExecutorServices(configuration);
         services.AddQueueServices();
+        return services;
     }
 
     private static void AddSharedServices(this IServiceCollection services)

@@ -9,7 +9,7 @@ Items left over after the Runner review (`REVIEW_CODE.md`) and the first pass of
   1. loads the Application and Deployment from the DB by ID
   2. loads the mapped secrets into its environment (`ISecretEnvironmentLoader`)
   3. calls `IEngineOrchestrator.StartAsync` or `DestroyAsync`, depending on `--operation`
-- Only these cross the boundary: the IDs (and `--operation provision|destroy`) as container args, non-secret env vars built by `ExecutorOptions.ToEnvironment()`, and a `/run/orchitect/secrets.json` copied into the container before it starts (connection string, Key Vault token, `Configuration`). The runner loads that file into its environment and deletes it at startup. The Runner resolves every concrete implementation through its own DI root.
+- Only these cross the boundary: the IDs (and `--operation provision|destroy`) as container args, non-secret env vars built by `ExecutorOptions.ToEnvironment()`, and a `/run/orchitect/secrets.json` copied into the container before it starts (connection string, Key Vault token, `Configuration`). The runner loads that file into its environment and deletes it at startup. The Runner resolves every concrete implementation through its own DI root. It registers only `AddEngineProvisioningServices()` and `AddRunnerServices()`; the queue, the Docker client and `ExecutorOptions` come from `AddEngineExecutionServices()`, which only the API calls.
 - Destroy is Runner-side only for now: run the image with `--operation destroy`. There is no API endpoint yet.
 
 ## Build

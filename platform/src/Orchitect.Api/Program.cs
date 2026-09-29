@@ -48,7 +48,8 @@ try
         .AddEndpointsApiExplorer()
         .AddPersistenceServices()
         .AddInventoryInfrastructureServices()
-        .AddEngineInfrastructureServices(builder.Configuration);
+        .AddEngineProvisioningServices()
+        .AddEngineExecutionServices(builder.Configuration);
 
     builder.Services.TryAddSingleton<IEncryptionService, AesEncryptionService>();
     builder.Services.AddOptions<EncryptionOptions>()
