@@ -168,7 +168,9 @@ public sealed class RunnerContainerSweepService : BackgroundService
         }
 
         var inspect = await docker.Containers.InspectContainerAsync(container.ID, cancellationToken);
-        return deployment.ProcessDeploymentStatus(inspect.State.ExitCode, null);
+        return inspect.State is { } state
+            ? deployment.ProcessDeploymentStatus(state.ExitCode, null)
+            : deployment.Interrupt();
     }
 
     private static string? GetRunId(ContainerListResponse container) =>

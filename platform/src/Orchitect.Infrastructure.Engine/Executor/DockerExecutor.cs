@@ -15,6 +15,8 @@ public sealed class DockerExecutor : IExecutor
     private static readonly TimeSpan RawOutputFlushInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan OutputRelayStopTimeout = TimeSpan.FromSeconds(2);
 
+    private const string DefaultNetworkMode = "default";
+
     private readonly ILogger<DockerExecutor> _logger;
     private readonly IDockerClient _docker;
     private readonly IConfiguration _configuration;
@@ -87,7 +89,7 @@ public sealed class DockerExecutor : IExecutor
                     ],
                     HostConfig = new HostConfig
                     {
-                        NetworkMode = network,
+                        NetworkMode = network ?? DefaultNetworkMode,
                         ExtraHosts = ["host.docker.internal:host-gateway"],
                         CapDrop = ["ALL"],
                         SecurityOpt = ["no-new-privileges"],
@@ -297,7 +299,7 @@ public sealed class DockerExecutor : IExecutor
 
         await _docker.Containers.ExtractArchiveToContainerAsync(
             containerId,
-            new ContainerPathStatParameters { Path = RunnerSecretsFile.DirectoryPath },
+            new CopyToContainerParameters { Path = RunnerSecretsFile.DirectoryPath },
             archive,
             cancellationToken);
 
@@ -405,7 +407,6 @@ public sealed class DockerExecutor : IExecutor
         {
             using var stream = await _docker.Containers.GetContainerLogsAsync(
                 containerId,
-                tty: false,
                 new ContainerLogsParameters
                 {
                     ShowStdout = true,

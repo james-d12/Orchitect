@@ -72,7 +72,7 @@ public sealed class RunnerContainerSweepServiceTests
         SetActiveDeployments(deployment);
         SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), deployment.Id));
         _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
-            .Returns(new ContainerInspectResponse { State = new ContainerState { ExitCode = exitCode } });
+            .Returns(new ContainerInspectResponse { State = new State { ExitCode = exitCode } });
 
         await _service.SweepAsync(CancellationToken.None);
 
@@ -87,7 +87,7 @@ public sealed class RunnerContainerSweepServiceTests
         SetActiveDeployments(deployment);
         SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), deployment.Id));
         _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
-            .Returns(new ContainerInspectResponse { State = new ContainerState { ExitCode = 0 } });
+            .Returns(new ContainerInspectResponse { State = new State { ExitCode = 0 } });
 
         await _service.SweepAsync(CancellationToken.None);
 
@@ -206,7 +206,7 @@ public sealed class RunnerContainerSweepServiceTests
         await _containers.Received(1).ListContainersAsync(
             Arg.Is<ContainersListParameters>(p =>
                 p.All == true &&
-                p.Filters["label"].Count == 1 &&
+                p.Filters != null && p.Filters["label"].Count == 1 &&
                 p.Filters["label"]["orchitect.runner=true"]),
             Arg.Any<CancellationToken>());
     }

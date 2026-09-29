@@ -206,7 +206,7 @@ Every phase ends with the same checks:
   - List all containers with the label `orchitect.runner=true` (from E9). The label names live in `RunnerContainerLabels`, shared with `DockerExecutor`.
   - Remove those in the `exited`, `created` or `dead` state, but only if they were created before this API process started or longer ago than `Timeout + StopGracePeriod`. So the sweep never removes a container this process is still creating or reading logs from.
   - Warn about running ones older than `Timeout + StopGracePeriod`. It doesn't stop them.
-- The sweep resolves `IDockerClient` lazily from `IServiceProvider`, so a Docker client that can't be created doesn't stop the API from starting. This matters in the integration-test host, where Testcontainers' `Docker.DotNet.Enhanced` 4.x replaces the `Docker.DotNet` 3.x assembly the Engine is built against.
+- The sweep resolves `IDockerClient` lazily from `IServiceProvider`, so a Docker client that can't be created doesn't stop the API from starting. It was added when the Engine still used `Docker.DotNet` 3.x, which clashed with Testcontainers' `Docker.DotNet.Enhanced` 4.x in the integration-test host. The Engine has since moved to `Docker.DotNet.Enhanced`, and the lazy resolution stays for resilience.
 - `DockerExecutor`'s detach warning now says the sweep removes the container once it has exited.
 - Tests: finished containers from a previous process are removed, recent ones from this process are kept, overdue ones are removed, running ones never are, the list filters on the label, and one failed remove doesn't stop the rest.
 - Check: against the local Docker daemon, the sweep removed an exited labelled container and kept a running labelled one and an unlabelled one.

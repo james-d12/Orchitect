@@ -31,7 +31,7 @@ public sealed class DockerExecutorTests
         _containers.StartContainerAsync(Arg.Any<string>(), Arg.Any<ContainerStartParameters>(),
                 Arg.Any<CancellationToken>())
             .Returns(true);
-        _containers.GetContainerLogsAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<ContainerLogsParameters>(),
+        _containers.GetContainerLogsAsync(Arg.Any<string>(), Arg.Any<ContainerLogsParameters>(),
                 Arg.Any<CancellationToken>())
             .Returns(_ => new MultiplexedStream(new MemoryStream(), true));
         SetRunning(false);
@@ -68,7 +68,7 @@ public sealed class DockerExecutorTests
         _ = _containers.CreateContainerAsync(Arg.Do<CreateContainerParameters>(p => created = p),
             Arg.Any<CancellationToken>());
         _ = _containers.ExtractArchiveToContainerAsync(ContainerId,
-            Arg.Is<ContainerPathStatParameters>(p => p.Path == RunnerSecretsFile.DirectoryPath),
+            Arg.Is<CopyToContainerParameters>(p => p.Path == RunnerSecretsFile.DirectoryPath),
             Arg.Do<Stream>(archive => copied = ReadSecrets(archive)), Arg.Any<CancellationToken>());
         SetWait(_ => Task.FromResult(new ContainerWaitResponse { StatusCode = 0 }));
 
@@ -83,7 +83,7 @@ public sealed class DockerExecutorTests
 
         Received.InOrder(() =>
         {
-            _containers.ExtractArchiveToContainerAsync(ContainerId, Arg.Any<ContainerPathStatParameters>(),
+            _containers.ExtractArchiveToContainerAsync(ContainerId, Arg.Any<CopyToContainerParameters>(),
                 Arg.Any<Stream>(), Arg.Any<CancellationToken>());
             _containers.StartContainerAsync(ContainerId, Arg.Any<ContainerStartParameters>(),
                 Arg.Any<CancellationToken>());
@@ -137,7 +137,7 @@ public sealed class DockerExecutorTests
     [Fact]
     public async Task ExecuteAsync_CancelledAfterExitWhileDrainingOutput_KeepsExitCodeAndRemovesContainer()
     {
-        _containers.GetContainerLogsAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<ContainerLogsParameters>(),
+        _containers.GetContainerLogsAsync(Arg.Any<string>(), Arg.Any<ContainerLogsParameters>(),
                 Arg.Any<CancellationToken>())
             .Returns(_ => new MultiplexedStream(new BlockingStream(), true));
         SetWait(_ =>
@@ -214,7 +214,7 @@ public sealed class DockerExecutorTests
 
     private void SetRunning(bool running) =>
         _containers.InspectContainerAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new ContainerInspectResponse { State = new ContainerState { Running = running } });
+            .Returns(new ContainerInspectResponse { State = new State { Running = running } });
 
     private void SetWait(Func<NSubstitute.Core.CallInfo, Task<ContainerWaitResponse>> wait) =>
         _containers.WaitContainerAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(wait);
