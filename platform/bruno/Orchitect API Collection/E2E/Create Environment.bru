@@ -1,0 +1,36 @@
+meta {
+  name: Create Environment
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{API_BASE_URL}}/environments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "name": "Dev",
+    "description": "Dev Environment used for testing before UAT",
+    "organisationId": {
+      "value": "{{ORGANISATION_ID}}"
+    }
+  }
+}
+
+script:post-response {
+  var id = res.body.id
+  
+  bru.setVar("ENVIRONMENT_ID", id)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

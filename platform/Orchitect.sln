@@ -12,9 +12,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Persistence", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Api", "src\Orchitect.Api\Orchitect.Api.csproj", "{0AC3CE1A-1787-40A1-822B-9EA6C0323D78}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Infrastructure", "src\Orchitect.Infrastructure\Orchitect.Infrastructure.csproj", "{5A3652DB-54C8-4290-84D2-8062C245D0BA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Infrastructure.Inventory", "src\Orchitect.Infrastructure.Inventory\Orchitect.Infrastructure.Inventory.csproj", "{5A3652DB-54C8-4290-84D2-8062C245D0BA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Infrastructure.Unit.Tests", "src\Orchitect.Infrastructure.Unit.Tests\Orchitect.Infrastructure.Unit.Tests.csproj", "{08425FD5-B210-4332-9E50-A6E52E92E37A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Infrastructure.Inventory.Unit.Tests", "src\Orchitect.Infrastructure.Inventory.Unit.Tests\Orchitect.Infrastructure.Inventory.Unit.Tests.csproj", "{08425FD5-B210-4332-9E50-A6E52E92E37A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Aspire", "Aspire", "{39DC69B3-EE8D-4C43-B6FA-B69DEF7B77F2}"
 EndProject
@@ -26,12 +26,30 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{CC0A1FCB
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Common.Unit.Tests", "src\Orchitect.Common.Unit.Tests\Orchitect.Common.Unit.Tests.csproj", "{74EE9A69-EA6A-44C0-8471-AF5B509A5E46}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Domain.Unit.Tests", "src\Orchitect.Domain.Unit.Tests\Orchitect.Domain.Unit.Tests.csproj", "{C59149B2-D803-46FF-8F2B-A78A3C351E11}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Runner", "src\Orchitect.Runner\Orchitect.Runner.csproj", "{F4145D1B-D812-4DC1-9D43-EE6F35E0FD2D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Execution", "src\Orchitect.Engine.Execution\Orchitect.Engine.Execution.csproj", "{7C585B88-7799-4CF3-926E-92587F3B7DB7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Execution.Unit.Tests", "src\Orchitect.Engine.Execution.Unit.Tests\Orchitect.Engine.Execution.Unit.Tests.csproj", "{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Contracts", "src\Orchitect.Engine.Contracts\Orchitect.Engine.Contracts.csproj", "{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Dispatch", "src\Orchitect.Engine.Dispatch\Orchitect.Engine.Dispatch.csproj", "{B2F6D1C3-4052-4D9F-8E3B-7C8D9E0F1A22}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Dispatch.Unit.Tests", "src\Orchitect.Engine.Dispatch.Unit.Tests\Orchitect.Engine.Dispatch.Unit.Tests.csproj", "{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11}.Release|Any CPU.Build.0 = Release|Any CPU
 		{0E8A91D2-E999-4D7C-9984-2B04118A9604}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0E8A91D2-E999-4D7C-9984-2B04118A9604}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0E8A91D2-E999-4D7C-9984-2B04118A9604}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -76,11 +94,38 @@ Global
 		{74EE9A69-EA6A-44C0-8471-AF5B509A5E46}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{74EE9A69-EA6A-44C0-8471-AF5B509A5E46}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{74EE9A69-EA6A-44C0-8471-AF5B509A5E46}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F4145D1B-D812-4DC1-9D43-EE6F35E0FD2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F4145D1B-D812-4DC1-9D43-EE6F35E0FD2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F4145D1B-D812-4DC1-9D43-EE6F35E0FD2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F4145D1B-D812-4DC1-9D43-EE6F35E0FD2D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7C585B88-7799-4CF3-926E-92587F3B7DB7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C585B88-7799-4CF3-926E-92587F3B7DB7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C585B88-7799-4CF3-926E-92587F3B7DB7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C585B88-7799-4CF3-926E-92587F3B7DB7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2F6D1C3-4052-4D9F-8E3B-7C8D9E0F1A22}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2F6D1C3-4052-4D9F-8E3B-7C8D9E0F1A22}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2F6D1C3-4052-4D9F-8E3B-7C8D9E0F1A22}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2F6D1C3-4052-4D9F-8E3B-7C8D9E0F1A22}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{C59149B2-D803-46FF-8F2B-A78A3C351E11} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{5AA7C306-0E96-4A54-A8DD-1A2F4CA2C0DC} = {39DC69B3-EE8D-4C43-B6FA-B69DEF7B77F2}
 		{67F547C0-B70F-437B-98BA-2A51C39D6642} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{08425FD5-B210-4332-9E50-A6E52E92E37A} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{74EE9A69-EA6A-44C0-8471-AF5B509A5E46} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
+		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
+		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 	EndGlobalSection
 EndGlobal

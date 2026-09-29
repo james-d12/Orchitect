@@ -1,0 +1,16 @@
+meta {
+  name: Get Environments
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{API_BASE_URL}}/environments
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

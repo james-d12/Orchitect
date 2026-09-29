@@ -38,4 +38,72 @@ public sealed record Deployment
     {
         return Create(request.ApplicationId, request.EnvironmentId, request.CommitId);
     }
+
+    public Deployment Start()
+    {
+        if (Status != DeploymentStatus.Pending)
+        {
+            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot start while {Status}.");
+        }
+
+        return WithStatus(DeploymentStatus.Deploying);
+    }
+
+    public bool IsActive => Status is DeploymentStatus.Pending or DeploymentStatus.Deploying
+        or DeploymentStatus.Destroying;
+
+    public bool CanDestroy => Status is DeploymentStatus.Deployed or DeploymentStatus.Failed;
+
+    public Deployment StartDestroy()
+    {
+        if (!CanDestroy)
+        {
+            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot be destroyed while {Status}.");
+        }
+
+        return WithStatus(DeploymentStatus.Destroying);
+    }
+
+    public Deployment Interrupt()
+    {
+        if (!IsActive)
+        {
+            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot be interrupted while {Status}.");
+        }
+
+        return WithStatus(DeploymentStatus.Failed);
+    }
+
+    public Deployment ProcessDeploymentStatus(long? exitCode, Exception? exception)
+    {
+        if (Status is not (DeploymentStatus.Deploying or DeploymentStatus.Destroying))
+        {
+            throw new InvalidOperationException(
+                $"Deployment '{Id.Value}' cannot process a run result while {Status}.");
+        }
+
+        if (exitCode is null && exception is null)
+        {
+            throw new ArgumentException("A run result needs an exit code or an exception.");
+        }
+
+        return exception switch
+        {
+            OperationCanceledException => this,
+            not null => WithStatus(DeploymentStatus.Failed),
+            null when exitCode == 0 => WithStatus(Status == DeploymentStatus.Destroying
+                ? DeploymentStatus.Destroyed
+                : DeploymentStatus.Deployed),
+            _ => WithStatus(DeploymentStatus.Failed)
+        };
+    }
+
+    private Deployment WithStatus(DeploymentStatus status)
+    {
+        return this with
+        {
+            Status = status,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
 }

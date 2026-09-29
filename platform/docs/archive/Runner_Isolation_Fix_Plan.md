@@ -1,0 +1,234 @@
+---
+title: "Runner isolation fix plan (Easy + Medium)"
+status: done
+workstream: runner
+milestone: "Runner Isolation"
+issues: [124]
+superseded_by: null
+last_reviewed: 2026-09-29
+---
+
+> **Done: E1–E15 and M1–M9 are fixed, M10 was dropped. The remaining findings (H1–H4, A1–A10) are tracked as issues from `runner/`.**
+
+# Runner Isolation – Fix Plan (Easy + Medium)
+
+## Context
+`platform/docs/runner/Runner_Isolation_Branch_Review.md` reviewed `feature/runner_isolation` and found 15 Easy and 10 Medium issues. They cover Terraform error handling, HCL injection, secrets exposure, container lifecycle and deployment status. The Hard items (H1–H4) are out of scope and will be tracked in `docs/runner/RUNNER_TODO.md`.
+
+**How the work is delivered:**
+- **Phase 1** fixes all the Easy findings (E1–E15). Then it **stops for review**.
+- **Phases 2–11** fix one Medium finding each (M1–M10), in order. Each phase is one commit and **stops for review** before the next one starts.
+
+**Status:** Phases 1–10 (E1–E15, M1–M9) are done. Phase 11 (M10) was dropped; see below.
+
+Decisions made:
+- **M1** uses root variables plus `terraform.tfvars.json`, so values are never evaluated as code.
+- **M7** copies a secrets file into the container with put-archive before it starts.
+- **M10** is dropped. A shared writable plugin cache would let one run plant a provider that later runs use unchecked.
+
+Paths are relative to `platform/src/Orchitect.Infrastructure.Engine/` unless they say otherwise.
+
+Comment policy: only short summary docs on interfaces, no other code comments.
+
+Every phase ends with the same checks:
+- `dotnet build` (warnings are errors)
+- `dotnet test src/Orchitect.Infrastructure.Engine.Unit.Tests`
+- the full `dotnet test`
+- the phase-specific checks listed under it
+
+---
+
+## Phase 1 – All Easy fixes (E1–E15) → review
+
+**Terraform command line** (`Provisioner/Terraform/TerraformCommandLine.cs`)
+- E5: build every command, including config-inspect and validate, with `WithArguments(IEnumerable<string>)`.
+- E6:
+  - Add `-lock-timeout=5m` to plan, plan-destroy and apply.
+  - Add `-input=false` to apply.
+  - Remove `RunDestroyAsync` from the interface and the class.
+
+**Terraform driver** (`Provisioner/Terraform/TerraformDriver.cs`)
+- E1: add an explicit `case ChangesNeeded` that returns `Success`. The `default` returns `PlanFailed` and logs the unexpected exit code.
+- E6: `DestroyAsync` calls `RunApplyAsync`.
+- E7: set the `PreValidationFailed` message to the joined `"{template}: {message}"` of each invalid result.
+
+**Terraform validator** (`Provisioner/Terraform/TerraformValidator.cs` and `Models/TerraformConfig.cs`)
+- E3:
+  - Add `Diagnostics` (severity, summary, detail, pos) to `TerraformConfig`.
+  - Always try to deserialize stdout, whatever the exit code.
+  - Catch `JsonException`, and include stdout and stderr in the `ModuleInspection` error.
+  - Error-severity diagnostics become a formatted `ModuleInvalid` message.
+- E13:
+  - Match inputs to variables with `Ordinal`.
+  - Replace the recursive `variables.tf`/`outputs.tf` check with a check for at least one `*.tf` file in the module root (`TopDirectoryOnly`).
+
+**Orchestrator** (`EngineOrchestrator.cs`)
+- E12: a null score file, or null/empty `Resources`, throws.
+- E2:
+  - A missing resource template throws, and the message names the type and the resource key.
+  - A null `Parameters` becomes an empty dictionary.
+- The return type becomes non-nullable.
+
+**Docker executor** (`Executor/DockerExecutor.cs`, `ExecutorOptions.cs`, `IExecutor.cs`, `Queue/DeploymentQueue.cs`)
+- E4: add `ExecutorOptions.LogLevel` (default `Information`) and emit it in `ToEnvironment()`. Remove the hardcoded `Debug`.
+- E8:
+  - Set `HostConfig` to `CapDrop = ["ALL"]`, `SecurityOpt = ["no-new-privileges"]` and `Init = true`.
+  - Add `Memory`, `NanoCPUs` and `PidsLimit` from the new nullable `ExecutorOptions` values (`MemoryBytes`, `NanoCpus`, `PidsLimit`), passed through `ExecutorContext`.
+- E9:
+  - Name the container `orchitect-runner-{RunId}-{8-char guid}`.
+  - Add the labels `orchitect.runner=true` and `orchitect.run-id={RunId}`.
+- E10:
+  - Inject `IConfiguration` and use `GetConnectionString("orchitect")`.
+  - Rewrite the connection string with `NpgsqlConnectionStringBuilder`. Add a `Npgsql` reference if it isn't there transitively.
+- E11:
+  - Catch `OperationCanceledException` when the token is cancelled, before the general catch, and log it at Debug.
+  - Observe the pending `read` task.
+  - Briefly await `logStreaming` after a drain-timeout cancel.
+  - Log `DockerContainerNotFoundException` at Warning.
+
+**Config and docs**
+- E14 (`EngineInfrastructureExtensions.cs`):
+  - Change `RunnerOptions:` to `ExecutorOptions:` in the validation messages.
+  - Add `[Required]` and a non-blank `.Validate` for `Image`.
+- E14 (`docs/runner/RUNNER_TODO.md`):
+  - Rename `DockerRunner`/`RunnerOptions` to the current names.
+  - Remove `docker-configure.sh` and `ORCHITECT_CLOUD_PROVIDER`.
+  - Fix the build command and tag.
+  - Tick the §7 items that are done.
+  - Add H1–H4 as tracked items.
+
+**Runner image** (`Orchitect.Runner/Dockerfile`, E15)
+- Pin `alpine` and `golang` to their current minor versions.
+- Verify Terraform with GPG before checking `SHA256SUMS`:
+  - `apk add gnupg`
+  - import the HashiCorp key and check its fingerprint against HashiCorp's security page
+  - `gpg --verify` the `.sig`
+- Note in the header comment that BuildKit is required.
+
+**Tests**
+- Driver: exit codes 2, 137 and -1. The pre-validation message contains the reasons. Destroy uses `RunApplyAsync`.
+- Validator:
+  - diagnostics with exit 1
+  - malformed JSON fails only its own template
+  - case mismatch → `InputInvalid`
+  - `variables.tf` only under `examples/`
+- A new orchestrator test for a missing template, null parameters and an empty score.
+- `ExecutorOptionsTests` covers the log level.
+- A connection-string rewrite test with `Server=localhost`.
+
+**Extra checks**
+- `docker build -f src/Orchitect.Runner/Dockerfile -t orchitect-runner:terraform .` from `platform/`.
+- A run through Aspire and Bruno. `docker inspect` shows the labels, `CapDrop` and `Init`, and the runner logs arrive at Information.
+
+---
+
+## Phase 2 – M1: HCL injection → review
+- Add a new `Provisioner/Terraform/TerraformValueConverter.cs`. It converts a raw string into a `JsonNode` based on the module variable's type:
+  - `string` → string
+  - `number` → invariant decimal
+  - `bool` → bool
+  - collections and objects → parsed as JSON, with a `'`→`"` fallback
+  - `any`/null → today's heuristic
+- The validator calls the converter, so a bad value becomes `InputInvalid`.
+- `TerraformRenderer.RenderModules` builds its output with `System.Text.Json.Nodes` and returns `(MainTfJson, TfVarsJson)`:
+  - Module names are sanitized.
+  - Each input gets a root `variable "{module}__{input}"`, with its type copied from the module.
+  - Module arguments are `"${var.…}"`.
+  - The values go in the tfvars.
+- The providers and backend blocks are also rendered as JSON.
+- `TerraformProjectBuilder` writes `main.tf.json`, `terraform.tfvars.json`, `providers.tf.json` and `backend.tf.json`. It never logs the tfvars.
+- Tests:
+  - An injection payload (`"\n}\nresource…` or `${file(...)}`) appears only in the tfvars, verbatim.
+  - Types come through correctly.
+  - The converter has its own tests.
+- Check: a run with a `${file("/etc/passwd")}` value is applied literally.
+
+## Phase 3 – M2: cancellation and SIGINT forwarding → review
+- `CommandLineBuilder.ExecuteAsync`/`ExecuteStreamAsync(CancellationToken)`:
+  - On cancel, send SIGINT through a `libc kill` P/Invoke. On Windows, use `Kill(true)`.
+  - Wait up to a 5-minute grace period, then `Kill(true)` and throw `OperationCanceledException`.
+- Thread `CancellationToken` through `ITerraformCommandLine`, `TerraformValidator`, `TerraformDriver` and `TerraformProvisioner`. The provisioner currently ignores its token.
+- `Orchitect.Runner/Program.cs`: invoke with `ProcessTerminationTimeout = Timeout.InfiniteTimeSpan`. `null` turns signal handling off, so SIGTERM would kill the runner without cancelling the token. The container's `StopTimeout` is the hard limit.
+- `DockerExecutor`: set `StopTimeout` from a new `ExecutorOptions.StopGracePeriod` (default 6 min, longer than the runner's 5-minute SIGINT grace period, so the runner can kill Terraform itself before Docker sends SIGKILL).
+- Test: `CommandLineBuilder` cancel against a `sleep`/trap script records the SIGINT.
+- Check: `docker stop` on a running runner, and Terraform logs that it's interrupted and releases the lock.
+
+## Phase 4 – M3: deployment status → review
+- `DeploymentStatus`: add `Deploying`. It's stored as a string, so no migration is needed.
+- `Deployment.Start()`: Pending → Deploying, otherwise throws.
+- `Deployment.ProcessDeploymentStatus(long? exitCode, Exception? exception)` owns the decision. It requires `Deploying`, and throws if both arguments are null.
+  - `OperationCanceledException` → unchanged (the outcome is unknown)
+  - any other exception → Failed
+  - exit code 0 → Deployed, otherwise Failed
+- `IExecutor.ExecuteAsync` returns an `ExecutorResult` with the exit code. It no longer throws on a non-zero exit.
+- `IDeploymentRepository.UpdateAsync`, implemented in `Orchitect.Persistence/Repositories/Engine/DeploymentRepository.cs` like `EnvironmentRepository.UpdateAsync`.
+- `DeploymentQueue` work item:
+  - Resolve the repository from `sp`.
+  - Call `Start()`, then pass the executor's exit code or the caught exception to `ProcessDeploymentStatus`.
+- Check: `GET /deployments/{id}` goes Pending → Deploying → Deployed, and Failed for an unknown resource type.
+
+## Phase 5 – M4: runner timeout → review
+- Add `ExecutorOptions.Timeout` (default 1h) and pass it through `ExecutorContext`.
+- `DockerExecutor`:
+  - Link a timeout CTS with the caller's token for `WaitContainerAsync`.
+  - On timeout alone: send SIGTERM with `KillContainerAsync` and wait up to `StopGracePeriod` for the container to exit. Then drain the logs, throw `TimeoutException`, and force-remove the container. `StopContainerAsync` isn't used because Docker.DotNet's 100 s client timeout would cut a long grace period short.
+  - The `TimeoutException` comes back in `ExecutorResult.Exception`, and `ProcessDeploymentStatus` marks the deployment `Failed`.
+- Check: `Timeout=00:00:30` → the deployment is `Failed` and the container is gone.
+
+## Phase 6 – M5: cancel race → review
+- Remove the `started` flag and the detach catch filter.
+- The `finally` calls `CleanupContainerAsync`, which runs `InspectContainerAsync`:
+  - running and caller cancelled → detach, with the existing warning
+  - otherwise → remove
+  - an inspect failure → detach, so a container that may still be running isn't killed. The M9 sweep removes it later.
+- Output draining stops quietly on cancellation, so a run that exits just before shutdown still reports its exit code.
+- `DockerExecutor` depends on `IDockerClient`, so it's unit tested with NSubstitute. The tests cover cancel during start (running or not), cancel while waiting, cancel after exit during the drain, and the M4 timeout paths.
+
+## Phase 7 – M6: backend config file → review
+- `TerraformProjectBuilder` writes `backend.tfbackend` (HCL `key = "escaped"`) with a 0600 `UnixCreateMode`.
+- `TerraformProjectBuilderResult.BackendConfig` → `string? BackendConfigFile`.
+- `RunInitAsync` passes `-backend-config=<file>`.
+- `TerraformRenderer.RenderBackendConfig` writes the file. Keys must be identifiers, and values escape `\`, `"`, newlines, `${` and `%{`, so they stay literal.
+- Tests: the file content, the placeholders, the mode, the escaping and invalid keys.
+- Check: a real `terraform init` against an http backend read an escaped value literally and converted `"true"` and `"2"` to bool and number. The same conversion applies to azurerm's `use_azuread_auth = "true"`.
+
+## Phase 8 – M7: secrets out of container env → review
+- `ExecutorContext.Secrets` holds the connection string, the Key Vault token environment and `ExecutorOptions.Configuration`.
+- `ToEnvironment()` no longer merges `Configuration`.
+- `DeploymentQueue` fills `Secrets`.
+- `DockerExecutor`:
+  - After create and before start, build a tar in memory with `System.Formats.Tar`: `secrets.json`, uid/gid 1654, mode 0400.
+  - Extract it with `ExtractArchiveToContainerAsync` to `/run/orchitect`.
+- Runner `Program.cs`: before the host is built, `RunnerSecretsFile.LoadIntoEnvironment()` reads `/run/orchitect/secrets.json`, deletes it, and sets each key as a process environment variable. Configuration binding (`ConnectionStrings__orchitect`, `SecretProvider__AzureKeyVault__AccessToken`), Azure and Terraform (`ARM_*`) then work unchanged.
+- There's no tmpfs mount: Docker creates tmpfs mounts at start, which would hide a file copied in before start.
+- Dockerfile: `mkdir /run/orchitect`, owned by `$APP_UID`, mode 700.
+- Tests: the tar entry (name, mode, uid/gid, content), loading and deleting the file, `ToEnvironment` excluding `Configuration`, the executor copying secrets before start and keeping them out of `Env`, and the queue passing the token and `Configuration` as secrets.
+- Check: with the rebuilt image, `docker inspect` showed only `Logging__LogLevel__Default` in the env. The runner used the connection string from the file, and the file was gone after the run.
+
+## Phase 9 – M8: split DI registrations → review
+- Replace `AddEngineInfrastructureServices` with two methods:
+  - `AddEngineProvisioningServices()` (shared, score, Helm, Terraform) for the Runner and the Playground
+  - `AddEngineExecutionServices(IConfiguration)` (executor, Docker client, token provider, queue) for the API
+- Both return `IServiceCollection`. The API chains both; the Runner and the Playground call only `AddEngineProvisioningServices()`. The Runner keeps `AddRunnerServices` for its secret provider.
+- Update `Orchitect.Api/Program.cs`, `Orchitect.Runner/Program.cs` and `Orchitect.Playground/Program.cs`.
+- Tests: `EngineInfrastructureExtensionsTests` checks that the provisioning set registers no executor, Docker client, queue, hosted service or `ExecutorOptions`, and that the execution set does.
+
+## Phase 10 – M9: leftover container sweep → review
+- Add a new `Executor/RunnerContainerSweepService` (`BackgroundService`), registered with the execution services. It runs at startup and every 10 minutes. A failed sweep logs a Warning and the loop carries on.
+  - List all containers with the label `orchitect.runner=true` (from E9). The label names live in `RunnerContainerLabels`, shared with `DockerExecutor`.
+  - Remove those in the `exited`, `created` or `dead` state, but only if they were created before this API process started or longer ago than `Timeout + StopGracePeriod`. So the sweep never removes a container this process is still creating or reading logs from.
+  - Warn about running ones older than `Timeout + StopGracePeriod`. It doesn't stop them.
+- The sweep resolves `IDockerClient` lazily from `IServiceProvider`, so a Docker client that can't be created doesn't stop the API from starting. It was added when the Engine still used `Docker.DotNet` 3.x, which clashed with Testcontainers' `Docker.DotNet.Enhanced` 4.x in the integration-test host. The Engine has since moved to `Docker.DotNet.Enhanced`, and the lazy resolution stays for resilience.
+- `DockerExecutor`'s detach warning now says the sweep removes the container once it has exited.
+- Tests: finished containers from a previous process are removed, recent ones from this process are kept, overdue ones are removed, running ones never are, the list filters on the label, and one failed remove doesn't stop the rest.
+- Check: against the local Docker daemon, the sweep removed an exited labelled container and kept a running labelled one and an unlabelled one.
+
+## Phase 11 – M10: provider plugin cache → dropped
+Not implemented. Terraform 1.4+ reads `TF_PLUGIN_CACHE_DIR` only when the working directory has a `.terraform.lock.hcl`, and the runner recreates its working directory on every run, so it never has one. A shared volume therefore fills up but is never read.
+
+Checked with Terraform 1.16.4 in the runner image, sharing a named volume between two runs:
+- Without a lock file, the second `terraform init` downloaded `hashicorp/null` again.
+- With `TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE=true`, it used the cache. But the lock file then held only the local `h1:` hash and none of the registry's signed `zh:` checksums, so cached providers aren't checked against the registry. Every run can write to the volume and runs execute template Terraform, so one run could plant a provider for later runs of other applications.
+
+If download time becomes a problem, a read-only `filesystem_mirror` baked into the image at build time avoids this, at the cost of image size and a pinned provider list.
+
