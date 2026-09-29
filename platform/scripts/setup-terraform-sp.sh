@@ -4,7 +4,14 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $0 <app-name> <subscription-id> <keyvault-name> [--role <role>]" >&2
+    cat >&2 <<EOF
+Usage: $0 <app-name> <subscription-id> <keyvault-name> [--role <role>] [--scope <scope>]
+
+  --role   Role to assign to the service principal (default: Contributor)
+  --scope  Scope of the role assignment (default: the whole subscription).
+           Template Terraform runs with these credentials, so prefer a narrow scope, e.g.
+           /subscriptions/<subscription-id>/resourceGroups/<resource-group>
+EOF
     exit 1
 }
 
@@ -16,10 +23,12 @@ VAULT_NAME="$3"
 shift 3
 
 ROLE="Contributor"
+SCOPE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --role) ROLE="${2:?--role needs a value}"; shift 2 ;;
+        --scope) SCOPE="${2:?--scope needs a value}"; shift 2 ;;
         *) usage ;;
     esac
 done
@@ -31,7 +40,11 @@ az account show >/dev/null 2>&1 || { echo "Run 'az login' first." >&2; exit 1; }
 
 az account set --subscription "$SUBSCRIPTION_ID"
 TENANT_ID="$(az account show --query tenantId -o tsv)"
-SCOPE="/subscriptions/$SUBSCRIPTION_ID"
+
+if [[ -z "$SCOPE" ]]; then
+    SCOPE="/subscriptions/$SUBSCRIPTION_ID"
+    echo "Warning: assigning '$ROLE' on the whole subscription. Use --scope to narrow it." >&2
+fi
 
 VAULT_ID="$(az keyvault show --name "$VAULT_NAME" --query id -o tsv)"
 VAULT_URI="$(az keyvault show --name "$VAULT_NAME" --query properties.vaultUri -o tsv)"
@@ -83,8 +96,12 @@ else
     log "Service principal already has '$ROLE' on $SCOPE"
 fi
 
+SECRET_NAME="orchitect-terraform"
+OLD_KEY_IDS="$(az ad app credential list --id "$APP_ID" \
+    --query "[?displayName=='$SECRET_NAME'].keyId" -o tsv)"
+
 log "Creating new client secret"
-CLIENT_SECRET="$(az ad app credential reset --id "$APP_ID" --append --display-name orchitect-terraform \
+CLIENT_SECRET="$(az ad app credential reset --id "$APP_ID" --append --display-name "$SECRET_NAME" \
     --years 1 --query password -o tsv 2>/dev/null)"
 
 set_secret() {
@@ -111,6 +128,11 @@ set_secret terraform-tenant-id "$TENANT_ID"
 set_secret terraform-subscription-id "$SUBSCRIPTION_ID"
 
 unset CLIENT_SECRET
+
+for key_id in $OLD_KEY_IDS; do
+    log "Removing previous client secret $key_id"
+    az ad app credential delete --id "$APP_ID" --key-id "$key_id" -o none
+done
 
 cat <<EOF
 
