@@ -94,6 +94,26 @@ public sealed class ResourceDependencyGraph : IResourceDependencyGraph
         return removed;
     }
 
+    public void SetDependencies(ResourceId from, IEnumerable<ResourceId> to)
+    {
+        if (!_nodes.TryGetValue(from, out ResourceDependencyNode? node))
+        {
+            throw new KeyNotFoundException("The resource must exist in the graph.");
+        }
+
+        var targets = to.ToHashSet();
+
+        foreach (ResourceId stale in node.Out.Where(id => !targets.Contains(id)).ToList())
+        {
+            RemoveDependency(from, stale);
+        }
+
+        foreach (ResourceId target in targets.Where(id => !node.Out.Contains(id)))
+        {
+            AddDependency(from, target);
+        }
+    }
+
     public bool HasDependencyPath(ResourceId startId, ResourceId targetId)
     {
         if (!_nodes.ContainsKey(startId) || !_nodes.ContainsKey(targetId))

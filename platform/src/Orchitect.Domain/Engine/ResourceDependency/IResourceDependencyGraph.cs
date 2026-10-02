@@ -16,6 +16,12 @@ public interface IResourceDependencyGraph
     bool RemoveResource(ResourceId resourceId);
     void AddDependency(ResourceId from, ResourceId to);
     bool RemoveDependency(ResourceId from, ResourceId to);
+
+    /// <summary>
+    /// Replaces a resource's outgoing dependencies, leaving every other resource's edges intact.
+    /// </summary>
+    void SetDependencies(ResourceId from, IEnumerable<ResourceId> to);
+
     bool HasDependencyPath(ResourceId startId, ResourceId targetId);
     bool ContainsResource(ResourceId resourceId);
     IList<ResourceId> ResolveOrder();

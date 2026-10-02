@@ -34,6 +34,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Execution"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Execution.Unit.Tests", "src\Orchitect.Engine.Execution.Unit.Tests\Orchitect.Engine.Execution.Unit.Tests.csproj", "{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Execution.Integration.Tests", "src\Orchitect.Engine.Execution.Integration.Tests\Orchitect.Engine.Execution.Integration.Tests.csproj", "{F3CA01E7-AC37-4DCA-81D0-A3AB71184531}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Contracts", "src\Orchitect.Engine.Contracts\Orchitect.Engine.Contracts.csproj", "{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Dispatch", "src\Orchitect.Engine.Dispatch\Orchitect.Engine.Dispatch.csproj", "{B2F6D1C3-4052-4D9F-8E3B-7C8D9E0F1A22}"
@@ -106,6 +108,10 @@ Global
 		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F3CA01E7-AC37-4DCA-81D0-A3AB71184531}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F3CA01E7-AC37-4DCA-81D0-A3AB71184531}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F3CA01E7-AC37-4DCA-81D0-A3AB71184531}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F3CA01E7-AC37-4DCA-81D0-A3AB71184531}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -126,6 +132,7 @@ Global
 		{08425FD5-B210-4332-9E50-A6E52E92E37A} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{74EE9A69-EA6A-44C0-8471-AF5B509A5E46} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
+		{F3CA01E7-AC37-4DCA-81D0-A3AB71184531} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 	EndGlobalSection
 EndGlobal

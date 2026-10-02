@@ -32,7 +32,7 @@ public sealed record Resource
             Id = new ResourceId(),
             OrganisationId = request.OrganisationId,
             Name = request.Name,
-            Slug = request.Name.ToLowerInvariant().Replace(' ', '-'),
+            Slug = CreateSlug(request.Name),
             Description = request.Description,
             ResourceTemplateId = request.ResourceTemplateId,
             ApplicationId = request.ApplicationId,
@@ -43,9 +43,16 @@ public sealed record Resource
         };
     }
 
+    public static string CreateSlug(string name) => name.ToLowerInvariant().Replace(' ', '-');
+
     public void AddConsumer(ApplicationId appId)
     {
         if (!_consumers.Contains(appId))
             _consumers.Add(appId);
+    }
+
+    public void RemoveConsumer(ApplicationId appId)
+    {
+        _consumers.Remove(appId);
     }
 }
