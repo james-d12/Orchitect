@@ -84,6 +84,7 @@ COPY src/Orchitect.Engine.Contracts/Orchitect.Engine.Contracts.csproj src/Orchit
 COPY src/Orchitect.Engine.Execution/Orchitect.Engine.Execution.csproj src/Orchitect.Engine.Execution/
 COPY src/Orchitect.Persistence/Orchitect.Persistence.csproj src/Orchitect.Persistence/
 COPY src/Orchitect.Runner/Orchitect.Runner.csproj src/Orchitect.Runner/
+COPY src/Orchitect.ServiceDefaults/Orchitect.ServiceDefaults.csproj src/Orchitect.ServiceDefaults/
 
 RUN dotnet restore src/Orchitect.Runner/Orchitect.Runner.csproj
 
@@ -99,7 +100,7 @@ RUN dotnet publish "./Orchitect.Runner.csproj" \
 
 # RELEASE LAYER
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0-alpine AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 
 USER root
 
