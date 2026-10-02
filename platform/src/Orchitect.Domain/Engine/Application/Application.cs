@@ -1,4 +1,5 @@
 using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Engine.Git;
 
 namespace Orchitect.Domain.Engine.Application;
 
@@ -22,6 +23,7 @@ public sealed record Application
     public static Application Create(string name, Repository repository, OrganisationId organisationId)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
+        ThrowIfInvalid(repository);
 
         return new Application
         {
@@ -36,28 +38,20 @@ public sealed record Application
 
     public static Application Create(CreateApplicationRequest request)
     {
-        ArgumentException.ThrowIfNullOrEmpty(request.Name);
-
-        return new Application
+        var repository = new Repository
         {
-            Id = new ApplicationId(),
-            OrganisationId = new OrganisationId(Guid.Parse(request.OrganisationId)),
-            Name = request.Name,
-            Repository = new Repository
-            {
-                Name = request.Repository.Name,
-                Url = request.Repository.Url,
-                Provider = request.Repository.Provider
-            },
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            Name = request.Repository.Name,
+            Url = request.Repository.Url,
+            Provider = request.Repository.Provider
         };
+
+        return Create(request.Name, repository, new OrganisationId(Guid.Parse(request.OrganisationId)));
     }
 
     public Application Update(string name, Repository repository)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
-        ArgumentNullException.ThrowIfNull(repository);
+        ThrowIfInvalid(repository);
 
         return this with
         {
@@ -65,5 +59,17 @@ public sealed record Application
             Repository = repository,
             UpdatedAt = DateTime.UtcNow
         };
+    }
+
+    private static void ThrowIfInvalid(Repository repository)
+    {
+        ArgumentNullException.ThrowIfNull(repository);
+        ArgumentException.ThrowIfNullOrEmpty(repository.Name);
+
+        if (!GitValidator.IsValidRepositoryUrl(repository.Url))
+        {
+            throw new ArgumentException($"Repository url '{repository.Url}' is not a valid git repository url.",
+                nameof(repository));
+        }
     }
 }

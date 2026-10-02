@@ -17,6 +17,9 @@ public sealed class DockerExecutor : IExecutor
     private static readonly TimeSpan OutputRelayStopTimeout = TimeSpan.FromSeconds(2);
 
     private const string DefaultNetworkMode = "default";
+    private const string DockerHost = "host.docker.internal";
+
+    public const string RunnerServiceName = "orchitect-runner";
 
     private readonly ILogger<DockerExecutor> _logger;
     private readonly IDockerClient _docker;
@@ -71,6 +74,11 @@ public sealed class DockerExecutor : IExecutor
                 [RunnerEnvironment.ConnectionString] = BuildRunnerConnectionString(context)
             };
 
+            if (_configuration[RunnerEnvironment.OtlpHeaders] is { Length: > 0 } otlpHeaders)
+            {
+                secrets[RunnerEnvironment.OtlpHeaders] = otlpHeaders;
+            }
+
             container = await _docker.Containers.CreateContainerAsync(
                 new CreateContainerParameters
                 {
@@ -86,12 +94,13 @@ public sealed class DockerExecutor : IExecutor
                     Env =
                     [
                         $"{RunnerEnvironment.RunId}={context.RunId}",
-                        ..context.Configuration.Select(x => $"{x.Key}={x.Value}")
+                        ..context.Configuration.Select(x => $"{x.Key}={x.Value}"),
+                        ..BuildTelemetryEnvironment(activity).Select(x => $"{x.Key}={x.Value}")
                     ],
                     HostConfig = new HostConfig
                     {
                         NetworkMode = network ?? DefaultNetworkMode,
-                        ExtraHosts = ["host.docker.internal:host-gateway"],
+                        ExtraHosts = [$"{DockerHost}:host-gateway"],
                         CapDrop = ["ALL"],
                         SecurityOpt = ["no-new-privileges"],
                         Init = true,
@@ -245,6 +254,52 @@ public sealed class DockerExecutor : IExecutor
         return RewriteConnectionString(connectionString, context.DatabaseHost, context.DatabasePort);
     }
 
+    private Dictionary<string, string> BuildTelemetryEnvironment(Activity? activity)
+    {
+        var environment = new Dictionary<string, string>();
+
+        if (activity is { IdFormat: ActivityIdFormat.W3C, Id: { } traceParent })
+        {
+            environment[RunnerEnvironment.TraceParent] = traceParent;
+
+            if (!string.IsNullOrEmpty(activity.TraceStateString))
+            {
+                environment[RunnerEnvironment.TraceState] = activity.TraceStateString;
+            }
+        }
+
+        var endpoint = _configuration[RunnerEnvironment.OtlpEndpoint];
+
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            return environment;
+        }
+
+        environment[RunnerEnvironment.OtlpEndpoint] = RewriteOtlpEndpoint(endpoint);
+        environment[RunnerEnvironment.ServiceName] = RunnerServiceName;
+
+        if (_configuration[RunnerEnvironment.OtlpProtocol] is { Length: > 0 } protocol)
+        {
+            environment[RunnerEnvironment.OtlpProtocol] = protocol;
+        }
+
+        return environment;
+    }
+
+    /// <summary>
+    /// Points an OTLP endpoint on the API's loopback interface at the Docker host, as seen from inside the runner container.
+    /// </summary>
+    internal static string RewriteOtlpEndpoint(string endpoint)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || !uri.IsLoopback)
+        {
+            return endpoint;
+        }
+
+        var rewritten = new UriBuilder(uri) { Host = DockerHost }.Uri.ToString();
+        return endpoint.EndsWith('/') ? rewritten : rewritten.TrimEnd('/');
+    }
+
     /// <summary>
     /// Points a connection string at the database as seen from inside the runner container.
     /// </summary>
@@ -258,7 +313,7 @@ public sealed class DockerExecutor : IExecutor
         }
         else if (builder.Host is "localhost" or "127.0.0.1" or "::1")
         {
-            builder.Host = "host.docker.internal";
+            builder.Host = DockerHost;
         }
 
         if (databasePort is { } port)

@@ -82,7 +82,7 @@ public sealed class EngineOrchestratorTests
         }, new OrganisationId());
 
     private static Deployment NewDeployment() =>
-        Deployment.Create(new ApplicationId(), new EnvironmentId(Guid.NewGuid()), new CommitId("abc123"));
+        Deployment.Create(new ApplicationId(), new EnvironmentId(Guid.NewGuid()), new CommitId(new string('a', 40)));
 
     private sealed class FixedScoreDriver(ScoreFile? scoreFile) : IScoreDriver
     {
