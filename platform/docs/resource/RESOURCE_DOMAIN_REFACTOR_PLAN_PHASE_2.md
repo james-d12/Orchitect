@@ -3,7 +3,7 @@ title: "Resource domain – Phase 2"
 status: active
 workstream: resource
 milestone: "Resource Domain"
-issues: [141, 142, 143, 144, 145, 146, 155]
+issues: [141, 142, 143, 144, 145, 146, 155, 187]
 superseded_by: null
 last_reviewed: 2026-09-29
 ---

@@ -12,11 +12,11 @@ public sealed record ResourceInstance
     public OrganisationId OrganisationId { get; private init; }
     public ResourceId ResourceId { get; private init; }
     public string Name { get; private set; } = string.Empty;
-    public ResourceTemplateVersionId TemplateVersionId { get; private init; }
+    public ResourceTemplateVersionId TemplateVersionId { get; private set; }
     public EnvironmentId EnvironmentId { get; private init; }
     public ResourceInstanceStatus Status { get; private set; }
     public ResourceInstanceOutput? Output { get; private set; }
-    public IReadOnlyDictionary<string, JsonElement> InputParameters { get; private init; } = new Dictionary<string, JsonElement>();
+    public IReadOnlyDictionary<string, JsonElement> InputParameters { get; private set; } = new Dictionary<string, JsonElement>();
     public DateTime CreatedAt { get; private init; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -24,10 +24,10 @@ public sealed record ResourceInstance
 
     private static readonly Dictionary<ResourceInstanceStatus, HashSet<ResourceInstanceStatus>> ValidTransitions = new()
     {
-        [ResourceInstanceStatus.Pending] = [ResourceInstanceStatus.Provisioning],
+        [ResourceInstanceStatus.Pending] = [ResourceInstanceStatus.Provisioning, ResourceInstanceStatus.PendingRemoval],
         [ResourceInstanceStatus.Provisioning] = [ResourceInstanceStatus.Active, ResourceInstanceStatus.Failed],
         [ResourceInstanceStatus.Active] = [ResourceInstanceStatus.Provisioning, ResourceInstanceStatus.PendingRemoval],
-        [ResourceInstanceStatus.Failed] = [ResourceInstanceStatus.Pending],
+        [ResourceInstanceStatus.Failed] = [ResourceInstanceStatus.Pending, ResourceInstanceStatus.PendingRemoval],
         [ResourceInstanceStatus.PendingRemoval] = [ResourceInstanceStatus.Removing],
         [ResourceInstanceStatus.Removing] = [ResourceInstanceStatus.Removed, ResourceInstanceStatus.RemovalFailed],
         [ResourceInstanceStatus.Removed] = [],
@@ -51,6 +51,16 @@ public sealed record ResourceInstance
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+    }
+
+    public void Reconfigure(ResourceTemplateVersionId templateVersionId,
+        IReadOnlyDictionary<string, JsonElement> inputParameters)
+    {
+        if (Status is ResourceInstanceStatus.Removing or ResourceInstanceStatus.Removed)
+            throw new InvalidOperationException($"Cannot reconfigure an instance that is {Status}.");
+        TemplateVersionId = templateVersionId;
+        InputParameters = inputParameters;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public void Transition(ResourceInstanceStatus newStatus, ResourceInstanceOutput? output = null)

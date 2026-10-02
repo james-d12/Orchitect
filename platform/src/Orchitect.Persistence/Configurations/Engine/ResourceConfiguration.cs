@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Environment;
 using Orchitect.Domain.Engine.Resource;
@@ -55,6 +56,15 @@ internal sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
         builder.Property(r => r.CreatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
         builder.Property(r => r.UpdatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
 
-        builder.Ignore(r => r.Consumers);
+        builder.PrimitiveCollection(r => r.Consumers)
+            .HasField("_consumers")
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .IsRequired()
+            .ElementType()
+            .HasConversion<ApplicationIdConverter>();
     }
+
+    private sealed class ApplicationIdConverter() : ValueConverter<ApplicationId, Guid>(
+        id => id.Value,
+        value => new ApplicationId(value));
 }
