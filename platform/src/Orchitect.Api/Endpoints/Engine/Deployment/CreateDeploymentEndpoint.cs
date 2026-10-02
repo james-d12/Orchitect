@@ -7,6 +7,7 @@ using Orchitect.Api.Shared;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
+using Orchitect.Domain.Engine.Git;
 using Orchitect.Engine.Dispatch.Queue;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
@@ -34,6 +35,11 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             HttpContext httpContext,
             CancellationToken cancellationToken)
     {
+        if (!GitValidator.IsValidCommitId(request.CommitId.Value))
+        {
+            return TypedResults.BadRequest($"Commit id '{request.CommitId.Value}' is not a full git commit SHA.");
+        }
+
         var application = await applicationRepository.GetByIdAsync(request.ApplicationId, cancellationToken);
 
         if (application is null)

@@ -164,8 +164,18 @@ public sealed class DeploymentTests
         Assert.Throws<InvalidOperationException>(() => Deploying().ProcessDeploymentStatus(1, null).Interrupt());
     }
 
+    [Theory]
+    [InlineData("abc123")]
+    [InlineData("main")]
+    [InlineData("")]
+    public void Create_InvalidCommitId_Throws(string commitId)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(commitId)));
+    }
+
     private static Deployment NewDeployment() =>
-        Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"));
+        Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)));
 
     private static Deployment Deploying() => NewDeployment().Start();
 

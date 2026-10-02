@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using AutoFixture;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -118,8 +119,7 @@ public sealed class DeploymentIntegrationTests
 
         // Act
         var response = await client.PostAsJsonAsync(DeploymentsUrl,
-            new CreateDeploymentRequest(deployment.ApplicationId, deployment.EnvironmentId,
-                new CommitId(_fixture.Create<string>())));
+            new CreateDeploymentRequest(deployment.ApplicationId, deployment.EnvironmentId, NewCommitId()));
 
         // Assert
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -136,7 +136,7 @@ public sealed class DeploymentIntegrationTests
 
         // Act
         var response = await client.PostAsJsonAsync(DeploymentsUrl,
-            new CreateDeploymentRequest(applicationId, environmentId, new CommitId(_fixture.Create<string>())));
+            new CreateDeploymentRequest(applicationId, environmentId, NewCommitId()));
 
         // Assert
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
@@ -219,12 +219,32 @@ public sealed class DeploymentIntegrationTests
 
         // Act
         var response = await client.PostAsJsonAsync(DeploymentsUrl,
-            new CreateDeploymentRequest(applicationId, environmentId, new CommitId("abc123")));
+            new CreateDeploymentRequest(applicationId, environmentId, NewCommitId()));
 
         // Assert
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var request = Assert.Single(_queue.Requests);
         Assert.Equal(RunnerOperation.Provision, request.Operation);
+    }
+
+    [Theory]
+    [InlineData("abc123")]
+    [InlineData("main")]
+    [InlineData("")]
+    public async Task DeploymentApi_WhenCreatingDeploymentWithInvalidCommitId_ShouldReturn400BadRequest(
+        string commitId)
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
+
+        // Act
+        var response = await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(applicationId, environmentId, new CommitId(commitId)));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(_queue.Requests);
     }
 
     [Theory]
@@ -240,7 +260,7 @@ public sealed class DeploymentIntegrationTests
 
         // Act
         var response = await client.PostAsJsonAsync(DeploymentsUrl,
-            new CreateDeploymentRequest(active.ApplicationId, active.EnvironmentId, new CommitId("abc123")));
+            new CreateDeploymentRequest(active.ApplicationId, active.EnvironmentId, NewCommitId()));
 
         // Assert
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -252,7 +272,7 @@ public sealed class DeploymentIntegrationTests
     {
         // Arrange
         var client = await _factory.CreateClient().AddAuthorisationHeader();
-        var commitId = new CommitId("abc123");
+        var commitId = NewCommitId();
         var first = await SeedDeploymentAsync(client, DeploymentStatus.Failed);
         await CreateDeploymentAsync(first.ApplicationId, first.EnvironmentId, DeploymentStatus.Failed, commitId);
 
@@ -274,7 +294,7 @@ public sealed class DeploymentIntegrationTests
     {
         // Arrange
         var client = await _factory.CreateClient().AddAuthorisationHeader();
-        var commitId = new CommitId("abc123");
+        var commitId = NewCommitId();
         var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
         await CreateDeploymentAsync(applicationId, environmentId, DeploymentStatus.Destroyed, commitId);
 
@@ -374,6 +394,8 @@ public sealed class DeploymentIntegrationTests
         return await CreateDeploymentAsync(applicationId, environmentId, status);
     }
 
+    private static CommitId NewCommitId() => new(Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(20)));
+
     private async Task<Deployment> CreateDeploymentAsync(ApplicationId applicationId, EnvironmentId environmentId,
         DeploymentStatus status, CommitId? commitId = null)
     {
@@ -381,7 +403,7 @@ public sealed class DeploymentIntegrationTests
         using (var createScope = _factory.Services.CreateScope())
         {
             created = await createScope.ServiceProvider.GetRequiredService<IDeploymentRepository>().CreateAsync(
-                Deployment.Create(applicationId, environmentId, commitId ?? new CommitId(_fixture.Create<string>())));
+                Deployment.Create(applicationId, environmentId, commitId ?? NewCommitId()));
         }
 
         ArgumentNullException.ThrowIfNull(created);

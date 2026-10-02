@@ -82,6 +82,25 @@ public sealed class ResourceTemplateIntegrationTests(WebApplicationFactoryWithPo
         Assert.IsType<Guid>(body.Id);
     }
 
+    [Theory]
+    [InlineData("ftp://github.com/test/repo", "v1.0.0")]
+    [InlineData("https://github.com/test/repo", "v1..0")]
+    public async Task ResourceTemplateApi_WhenCreatingResourceTemplateWithInvalidSource_ShouldReturn400BadRequest(
+        string url, string tag)
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var request = BuildCreateWithVersionRequest(organisation.Id);
+        request = request with { Source = request.Source with { BaseUrl = new Uri(url), Tag = tag } };
+
+        // Act
+        var response = await client.PostAsJsonAsync($"{ResourceTemplatesUrl}/with-version", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task ResourceTemplateApi_WhenGettingResourceTemplateById_ShouldReturn200Ok()
     {
