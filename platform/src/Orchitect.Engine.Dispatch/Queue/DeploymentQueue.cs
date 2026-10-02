@@ -51,7 +51,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
             catch (Exception exception) when (!ct.IsCancellationRequested)
             {
                 activity.RecordException(exception);
-                await FailOwnedDeploymentAsync(repository, request);
+                await FailOwnedDeploymentAsync(repository, request, exception);
                 throw;
             }
         });
@@ -94,7 +94,8 @@ public sealed class DeploymentQueue : IDeploymentQueue
         _logger.LogInformation("Deployment {DeploymentId} is {Status}.", processed.Id.Value, processed.Status);
     }
 
-    private async Task FailOwnedDeploymentAsync(IDeploymentRepository repository, DeploymentQueueRequest request)
+    private async Task FailOwnedDeploymentAsync(IDeploymentRepository repository, DeploymentQueueRequest request,
+        Exception failure)
     {
         try
         {
@@ -108,7 +109,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
                 return;
             }
 
-            await repository.UpdateAsync(deployment.Interrupt(), CancellationToken.None);
+            await repository.UpdateAsync(deployment.Interrupt(failure.Message), CancellationToken.None);
             _logger.LogWarning("Deployment {DeploymentId} was {Status} when its work item failed and is now Failed.",
                 deployment.Id.Value, deployment.Status);
         }

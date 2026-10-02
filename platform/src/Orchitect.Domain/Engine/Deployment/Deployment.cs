@@ -16,13 +16,24 @@ public sealed record Deployment
     public required DeploymentStatus Status { get; init; }
     public required DateTime CreatedAt { get; init; }
     public required DateTime UpdatedAt { get; init; }
+    public required string RequestedBy { get; init; }
+    public DateTime? StartedAt { get; init; }
+    public DateTime? CompletedAt { get; init; }
+    public string? ErrorSummary { get; init; }
+
+    public const int RequestedByMaxLength = 256;
+    public const int ErrorSummaryMaxLength = 2000;
 
     private Deployment()
     {
     }
 
-    public static Deployment Create(ApplicationId applicationId, EnvironmentId environmentId, CommitId commitId)
+    public static Deployment Create(ApplicationId applicationId, EnvironmentId environmentId, CommitId commitId,
+        string requestedBy)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestedBy);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(requestedBy.Length, RequestedByMaxLength, nameof(requestedBy));
+
         if (!GitValidator.IsValidCommitId(commitId.Value))
         {
             throw new ArgumentException($"Commit id '{commitId.Value}' is not a full git commit SHA.",
@@ -38,12 +49,13 @@ public sealed record Deployment
             Status = DeploymentStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
+            RequestedBy = requestedBy
         };
     }
 
-    public static Deployment Create(CreateDeploymentRequest request)
+    public static Deployment Create(CreateDeploymentRequest request, string requestedBy)
     {
-        return Create(request.ApplicationId, request.EnvironmentId, request.CommitId);
+        return Create(request.ApplicationId, request.EnvironmentId, request.CommitId, requestedBy);
     }
 
     public Deployment Start()
@@ -53,7 +65,7 @@ public sealed record Deployment
             throw new InvalidOperationException($"Deployment '{Id.Value}' cannot start while {Status}.");
         }
 
-        return WithStatus(DeploymentStatus.Deploying);
+        return StartRun(DeploymentStatus.Deploying);
     }
 
     public bool IsActive => Status is DeploymentStatus.Pending or DeploymentStatus.Deploying
@@ -68,17 +80,17 @@ public sealed record Deployment
             throw new InvalidOperationException($"Deployment '{Id.Value}' cannot be destroyed while {Status}.");
         }
 
-        return WithStatus(DeploymentStatus.Destroying);
+        return StartRun(DeploymentStatus.Destroying);
     }
 
-    public Deployment Interrupt()
+    public Deployment Interrupt(string reason)
     {
         if (!IsActive)
         {
             throw new InvalidOperationException($"Deployment '{Id.Value}' cannot be interrupted while {Status}.");
         }
 
-        return WithStatus(DeploymentStatus.Failed);
+        return Complete(DeploymentStatus.Failed, reason);
     }
 
     public Deployment ProcessDeploymentStatus(long? exitCode, Exception? exception)
@@ -97,20 +109,40 @@ public sealed record Deployment
         return exception switch
         {
             OperationCanceledException => this,
-            not null => WithStatus(DeploymentStatus.Failed),
-            null when exitCode == 0 => WithStatus(Status == DeploymentStatus.Destroying
+            not null => Complete(DeploymentStatus.Failed, exception.Message),
+            null when exitCode == 0 => Complete(Status == DeploymentStatus.Destroying
                 ? DeploymentStatus.Destroyed
-                : DeploymentStatus.Deployed),
-            _ => WithStatus(DeploymentStatus.Failed)
+                : DeploymentStatus.Deployed, null),
+            _ => Complete(DeploymentStatus.Failed, $"The runner exited with code {exitCode}.")
         };
     }
 
-    private Deployment WithStatus(DeploymentStatus status)
+    private Deployment StartRun(DeploymentStatus status)
     {
+        var now = DateTime.UtcNow;
+
         return this with
         {
             Status = status,
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = now,
+            StartedAt = now,
+            CompletedAt = null,
+            ErrorSummary = null
+        };
+    }
+
+    private Deployment Complete(DeploymentStatus status, string? errorSummary)
+    {
+        var now = DateTime.UtcNow;
+
+        return this with
+        {
+            Status = status,
+            UpdatedAt = now,
+            CompletedAt = now,
+            ErrorSummary = errorSummary is { Length: > ErrorSummaryMaxLength }
+                ? errorSummary[..ErrorSummaryMaxLength]
+                : errorSummary
         };
     }
 }

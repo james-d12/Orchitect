@@ -51,6 +51,29 @@ public sealed class DeploymentIntegrationTests
         Assert.Equal(deployment.Id.Value, body.Id);
         Assert.Equal(deployment.CommitId.Value, body.CommitId);
         Assert.Equal(nameof(DeploymentStatus.Deployed), body.Status);
+        Assert.Equal(deployment.RequestedBy, body.RequestedBy);
+        Assert.NotNull(body.StartedAt);
+        Assert.NotNull(body.CompletedAt);
+        Assert.Null(body.ErrorSummary);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenGettingFailedDeployment_ShouldReturnErrorSummary()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Failed);
+
+        // Act
+        var response = await client.GetAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+        var body = await response.ReadFromJsonAsync<GetDeploymentEndpoint.GetDeploymentResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(nameof(DeploymentStatus.Failed), body.Status);
+        Assert.NotNull(body.CompletedAt);
+        Assert.Equal("The runner exited with code 1.", body.ErrorSummary);
     }
 
     [Fact]
@@ -142,6 +165,8 @@ public sealed class DeploymentIntegrationTests
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         var latest = await GetLatestDeploymentAsync(applicationId, environmentId);
         Assert.Equal(DeploymentStatus.Failed, latest.Status);
+        Assert.NotNull(latest.CompletedAt);
+        Assert.Equal("The deployment could not be queued.", latest.ErrorSummary);
     }
 
     [Fact]
@@ -157,7 +182,9 @@ public sealed class DeploymentIntegrationTests
 
         // Assert
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal(DeploymentStatus.Failed, (await GetDeploymentAsync(deployment.Id)).Status);
+        var failed = await GetDeploymentAsync(deployment.Id);
+        Assert.Equal(DeploymentStatus.Failed, failed.Status);
+        Assert.Equal("The destroy could not be queued.", failed.ErrorSummary);
     }
 
     [Fact]
@@ -225,6 +252,9 @@ public sealed class DeploymentIntegrationTests
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var request = Assert.Single(_queue.Requests);
         Assert.Equal(RunnerOperation.Provision, request.Operation);
+        var deployment = await GetDeploymentAsync(request.DeploymentId);
+        Assert.Equal("test@example.com", deployment.RequestedBy);
+        Assert.Null(deployment.StartedAt);
     }
 
     [Theory]
@@ -403,7 +433,7 @@ public sealed class DeploymentIntegrationTests
         using (var createScope = _factory.Services.CreateScope())
         {
             created = await createScope.ServiceProvider.GetRequiredService<IDeploymentRepository>().CreateAsync(
-                Deployment.Create(applicationId, environmentId, commitId ?? NewCommitId()));
+                Deployment.Create(applicationId, environmentId, commitId ?? NewCommitId(), "test@example.com"));
         }
 
         ArgumentNullException.ThrowIfNull(created);
