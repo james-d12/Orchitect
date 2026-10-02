@@ -104,6 +104,47 @@ public sealed class ResourceDependencyGraphTests
     }
 
     [Fact]
+    public void SetDependencies_ReplacesOutgoingEdges()
+    {
+        var (app, vault, storage) = (Add(), Add(), Add());
+        _graph.AddDependency(app, vault);
+
+        _graph.SetDependencies(app, [storage]);
+
+        Assert.False(_graph.HasDependencyPath(app, vault));
+        Assert.True(_graph.HasDependencyPath(app, storage));
+        Assert.Equal(0, _graph.DependentCount(vault));
+    }
+
+    [Fact]
+    public void SetDependencies_LeavesOtherResourcesEdgesIntact()
+    {
+        var (app, vault, other) = (Add(), Add(), Add());
+        _graph.AddDependency(other, vault);
+
+        _graph.SetDependencies(app, []);
+
+        Assert.True(_graph.HasDependencyPath(other, vault));
+    }
+
+    [Fact]
+    public void SetDependencies_UnknownResource_Throws()
+    {
+        var vault = Add();
+
+        Assert.Throws<KeyNotFoundException>(() => _graph.SetDependencies(new ResourceId(), [vault]));
+    }
+
+    [Fact]
+    public void SetDependencies_WouldCreateCycle_Throws()
+    {
+        var (app, vault) = (Add(), Add());
+        _graph.AddDependency(vault, app);
+
+        Assert.Throws<InvalidOperationException>(() => _graph.SetDependencies(app, [vault]));
+    }
+
+    [Fact]
     public void HasDependencyPath_FollowsDependenciesTransitively()
     {
         var (aks, subnet, vnet, unrelated) = (Add(), Add(), Add(), Add());

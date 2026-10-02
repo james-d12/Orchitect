@@ -58,10 +58,7 @@ try
 
     builder.Services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<OrchitectDbContext>();
 
-    builder.Services.AddOptions<JwtOptions>()
-        .Bind(builder.Configuration.GetSection("JwtOptions"))
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
+    builder.Services.AddJwtOptions(builder.Configuration);
 
     builder.Services.AddHostedService<DiscoveryHostedService>();
 

@@ -4,6 +4,7 @@ using Orchitect.Domain.Engine.Environment;
 using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Domain.Engine.ResourceTemplate;
+using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Domain.Unit.Tests.Engine;
 
@@ -11,10 +12,10 @@ public sealed class ResourceInstanceTests
 {
     private static readonly Dictionary<ResourceInstanceStatus, ResourceInstanceStatus[]> AllowedTransitions = new()
     {
-        [ResourceInstanceStatus.Pending] = [ResourceInstanceStatus.Provisioning],
+        [ResourceInstanceStatus.Pending] = [ResourceInstanceStatus.Provisioning, ResourceInstanceStatus.PendingRemoval],
         [ResourceInstanceStatus.Provisioning] = [ResourceInstanceStatus.Active, ResourceInstanceStatus.Failed],
         [ResourceInstanceStatus.Active] = [ResourceInstanceStatus.Provisioning, ResourceInstanceStatus.PendingRemoval],
-        [ResourceInstanceStatus.Failed] = [ResourceInstanceStatus.Pending],
+        [ResourceInstanceStatus.Failed] = [ResourceInstanceStatus.Pending, ResourceInstanceStatus.PendingRemoval],
         [ResourceInstanceStatus.PendingRemoval] = [ResourceInstanceStatus.Removing],
         [ResourceInstanceStatus.Removing] = [ResourceInstanceStatus.Removed, ResourceInstanceStatus.RemovalFailed],
         [ResourceInstanceStatus.Removed] = [],
@@ -207,6 +208,50 @@ public sealed class ResourceInstanceTests
         instance.Transition(ResourceInstanceStatus.Removed);
 
         Assert.Equal(ResourceInstanceStatus.Removed, instance.Status);
+    }
+
+    [Fact]
+    public void Reconfigure_Active_ReplacesVersionAndInputs()
+    {
+        var instance = InStatus(ResourceInstanceStatus.Active);
+        var versionId = new ResourceTemplateVersionId();
+        var inputs = new Dictionary<string, JsonElement> { ["sku"] = JsonSerializer.SerializeToElement("GRS") };
+
+        instance.Reconfigure(versionId, inputs);
+
+        Assert.Equal(versionId, instance.TemplateVersionId);
+        Assert.Equal("GRS", instance.InputParameters["sku"].GetString());
+        Assert.Equal(ResourceInstanceStatus.Active, instance.Status);
+    }
+
+    [Theory]
+    [InlineData(ResourceInstanceStatus.Removing)]
+    [InlineData(ResourceInstanceStatus.Removed)]
+    public void Reconfigure_BeingOrAlreadyRemoved_Throws(ResourceInstanceStatus status)
+    {
+        var instance = InStatus(status);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            instance.Reconfigure(new ResourceTemplateVersionId(), new Dictionary<string, JsonElement>()));
+    }
+
+    [Fact]
+    public void RemoveConsumer_ExistingConsumer_RemovesIt()
+    {
+        var resource = Resource.Create(new CreateResourceRequest(new OrganisationId(), "orders-storage",
+            string.Empty, new ResourceTemplateId(), new EnvironmentId(Guid.NewGuid()), ResourceKind.Direct));
+        var applicationId = new ApplicationId();
+        resource.AddConsumer(applicationId);
+
+        resource.RemoveConsumer(applicationId);
+
+        Assert.Empty(resource.Consumers);
+    }
+
+    [Fact]
+    public void CreateSlug_NameWithSpacesAndCapitals_IsLowerKebabCase()
+    {
+        Assert.Equal("orders-shared-storage", Resource.CreateSlug("Orders Shared-Storage"));
     }
 
     private static ResourceInstance InStatus(ResourceInstanceStatus status)
