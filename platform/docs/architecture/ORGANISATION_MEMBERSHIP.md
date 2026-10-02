@@ -3,7 +3,7 @@ title: "Organisation membership checks"
 status: active
 workstream: security
 milestone: "Security & Auth"
-issues: [175, 197, 198]
+issues: [175, 197, 198, 199, 200, 201]
 superseded_by: null
 last_reviewed: 2026-10-02
 ---
@@ -40,9 +40,9 @@ Branch `feature/organisation_membership_check`, PR #195 (open, awaiting review).
 ## Outstanding
 - `PipelineRepository.BulkUpsertAsync` inserts an existing owner again (`PK_Owners`). When fixed, add the pipeline case back to `InventoryApi_WhenNotAMember_ShouldReturn404NotFound` (#197)
 - Stray `OrganisationId1` column on `OrganisationUsers` from the relationship being configured twice (#198)
-- There's no API to add or remove organisation members, and no backfill for organisations created before this change (not yet raised as an issue)
-- `GetAll` filtering for applications, environments and resource templates loads every row before filtering; move it into repository queries (not yet raised as an issue)
-- `Shared/ClaimsPrincipalExtensions.GetOrganisationIdValue` and `Extensions/ClaimsPrincipalExtensions.GetOrganisationId` are unused, and they fall back to the user id as an organisation id. Remove them (not yet raised as an issue)
+- There's no API to add or remove organisation members, and no backfill for organisations created before this change (#199)
+- `GetAll` filtering for applications, environments and resource templates loads every row before filtering; move it into repository queries (#200)
+- `Shared/ClaimsPrincipalExtensions.GetOrganisationIdValue` and `Extensions/ClaimsPrincipalExtensions.GetOrganisationId` are unused, and they fall back to the user id as an organisation id. Remove them (#201)
 
 ## Working notes for the next agent
 - Repo rules in memory: only concise `/// <summary>` docs on interface members, no other code comments; `git add` explicit paths only; `.editorconfig` has `insert_final_newline = false`.
