@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
@@ -28,12 +30,16 @@ public sealed class GetApplicationEndpoint : IEndpoint
         Guid id,
         [FromServices]
         IApplicationRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var applicationId = new ApplicationId(id);
         var applicationResponse = await repository.GetByIdAsync(applicationId, cancellationToken);
 
-        if (applicationResponse is null)
+        if (applicationResponse is null ||
+            !await organisationRepository.IsMemberAsync(user, applicationResponse.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

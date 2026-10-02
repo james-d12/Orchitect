@@ -1,9 +1,12 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
@@ -28,11 +31,24 @@ public sealed class GetDeploymentEndpoint : IEndpoint
         Guid id,
         [FromServices]
         IDeploymentRepository repository,
+        [FromServices]
+        IApplicationRepository applicationRepository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var deployment = await repository.GetByIdAsync(new DeploymentId(id), cancellationToken);
 
         if (deployment is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var application = await applicationRepository.GetByIdAsync(deployment.ApplicationId, cancellationToken);
+
+        if (application is null ||
+            !await organisationRepository.IsMemberAsync(user, application.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

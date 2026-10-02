@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Domain.Inventory.SourceControl.Services;
 
@@ -35,12 +37,16 @@ public sealed class GetPullRequestEndpoint : IEndpoint
         string id,
         [FromServices]
         IPullRequestRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var pullRequestId = new PullRequestId(id);
         var pullRequest = await repository.GetByIdAsync(pullRequestId, cancellationToken);
 
-        if (pullRequest is null)
+        if (pullRequest is null ||
+            !await organisationRepository.IsMemberAsync(user, pullRequest.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

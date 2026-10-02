@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
@@ -12,22 +14,28 @@ namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
 public sealed class GetAllResourceTemplatesEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
-        .MapGet("/", Handle)
+        .MapGet("/", HandleAsync)
         .WithSummary("Gets all resource templates.");
 
     public sealed record GetAllResourceTemplatesResponse(
         List<GetResourceTemplateEndpoint.GetResourceTemplateResponse> ResourceTemplates);
 
-    private static Results<Ok<GetAllResourceTemplatesResponse>, NotFound, InternalServerError> Handle(
+    private static async Task<Results<Ok<GetAllResourceTemplatesResponse>, NotFound, InternalServerError>> HandleAsync(
         [FromServices]
         IResourceTemplateRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         [FromServices]
         ILogger<GetResourceTemplateEndpoint> logger,
         CancellationToken cancellationToken)
     {
         try
         {
-            var resourceTemplates = repository.GetAll().ToList();
+            var organisationIds = await organisationRepository.GetMemberOrganisationIdsAsync(user, cancellationToken);
+            var resourceTemplates = repository.GetAll()
+                .Where(r => organisationIds.Contains(r.OrganisationId))
+                .ToList();
             var resourceTemplatesResponse = resourceTemplates
                 .Select(r =>
                 {

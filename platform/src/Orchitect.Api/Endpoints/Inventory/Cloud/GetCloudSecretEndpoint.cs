@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Services;
 
@@ -29,12 +31,16 @@ public sealed class GetCloudSecretEndpoint : IEndpoint
         string id,
         [FromServices]
         ICloudSecretRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var cloudSecretId = new CloudSecretId(id);
         var cloudSecret = await repository.GetByIdAsync(cloudSecretId, cancellationToken);
 
-        if (cloudSecret is null)
+        if (cloudSecret is null ||
+            !await organisationRepository.IsMemberAsync(user, cloudSecret.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

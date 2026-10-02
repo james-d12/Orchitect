@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -21,12 +22,13 @@ public sealed class GetOrganisationEndpoint : IEndpoint
         Guid id,
         [FromServices]
         IOrganisationRepository repository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var organisationId = new OrganisationId(id);
         var organisationResponse = await repository.GetByIdAsync(organisationId, cancellationToken);
 
-        if (organisationResponse is null)
+        if (organisationResponse is null || !await repository.IsMemberAsync(user, organisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

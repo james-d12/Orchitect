@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Environment;
 
 namespace Orchitect.Api.Endpoints.Engine.Environment;
@@ -19,9 +21,20 @@ public sealed class DeleteEnvironmentEndpoint : IEndpoint
         Guid id,
         [FromServices]
         IEnvironmentRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var environmentId = new EnvironmentId(id);
+        var existing = await repository.GetByIdAsync(environmentId, cancellationToken);
+
+        if (existing is null ||
+            !await organisationRepository.IsMemberAsync(user, existing.OrganisationId, cancellationToken))
+        {
+            return TypedResults.NotFound();
+        }
+
         var deleted = await repository.DeleteAsync(environmentId, cancellationToken);
 
         if (!deleted)

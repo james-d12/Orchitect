@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -23,9 +24,11 @@ public sealed class CreateOrganisationEndpoint : IEndpoint
         CreateOrganisationRequest request,
         [FromServices]
         IOrganisationRepository repository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
-        var organisation = Orchitect.Domain.Core.Organisation.Organisation.Create(request.Name);
+        var organisation = Orchitect.Domain.Core.Organisation.Organisation.Create(request.Name)
+            .AddUser(user.GetUserId());
         var organisationResponse = await repository.CreateAsync(organisation, cancellationToken);
 
         if (organisationResponse is null)

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
@@ -45,6 +47,9 @@ public sealed class GetResourceTemplateEndpoint : IEndpoint
         [FromServices]
         IResourceTemplateRepository repository,
         [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
+        [FromServices]
         ILogger<GetResourceTemplateEndpoint> logger,
         CancellationToken cancellationToken)
     {
@@ -53,7 +58,8 @@ public sealed class GetResourceTemplateEndpoint : IEndpoint
             var resourceTemplateId = new ResourceTemplateId(id);
             var resourceTemplateResponse = await repository.GetByIdAsync(resourceTemplateId, cancellationToken);
 
-            if (resourceTemplateResponse is null)
+            if (resourceTemplateResponse is null ||
+            !await organisationRepository.IsMemberAsync(user, resourceTemplateResponse.OrganisationId, cancellationToken))
             {
                 return TypedResults.NotFound();
             }

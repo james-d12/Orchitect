@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
@@ -19,9 +21,20 @@ public sealed class DeleteResourceTemplateEndpoint : IEndpoint
         Guid id,
         [FromServices]
         IResourceTemplateRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var resourceTemplateId = new ResourceTemplateId(id);
+        var existing = await repository.GetByIdAsync(resourceTemplateId, cancellationToken);
+
+        if (existing is null ||
+            !await organisationRepository.IsMemberAsync(user, existing.OrganisationId, cancellationToken))
+        {
+            return TypedResults.NotFound();
+        }
+
         var deleted = await repository.DeleteAsync(resourceTemplateId, cancellationToken);
 
         if (!deleted)

@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
@@ -32,6 +34,9 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             IEnvironmentRepository environmentRepository,
             [FromServices]
             IDeploymentQueue deploymentQueue,
+            [FromServices]
+            IOrganisationRepository organisationRepository,
+            ClaimsPrincipal user,
             HttpContext httpContext,
             CancellationToken cancellationToken)
     {
@@ -42,14 +47,16 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
 
         var application = await applicationRepository.GetByIdAsync(request.ApplicationId, cancellationToken);
 
-        if (application is null)
+        if (application is null ||
+            !await organisationRepository.IsMemberAsync(user, application.OrganisationId, cancellationToken))
         {
             return TypedResults.BadRequest($"Application with Id: {request.ApplicationId} does not exist.");
         }
 
         var environment = await environmentRepository.GetByIdAsync(request.EnvironmentId, cancellationToken);
 
-        if (environment is null)
+        if (environment is null ||
+            !await organisationRepository.IsMemberAsync(user, environment.OrganisationId, cancellationToken))
         {
             return TypedResults.BadRequest($"Environment with Id: {request.EnvironmentId} does not exist.");
         }

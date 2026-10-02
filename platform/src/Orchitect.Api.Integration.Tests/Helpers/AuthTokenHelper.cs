@@ -22,6 +22,13 @@ public static class AuthTokenHelper
         return client;
     }
 
+    public static async Task<HttpClient> AddAuthorisationHeaderForNewUser(this HttpClient client)
+    {
+        var token = await RegisterAndLoginAsync(client, $"{Guid.NewGuid():N}@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
+
     private static async Task<string> GetAccessTokenAsync(HttpClient client)
     {
         if (!string.IsNullOrEmpty(_accessToken))
@@ -29,9 +36,16 @@ public static class AuthTokenHelper
             return _accessToken;
         }
 
+        var accessToken = await RegisterAndLoginAsync(client, "test@example.com");
+        _accessToken = accessToken;
+        return accessToken;
+    }
+
+    private static async Task<string> RegisterAndLoginAsync(HttpClient client, string email)
+    {
         var registerUserRequest = new RegisterUserEndpoint.RegisterUserRequest(
             Username: $"user_{Guid.NewGuid():N}"[..16],
-            Email: "test@example.com",
+            Email: email,
             Password: "Password123!");
 
         await client.PostAsJsonAsync($"{UsersUrl}/register", registerUserRequest);
@@ -45,8 +59,6 @@ public static class AuthTokenHelper
 
         ArgumentException.ThrowIfNullOrEmpty(body?.AccessToken);
 
-        var accessToken = body.AccessToken;
-        _accessToken = accessToken;
-        return accessToken;
+        return body.AccessToken;
     }
 }

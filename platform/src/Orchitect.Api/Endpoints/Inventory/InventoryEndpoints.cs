@@ -25,6 +25,7 @@ public static class InventoryEndpoints
     {
         var discoveryGroup = endpoints.MapGroup("/discovery")
             .RequireAuthorization()
+            .AddEndpointFilter<OrganisationMembershipFilter>()
             .WithTags("Discovery");
 
         discoveryGroup.MapEndpoint<CreateDiscoveryConfigurationEndpoint>();
@@ -38,6 +39,7 @@ public static class InventoryEndpoints
     {
         var cloudResourcesGroup = endpoints.MapGroup("/cloud/resources")
             .RequireAuthorization()
+            .AddEndpointFilter<OrganisationMembershipFilter>()
             .WithTags("Cloud");
 
         cloudResourcesGroup.MapEndpoint<GetAllCloudResourcesEndpoint>();
@@ -45,6 +47,7 @@ public static class InventoryEndpoints
 
         var cloudSecretsGroup = endpoints.MapGroup("/cloud/secrets")
             .RequireAuthorization()
+            .AddEndpointFilter<OrganisationMembershipFilter>()
             .WithTags("Cloud");
 
         cloudSecretsGroup.MapEndpoint<GetAllCloudSecretsEndpoint>();
@@ -55,6 +58,7 @@ public static class InventoryEndpoints
     {
         var issuesGroup = endpoints.MapGroup("/issues")
             .RequireAuthorization()
+            .AddEndpointFilter<OrganisationMembershipFilter>()
             .WithTags("Issues");
 
         issuesGroup.MapEndpoint<GetAllIssuesEndpoint>();
@@ -65,6 +69,7 @@ public static class InventoryEndpoints
     {
         var pipelinesGroup = endpoints.MapGroup("/pipelines")
             .RequireAuthorization()
+            .AddEndpointFilter<OrganisationMembershipFilter>()
             .WithTags("Pipelines");
 
         pipelinesGroup.MapEndpoint<GetAllPipelinesEndpoint>();
@@ -75,6 +80,7 @@ public static class InventoryEndpoints
     {
         var repositoriesGroup = endpoints.MapGroup("/repositories")
             .RequireAuthorization()
+            .AddEndpointFilter<OrganisationMembershipFilter>()
             .WithTags("Source Control");
 
         repositoriesGroup.MapEndpoint<GetAllRepositoriesEndpoint>();
@@ -82,6 +88,7 @@ public static class InventoryEndpoints
 
         var pullRequestsGroup = endpoints.MapGroup("/pull-requests")
             .RequireAuthorization()
+            .AddEndpointFilter<OrganisationMembershipFilter>()
             .WithTags("Source Control");
 
         pullRequestsGroup.MapEndpoint<GetAllPullRequestsEndpoint>();

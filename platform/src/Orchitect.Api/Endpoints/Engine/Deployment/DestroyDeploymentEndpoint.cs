@@ -1,9 +1,12 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Dispatch.Queue;
@@ -27,6 +30,11 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
             [FromServices]
             IDeploymentRepository repository,
             [FromServices]
+            IApplicationRepository applicationRepository,
+            [FromServices]
+            IOrganisationRepository organisationRepository,
+            ClaimsPrincipal user,
+            [FromServices]
             IDeploymentQueue deploymentQueue,
             HttpContext httpContext,
             CancellationToken cancellationToken)
@@ -34,6 +42,14 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
         var deployment = await repository.GetByIdAsync(new DeploymentId(id), cancellationToken);
 
         if (deployment is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var application = await applicationRepository.GetByIdAsync(deployment.ApplicationId, cancellationToken);
+
+        if (application is null ||
+            !await organisationRepository.IsMemberAsync(user, application.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

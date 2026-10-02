@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Services;
 
@@ -30,12 +32,16 @@ public sealed class GetCloudResourceEndpoint : IEndpoint
         string id,
         [FromServices]
         ICloudResourceRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var cloudResourceId = new CloudResourceId(id);
         var cloudResourceResponse = await repository.GetByIdAsync(cloudResourceId, cancellationToken);
 
-        if (cloudResourceResponse is null)
+        if (cloudResourceResponse is null ||
+            !await organisationRepository.IsMemberAsync(user, cloudResourceResponse.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

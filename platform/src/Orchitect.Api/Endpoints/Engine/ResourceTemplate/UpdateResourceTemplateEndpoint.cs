@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
@@ -25,12 +27,16 @@ public sealed class UpdateResourceTemplateEndpoint : IEndpoint
         UpdateResourceTemplateRequest request,
         [FromServices]
         IResourceTemplateRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var resourceTemplateId = new ResourceTemplateId(id);
         var existingResourceTemplate = await repository.GetByIdAsync(resourceTemplateId, cancellationToken);
 
-        if (existingResourceTemplate is null)
+        if (existingResourceTemplate is null ||
+            !await organisationRepository.IsMemberAsync(user, existingResourceTemplate.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

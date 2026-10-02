@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -25,12 +26,13 @@ public sealed class UpdateOrganisationEndpoint : IEndpoint
         UpdateOrganisationRequest request,
         [FromServices]
         IOrganisationRepository repository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var organisationId = new OrganisationId(id);
         var existingOrganisation = await repository.GetByIdAsync(organisationId, cancellationToken);
 
-        if (existingOrganisation is null)
+        if (existingOrganisation is null || !await repository.IsMemberAsync(user, organisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

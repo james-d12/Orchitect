@@ -62,7 +62,8 @@ public static class CoreEndpoints
     private static RouteGroupBuilder MapPrivateGroup(this IEndpointRouteBuilder endpoints, string? prefix = null)
     {
         return endpoints.MapGroup(prefix ?? string.Empty)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<OrganisationMembershipFilter>();
     }
 
     private static IEndpointRouteBuilder MapEndpoint<TEndpoint>(this IEndpointRouteBuilder endpoints)

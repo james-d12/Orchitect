@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Pipeline;
 using Orchitect.Domain.Inventory.Pipeline.Services;
 
@@ -29,12 +31,16 @@ public sealed class GetPipelineEndpoint : IEndpoint
         string id,
         [FromServices]
         IPipelineRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var pipelineId = new PipelineId(id);
         var pipeline = await repository.GetByIdAsync(pipelineId, cancellationToken);
 
-        if (pipeline is null)
+        if (pipeline is null ||
+            !await organisationRepository.IsMemberAsync(user, pipeline.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

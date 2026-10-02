@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
 using Orchitect.Domain.Core.Credential;
+using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Api.Endpoints.Core.Credential;
 
@@ -29,13 +31,17 @@ public sealed class UpdateCredentialEndpoint : IEndpoint
         [FromServices]
         ICredentialRepository repository,
         [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
+        [FromServices]
         IEncryptionService encryptionService,
         CancellationToken cancellationToken)
     {
         var credentialId = new CredentialId(id);
         var existing = await repository.GetByIdAsync(credentialId, cancellationToken);
 
-        if (existing is null)
+        if (existing is null ||
+            !await organisationRepository.IsMemberAsync(user, existing.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }

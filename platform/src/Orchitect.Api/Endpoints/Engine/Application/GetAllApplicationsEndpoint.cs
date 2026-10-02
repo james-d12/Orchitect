@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
 
 namespace Orchitect.Api.Endpoints.Engine.Application;
@@ -11,16 +13,23 @@ namespace Orchitect.Api.Endpoints.Engine.Application;
 public sealed class GetAllApplicationsEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
-        .MapGet("/", Handle)
+        .MapGet("/", HandleAsync)
         .WithSummary("Get All Applications.");
 
     public sealed record GetAllApplicationsResponse(List<GetApplicationEndpoint.GetApplicationResponse> Applications);
 
-    private static Results<Ok<GetAllApplicationsResponse>, InternalServerError> Handle(
+    private static async Task<Results<Ok<GetAllApplicationsResponse>, InternalServerError>> HandleAsync(
         [FromServices]
-        IApplicationRepository repository)
+        IApplicationRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
+        CancellationToken cancellationToken)
     {
-        var applications = repository.GetAll().ToList();
+        var organisationIds = await organisationRepository.GetMemberOrganisationIdsAsync(user, cancellationToken);
+        var applications = repository.GetAll()
+            .Where(r => organisationIds.Contains(r.OrganisationId))
+            .ToList();
         var applicationsResponse = applications
             .Select(application => new GetApplicationEndpoint.GetApplicationResponse(
                 application.Id.Value,

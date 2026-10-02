@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Issue;
 using Orchitect.Domain.Inventory.Issue.Services;
 
@@ -31,12 +33,16 @@ public sealed class GetIssueEndpoint : IEndpoint
         string id,
         [FromServices]
         IIssueRepository repository,
+        [FromServices]
+        IOrganisationRepository organisationRepository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var issueId = new IssueId(id);
         var issue = await repository.GetByIdAsync(issueId, cancellationToken);
 
-        if (issue is null)
+        if (issue is null ||
+            !await organisationRepository.IsMemberAsync(user, issue.OrganisationId, cancellationToken))
         {
             return TypedResults.NotFound();
         }
