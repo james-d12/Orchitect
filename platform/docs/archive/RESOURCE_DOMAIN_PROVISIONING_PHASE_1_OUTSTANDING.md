@@ -244,6 +244,8 @@ These are not blocking the persistence work above but should be addressed for co
 
 Recommend **Option A** — no code change required, just document the convention.
 
+**Done (#139):** Option A, written up in [`resource/domain-model-conventions.md`](../resource/domain-model-conventions.md).
+
 ### 7b. `IApplicationRepository` missing org-scoped query
 
 `IResourceRepository` has `GetByEnvironmentAsync`. `IApplicationRepository` has no domain-specific query. Add:
@@ -255,6 +257,8 @@ Task<IReadOnlyList<Application>> GetByOrganisationAsync(
 ```
 
 And implement in `ApplicationRepository` using `_dbContext.Applications.AsNoTracking().Where(a => a.OrganisationId == organisationId).ToListAsync()`.
+
+**Done (#137):** added with integration tests in `ApplicationIntegrationTests`.
 
 ---
 
