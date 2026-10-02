@@ -17,6 +17,7 @@ public sealed class DockerExecutor : IExecutor
     private static readonly TimeSpan OutputRelayStopTimeout = TimeSpan.FromSeconds(2);
 
     private const string DefaultNetworkMode = "default";
+    private const string RunnerConnectionStringName = "orchitect-runner";
 
     private readonly ILogger<DockerExecutor> _logger;
     private readonly IDockerClient _docker;
@@ -234,12 +235,12 @@ public sealed class DockerExecutor : IExecutor
 
     private string BuildRunnerConnectionString(ExecutorContext context)
     {
-        var connectionString = _configuration.GetConnectionString("orchitect");
+        var connectionString = _configuration.GetConnectionString(RunnerConnectionStringName);
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
-                "ConnectionStrings:orchitect is not set, so the runner container cannot reach the database.");
+                $"ConnectionStrings:{RunnerConnectionStringName} is not set, so the runner container cannot reach the database.");
         }
 
         return RewriteConnectionString(connectionString, context.DatabaseHost, context.DatabasePort);

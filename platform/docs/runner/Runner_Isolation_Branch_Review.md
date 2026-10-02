@@ -51,7 +51,7 @@ Each finding also has a severity: 🔴 high, 🟡 medium, 🟢 low.
 | M8 | Runner registers API-only services (queue, Docker client, executor options) | Medium | 🟢 | Fixed (see fix plan) |
 | M9 | No sweep for leftover `orchitect-runner-*` containers | Medium | 🟢 | Fixed (see fix plan) |
 | M10 | No Terraform provider plugin cache | Medium | 🟢 | Dropped (`624cccd`), #124 |
-| H1 | Runner holds the API's full DB credentials while running untrusted Terraform | Hard | 🔴 | Open, #102, #104, #105 |
+| H1 | Runner holds the API's full DB credentials while running untrusted Terraform | Hard | 🔴 | Partial (read-only role, #104), #102, #105 |
 | H2 | Key Vault token covers all of Key Vault, not just the mapped secrets | Hard | 🔴 | Open, #108 |
 | H3 | Deployment queue is serial, blocking and in-memory | Hard | 🟡 | Partial (`73c8716`, `f53a43c`), #110, #111 |
 | H4 | Containerised API can't reach Docker; socket access is root-equivalent | Hard | 🟡 | Open, #114 |

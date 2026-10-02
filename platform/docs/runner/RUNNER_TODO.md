@@ -47,7 +47,7 @@ The API validates `TerraformBackend` and `SecretProvider` at startup (`ValidateO
 | Section | Purpose |
 |---|---|
 | `Image` | Required. The runner image to start. |
-| `Network`, `DatabaseHost`, `DatabasePort` | Docker network for the container and how the runner reaches Postgres. The runner's connection string is derived from the API's own `ConnectionStrings:orchitect`, with the host/port rewritten. |
+| `Network`, `DatabaseHost`, `DatabasePort` | Docker network for the container and how the runner reaches Postgres. The runner's connection string is `ConnectionStrings:orchitect-runner` with the host/port rewritten. The API's own `ConnectionStrings:orchitect` is never passed to the runner, and a run fails if `orchitect-runner` isn't set. |
 | `LogLevel` | The runner's default log level (default `Information`). `Debug` logs the rendered Terraform, which includes input values. |
 | `MemoryBytes`, `NanoCpus`, `PidsLimit` | Container limits (defaults 2 GiB, 2 CPUs, 512 PIDs). Set to null to remove a limit. |
 | `TerraformBackend` | Where state lives. `Mode` is `Local` (default, lost with the container) or `Remote`. For `Remote`, `Type` is any Terraform backend (`azurerm`, `s3`, `gcs`, ...) and `Config` is backend-specific. It's written to an owner-only `backend.tfbackend` file and passed with `terraform init -backend-config=<file>`, so values never appear in process arguments. Orchitect only substitutes `{applicationId}`, `{environmentId}` and `{projectName}`. Setting `Type`/`Config` with `Mode = Local` is rejected. |
@@ -85,6 +85,21 @@ The Azure SDK never reads `ARM_*`, and Terraform never reads `AZURE_*`.
 - azurerm with `use_azuread_auth = true`: the ARM identity needs *Storage Blob Data Contributor* on the state account.
 - The S3 backend may need `role_arn` etc. in its `Config`.
 - The Key Vault bootstrap identity needs *Key Vault Secrets User*.
+
+### Runner database role
+The runner connects as `orchitect_runner`. The `runner_read_only_role` migration creates it as a `NOLOGIN` role if it doesn't exist, and grants it `CONNECT`, `USAGE` on `public` and `SELECT` on `Applications`, `Deployments`, `ResourceTemplates` and `ResourceTemplateVersion`. It has no other privileges. A runner that needs another table needs a new migration that grants it.
+
+The role is cluster-wide, but the login and password come from the environment:
+- **Aspire:** `postgres-init/runner-role.sh` creates `orchitect_runner` with `LOGIN` and a generated password when the container is first initialised. The AppHost passes the matching `ConnectionStrings__orchitect-runner` to the API.
+- **Elsewhere:** either let the migration create the role (the migrating user needs `CREATEROLE`) or create it yourself first. Then enable login and give the API the connection string:
+  ```sql
+  ALTER ROLE orchitect_runner WITH LOGIN PASSWORD '<password>';
+  ```
+  ```bash
+  dotnet user-secrets set "ConnectionStrings:orchitect-runner" "Host=<host>;Port=5432;Database=orchitect;Username=orchitect_runner;Password=<password>"
+  ```
+
+On Postgres 14 and earlier, `PUBLIC` can still `CREATE` in the `public` schema, so the runner could create tables there. Run `REVOKE CREATE ON SCHEMA public FROM PUBLIC` if that matters.
 
 ## TODO
 
@@ -141,7 +156,7 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
 - [ ] Image selection is a single `ExecutorOptions:Image`. When more cloud/IaC combinations are needed, derive the tag from the environment/templates. (#132)
 
 ### 8. Design issues (Hard, from `Runner_Isolation_Branch_Review.md`)
-- [ ] **H1** The runner holds the API's full DB credentials while running untrusted Terraform. First step: a dedicated Postgres role with `SELECT` on the engine tables. Proper fix: the API passes a run manifest and the runner never touches the database. (#102, #104, #105)
+- [ ] **H1** The runner holds the API's full DB credentials while running untrusted Terraform. First step done (#104): the runner connects as `orchitect_runner`, which only has `SELECT` on the engine tables it reads (see [Runner database role](#runner-database-role)). Template code can still read every application, deployment and resource template. Proper fix: the API passes a run manifest and the runner never touches the database. (#102, #105)
 - [ ] **H2** The Key Vault token covers every vault and secret the API's identity can read. Resolve only the mapped secrets in the API, use a runner-only vault, or give the runner its own least-privilege identity. (#108)
 - [ ] **H3** The deployment queue is serial, blocking and in-memory. Needs a durable queue, bounded concurrency and non-blocking enqueue. One run per application/environment is already enforced by `IX_Deployments_ActiveRun`. Queued work is still lost on restart: `RunnerContainerSweepService` marks those deployments `Failed` instead of running them. (#110, #111)
 - [ ] **H4** A containerised API can't reach Docker, and mounting the socket is root-equivalent. Options: rootless Docker/Podman, a remote Docker host, a small job-launcher service, or a platform-native `IExecutor` (Kubernetes Jobs, Container Apps Jobs, ECS). (#114)

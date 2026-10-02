@@ -14,16 +14,19 @@ public sealed class DockerExecutorTests : IDisposable
 {
     private const string ContainerId = "0123456789abcdef";
 
+    private const string ApiConnectionString = "Host=localhost;Port=41031;Username=postgres;Password=api;Database=orchitect";
+    private const string RunnerConnectionString = "Host=localhost;Port=41031;Username=orchitect_runner;Password=runner;Database=orchitect";
+
+    private readonly IDockerClient _docker = Substitute.For<IDockerClient>();
     private readonly IContainerOperations _containers = Substitute.For<IContainerOperations>();
     private readonly CancellationTokenSource _cancellation = new();
     private readonly DockerExecutor _executor;
 
     public DockerExecutorTests()
     {
-        var docker = Substitute.For<IDockerClient>();
         var images = Substitute.For<IImageOperations>();
-        docker.Containers.Returns(_containers);
-        docker.Images.Returns(images);
+        _docker.Containers.Returns(_containers);
+        _docker.Images.Returns(images);
 
         images.InspectImageAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new ImageInspectResponse { ID = "sha256:runner" });
@@ -37,14 +40,11 @@ public sealed class DockerExecutorTests : IDisposable
             .Returns(_ => new MultiplexedStream(new MemoryStream(), true));
         SetRunning(false);
 
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:orchitect"] = "Host=localhost;Port=41031;Database=orchitect"
-            })
-            .Build();
-
-        _executor = new DockerExecutor(NullLogger<DockerExecutor>.Instance, docker, configuration);
+        _executor = CreateExecutor(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:orchitect"] = ApiConnectionString,
+            ["ConnectionStrings:orchitect-runner"] = RunnerConnectionString
+        });
     }
 
     public void Dispose() => _cancellation.Dispose();
@@ -92,10 +92,35 @@ public sealed class DockerExecutorTests : IDisposable
                 Arg.Any<CancellationToken>());
         });
         Assert.Equal("s3cr3t", copied!["ARM_CLIENT_SECRET"]);
-        Assert.Contains("host.docker.internal", copied["ConnectionStrings__orchitect"]);
+        var runnerConnection = new NpgsqlConnectionStringBuilder(copied[RunnerEnvironment.ConnectionString]);
+        Assert.Equal("host.docker.internal", runnerConnection.Host);
+        Assert.Equal("orchitect_runner", runnerConnection.Username);
+        Assert.Equal("runner", runnerConnection.Password);
         Assert.Contains("Logging__LogLevel__Default=Information", created!.Env);
         Assert.DoesNotContain(created.Env, e => e.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
         Assert.DoesNotContain(created.Env, e => e.Contains("s3cr3t", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RunnerConnectionStringMissing_FailsWithoutFallingBackToApiCredentials()
+    {
+        var executor = CreateExecutor(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:orchitect"] = ApiConnectionString
+        });
+
+        var result = await executor.ExecuteAsync(new ExecutorContext
+        {
+            Image = "orchitect-runner:test",
+            RunId = "run-1",
+            Arguments = [],
+            Configuration = new Dictionary<string, string>()
+        }, _cancellation.Token);
+
+        var exception = Assert.IsType<InvalidOperationException>(result.Exception);
+        Assert.Contains("ConnectionStrings:orchitect-runner", exception.Message);
+        await _containers.DidNotReceive().CreateContainerAsync(Arg.Any<CreateContainerParameters>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -207,6 +232,10 @@ public sealed class DockerExecutorTests : IDisposable
             Timeout = timeout,
             StopGracePeriod = stopGracePeriod
         }, _cancellation.Token);
+
+    private DockerExecutor CreateExecutor(Dictionary<string, string?> settings) =>
+        new(NullLogger<DockerExecutor>.Instance, _docker,
+            new ConfigurationBuilder().AddInMemoryCollection(settings).Build());
 
     private static Dictionary<string, string> ReadSecrets(Stream archive)
     {

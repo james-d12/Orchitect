@@ -1,7 +1,17 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var postgres = builder.AddPostgres("postgres").WithHostPort(41031);
+var runnerDbPassword = ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(
+    builder, "orchitect-runner-password", special: false);
+
+var postgres = builder.AddPostgres("postgres")
+    .WithHostPort(41031)
+    .WithEnvironment("ORCHITECT_RUNNER_PASSWORD", runnerDbPassword)
+    .WithInitFiles("./postgres-init");
 var orchitectDb = postgres.AddDatabase("orchitect");
+
+var postgresEndpoint = postgres.Resource.PrimaryEndpoint;
+var runnerConnectionString = ReferenceExpression.Create(
+    $"Host={postgresEndpoint.Property(EndpointProperty.Host)};Port={postgresEndpoint.Property(EndpointProperty.Port)};Username=orchitect_runner;Password={runnerDbPassword};Database={orchitectDb.Resource.DatabaseName}");
 
 var keyVaultUri = builder.AddParameter("keyvault-uri");
 
@@ -18,6 +28,7 @@ var api = builder.AddProject<Projects.Orchitect_Api>("orchitect-api")
     .WithEnvironment("ExecutorOptions__Network", "aspire-session-network-")
     .WithEnvironment("ExecutorOptions__DatabaseHost", postgres.Resource.Name)
     .WithEnvironment("ExecutorOptions__DatabasePort", "5432")
+    .WithEnvironment("ConnectionStrings__orchitect-runner", runnerConnectionString)
     .WithEnvironment("ExecutorOptions__SecretProvider__Type", "AzureKeyVault")
     .WithEnvironment("ExecutorOptions__SecretProvider__AzureKeyVault__VaultUri", keyVaultUri)
     .WithEnvironment("ExecutorOptions__SecretProvider__Mappings__ARM_CLIENT_ID", "terraform-client-id")
