@@ -21,7 +21,7 @@ public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture
     }, fixture.Organisation.Id);
 
     private readonly Deployment _deployment =
-        Deployment.Create(new ApplicationId(), new EnvironmentId(Guid.NewGuid()), new CommitId("abc123"));
+        Deployment.Create(new ApplicationId(), new EnvironmentId(Guid.NewGuid()), new CommitId(new string('a', 40)));
 
     [Fact]
     public async Task StartAsync_MultiResourceScoreFile_RecordsResourcesInstancesAndGraph()
