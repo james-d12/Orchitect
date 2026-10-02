@@ -42,6 +42,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Dispatch",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Dispatch.Unit.Tests", "src\Orchitect.Engine.Dispatch.Unit.Tests\Orchitect.Engine.Dispatch.Unit.Tests.csproj", "{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.AppHost.E2E.Tests", "src\Orchitect.AppHost.E2E.Tests\Orchitect.AppHost.E2E.Tests.csproj", "{D4B8F3E5-6274-4FB1-A05D-9E0F1A2B3C44}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -124,6 +126,10 @@ Global
 		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D4B8F3E5-6274-4FB1-A05D-9E0F1A2B3C44}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D4B8F3E5-6274-4FB1-A05D-9E0F1A2B3C44}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D4B8F3E5-6274-4FB1-A05D-9E0F1A2B3C44}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D4B8F3E5-6274-4FB1-A05D-9E0F1A2B3C44}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{C59149B2-D803-46FF-8F2B-A78A3C351E11} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
@@ -134,5 +140,6 @@ Global
 		{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{F3CA01E7-AC37-4DCA-81D0-A3AB71184531} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 		{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
+		{D4B8F3E5-6274-4FB1-A05D-9E0F1A2B3C44} = {CC0A1FCB-7A7A-427C-B617-0B883DB93332}
 	EndGlobalSection
 EndGlobal
