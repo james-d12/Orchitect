@@ -20,12 +20,12 @@ Severity: 🔴 high, 🟡 medium, 🟢 low.
 
 | # | Finding | Severity | Status | Issues |
 |---|---|---|---|---|
-| A1 | The branch works against the target architecture in `API_RUNNER_SEPARATION.md` (runner has DB access) | 🔴 | Open | #102, #105 |
-| A2 | No "Run" concept in the domain | 🔴 | Open | #110, #113 |
+| A1 | The branch works against the target architecture in `API_RUNNER_SEPARATION.md` (runner has DB access) | 🔴 | Decided: runner calls an internal API, no DB access | #102, #105 |
+| A2 | No "Run" concept in the domain | 🔴 | Open; prerequisite for the runner API | #110, #113 |
 | A3 | `Orchitect.Infrastructure.Engine` mixes the control plane and the data plane | 🟡 | Fixed: split into `Orchitect.Engine.Contracts`, `.Dispatch` and `.Execution` | #115, #116 |
 | A4 | The API–runner contract is implicit and untested | 🟡 | Partial: round-trip test added (`db5994b`); argument and env key names moved to `Orchitect.Engine.Contracts` (A3) | #117, #118 |
-| A5 | The executor knows about the database | 🟡 | Open | #107 |
-| A6 | Adding a secret provider means editing switches in separate places | 🟡 | Open | #109 |
+| A5 | The executor knows about the database | 🟡 | Open; becomes `ExecutorOptions:ApiBaseUrl` | #107 |
+| A6 | Adding a secret provider means editing switches in separate places | 🟡 | Open; API side only once #108 lands | #109 |
 | A7 | Local state mode is the default but broken in this topology | 🟡 | Open | #119 |
 | A8 | Runner observability: no trace propagation, no per-run logs | 🟡 | Open | #120, #121 |
 | A9 | An architecture guard test was silently broken | 🟢 | Fixed: Inventory guard fixed (`129e3b2`); Engine layering tests added in `EngineLayeringTests` and `ApiLayeringTests` | #122 |
@@ -53,11 +53,9 @@ The consequences go beyond security (see H1):
 - **Schema coupling.** The runner image carries an EF model. If the API and the runner are built from different commits, the runner breaks against a migrated schema. The image tag is the floating `orchitect-runner:terraform`, so version skew is likely.
 - **The runner decides what to run.** It parses the score file and resolves templates itself. The target doc says that's the API's job ("What should this run execute?").
 
-**Recommendation:** decide whether this branch is an intermediate step.
-- If it is, say so in `API_RUNNER_SEPARATION.md`, and design the run manifest contract now, even if the DB path stays for a while.
-- If it isn't, the doc and the code need to agree.
+**Decision (#102, 2026-10-02):** the current DB access is an intermediate step. The target is a thin runner that calls an internal API on Orchitect.API: it submits the parsed score file, and the API resolves templates and records resources. The design, contract and migration order are in [API_RUNNER_SEPARATION.md](API_RUNNER_SEPARATION.md).
 
-In either case, tie the runner image tag to the API build version.
+The contract-version header (§7 there) catches image/API skew. Tying the runner image tag to the API build version is still worthwhile.
 
 ## A2. 🔴 There's no "Run" in the domain
 
@@ -134,7 +132,7 @@ The whole interface is CLI arguments plus env var names assembled from strings i
 
 `ExecutorContext` carries `DatabaseHost` and `DatabasePort`, and `DockerExecutor.BuildRunnerConnectionString` rewrites a Postgres connection string. That's a composition concern leaking into what should be a generic "run this image with this config" abstraction. A Kubernetes or ACA executor would have to repeat the same logic.
 
-**Recommendation:** build the runner's configuration in one place (the dispatch layer, currently `DeploymentQueue`) and keep `ExecutorContext` to image, arguments, environment and resource limits. If A1 goes the manifest route, this goes away entirely.
+**Recommendation:** build the runner's configuration in one place (the dispatch layer, currently `DeploymentQueue`) and keep `ExecutorContext` to image, arguments, environment and resource limits. With the A1 decision, the DB fields are replaced by `ExecutorOptions:ApiBaseUrl` (#107).
 
 ## A6. 🟡 Adding a secret provider means editing switches in separate places
 
@@ -146,7 +144,7 @@ The whole interface is CLI arguments plus env var names assembled from strings i
 
 `IRunnerSecretTokenProvider` has a generic name but a single Key Vault implementation, and it's registered unconditionally. Adding AWS Secrets Manager means editing all of these.
 
-**Recommendation:** use one strategy per provider type, holding both halves ("what the API hands over" and "how the runner resolves"), registered by type. Note that H2 may change this anyway: if the API resolves the mapped secrets itself, the runner-side provider selection mostly disappears.
+**Recommendation:** use one strategy per provider type, holding both halves ("what the API hands over" and "how the runner resolves"), registered by type. Following the H2 decision (#108), the API resolves the mapped secrets itself, so only the API-side half remains.
 
 ## A7. 🟡 Local state mode is the default but broken in this topology
 
