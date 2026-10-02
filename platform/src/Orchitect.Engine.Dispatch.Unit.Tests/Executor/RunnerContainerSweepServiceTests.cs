@@ -241,7 +241,7 @@ public sealed class RunnerContainerSweepServiceTests
         };
 
     private static Deployment NewDeployment() =>
-        Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)));
+        Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)), "test@example.com");
 
     private void SetActiveDeployments(params Deployment[] deployments) =>
         _deployments.GetActiveAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())

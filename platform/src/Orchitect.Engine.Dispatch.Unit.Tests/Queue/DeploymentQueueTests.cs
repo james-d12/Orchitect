@@ -199,14 +199,16 @@ public sealed class DeploymentQueueTests
     }
 
     private static Deployment Deployed() =>
-        Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)))
+        Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)),
+                "test@example.com")
             .Start()
             .ProcessDeploymentStatus(0, null);
 
     private static (Deployment, RecordingDeploymentRepository, IServiceProvider) Setup(Deployment? existing = null)
     {
         var deployment = existing ??
-                         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)));
+                         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)),
+                             "test@example.com");
         var repository = new RecordingDeploymentRepository { Deployment = deployment };
         var services = new ServiceCollection()
             .AddSingleton<IDeploymentRepository>(repository)
