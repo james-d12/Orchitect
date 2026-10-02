@@ -46,6 +46,25 @@ public sealed class ApplicationIntegrationTests(WebApplicationFactoryWithPostgre
     }
 
     [Fact]
+    public async Task ApplicationApi_WhenCreatingApplicationWithInvalidRepositoryUrl_ShouldReturn400BadRequest()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var request = BuildCreateRequest(organisation.Id);
+        request = request with
+        {
+            Repository = request.Repository with { Url = new Uri("ftp://github.com/test/repo") }
+        };
+
+        // Act
+        var response = await client.PostAsJsonAsync(ApplicationsUrl, request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ApplicationApi_WhenGettingApplicationById_ShouldReturn200Ok()
     {
         // Arrange
@@ -136,6 +155,26 @@ public sealed class ApplicationIntegrationTests(WebApplicationFactoryWithPostgre
         Assert.Equal(updateRequest.Repository.Provider, body.Repository.Provider);
         Assert.NotEqual(default, body.CreatedAt);
         Assert.NotEqual(default, body.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task ApplicationApi_WhenUpdatingApplicationWithInvalidRepositoryUrl_ShouldReturn400BadRequest()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var created = await client.CreateApplicationAsync(organisation.Id);
+        var updateRequest = BuildUpdateRequest();
+        updateRequest = updateRequest with
+        {
+            Repository = updateRequest.Repository with { Url = new Uri("https://github.com") }
+        };
+
+        // Act
+        var response = await client.PutAsJsonAsync($"{ApplicationsUrl}/{created.Id}", updateRequest);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

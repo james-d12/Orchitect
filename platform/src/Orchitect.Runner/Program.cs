@@ -1,8 +1,10 @@
 using System.CommandLine;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner;
@@ -10,6 +12,7 @@ using Orchitect.Engine.Contracts.Terraform;
 using Orchitect.Engine.Execution;
 using Orchitect.Engine.Execution.Secret;
 using Orchitect.Persistence;
+using Orchitect.ServiceDefaults;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 RunnerSecretsFile.LoadIntoEnvironment();
@@ -18,6 +21,8 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
+builder.AddServiceDefaults();
+builder.Services.Configure<ConsoleLifetimeOptions>(options => options.SuppressStatusMessages = true);
 
 builder.Services.AddEngineProvisioningServices();
 builder.Services.AddPersistenceServices();
@@ -54,6 +59,16 @@ rootCommand.SetAction(async (parseResult, cancellationToken) =>
     var applicationId = new ApplicationId(parseResult.GetRequiredValue(applicationIdOption));
     var deploymentId = new DeploymentId(parseResult.GetRequiredValue(deploymentIdOption));
     var operation = parseResult.GetValue(operationOption);
+
+    ActivityContext.TryParse(
+        Environment.GetEnvironmentVariable(RunnerEnvironment.TraceParent),
+        Environment.GetEnvironmentVariable(RunnerEnvironment.TraceState),
+        isRemote: true,
+        out var parentContext);
+
+    using var activity = Tracing.StartActivity(parentContext, "Run");
+    activity?.SetTag("orchitect.deployment.id", deploymentId.Value);
+    activity?.SetTag("orchitect.run.operation", operation.ToString());
 
     using var scope = host.Services.CreateScope();
 
@@ -96,5 +111,11 @@ rootCommand.SetAction(async (parseResult, cancellationToken) =>
     }
 });
 
-return await rootCommand.Parse(args)
+await host.StartAsync();
+
+var exitCode = await rootCommand.Parse(args)
     .InvokeAsync(new InvocationConfiguration { ProcessTerminationTimeout = Timeout.InfiniteTimeSpan });
+
+await host.StopAsync();
+
+return exitCode;
