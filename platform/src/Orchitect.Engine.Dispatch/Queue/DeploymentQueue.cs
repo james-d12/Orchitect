@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orchitect.Common.Observability;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Dispatch.Executor;
@@ -32,16 +34,23 @@ public sealed class DeploymentQueue : IDeploymentQueue
 
     public async Task QueueDeploymentTaskAsync(DeploymentQueueRequest request, CancellationToken token = default)
     {
+        var parentContext = Activity.Current?.Context ?? default;
+
         await _backgroundTaskQueueProcessor.QueueBackgroundWorkItemAsync(async (sp, ct) =>
         {
+            using var activity = Tracing.StartActivity(parentContext, nameof(QueueDeploymentTaskAsync));
+            activity?.SetTag("orchitect.deployment.id", request.DeploymentId.Value);
+            activity?.SetTag("orchitect.run.operation", request.Operation.ToString());
+
             var repository = sp.GetRequiredService<IDeploymentRepository>();
 
             try
             {
                 await RunAsync(repository, request, ct);
             }
-            catch (Exception) when (!ct.IsCancellationRequested)
+            catch (Exception exception) when (!ct.IsCancellationRequested)
             {
+                activity.RecordException(exception);
                 await FailOwnedDeploymentAsync(repository, request);
                 throw;
             }

@@ -12,4 +12,11 @@ public static class RunnerEnvironment
     public const string KeyVaultAccessToken = $"{KeyVaultPrefix}{nameof(AzureKeyVaultOptions.AccessToken)}";
     public const string KeyVaultAccessTokenExpiresOn =
         $"{KeyVaultPrefix}{nameof(AzureKeyVaultOptions.AccessTokenExpiresOn)}";
+
+    public const string TraceParent = "TRACEPARENT";
+    public const string TraceState = "TRACESTATE";
+    public const string OtlpEndpoint = "OTEL_EXPORTER_OTLP_ENDPOINT";
+    public const string OtlpHeaders = "OTEL_EXPORTER_OTLP_HEADERS";
+    public const string OtlpProtocol = "OTEL_EXPORTER_OTLP_PROTOCOL";
+    public const string ServiceName = "OTEL_SERVICE_NAME";
 }

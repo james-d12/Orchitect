@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -179,6 +180,24 @@ public sealed class DeploymentQueueTests
         Assert.Empty(repository.Statuses);
     }
 
+    [Fact]
+    public async Task WorkItem_RunsInTraceOfQueueingRequest()
+    {
+        using var listener = new ActivityListener();
+        listener.ShouldListenTo = _ => true;
+        listener.Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded;
+        ActivitySource.AddActivityListener(listener);
+        var (deployment, _, services) = Setup();
+        var executor = new FakeExecutor();
+        var request = new Activity("request").Start();
+        var workItem = await QueueAsync(deployment, executor);
+        request.Stop();
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal(request.TraceId, executor.TraceId);
+    }
+
     private static Deployment Deployed() =>
         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId("abc123"))
             .Start()
@@ -232,12 +251,14 @@ public sealed class DeploymentQueueTests
         public Action? OnExecute { get; init; }
         public bool Executed { get; private set; }
         public ExecutorContext? Context { get; private set; }
+        public ActivityTraceId? TraceId { get; private set; }
 
         public Task<ExecutorResult> ExecuteAsync(ExecutorContext context,
             CancellationToken cancellationToken = default)
         {
             Executed = true;
             Context = context;
+            TraceId = Activity.Current?.TraceId;
             OnExecute?.Invoke();
             if (cancellationToken.IsCancellationRequested)
             {
