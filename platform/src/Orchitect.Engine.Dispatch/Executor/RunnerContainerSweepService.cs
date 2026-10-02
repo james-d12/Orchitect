@@ -152,9 +152,14 @@ public sealed class RunnerContainerSweepService : BackgroundService
         ContainerListResponse? container,
         CancellationToken cancellationToken)
     {
-        if (deployment.Status == DeploymentStatus.Pending || container is null)
+        if (deployment.Status == DeploymentStatus.Pending)
         {
-            return deployment.Interrupt();
+            return deployment.Interrupt("The API stopped before the deployment started.");
+        }
+
+        if (container is null)
+        {
+            return deployment.Interrupt("The runner container was not found after the API restarted.");
         }
 
         if (!FinishedStates.Contains(container.State, StringComparer.OrdinalIgnoreCase))
@@ -164,13 +169,13 @@ public sealed class RunnerContainerSweepService : BackgroundService
 
         if (!string.Equals(container.State, ExitedState, StringComparison.OrdinalIgnoreCase))
         {
-            return deployment.Interrupt();
+            return deployment.Interrupt($"The runner container was {container.State} after the API restarted.");
         }
 
         var inspect = await docker.Containers.InspectContainerAsync(container.ID, cancellationToken);
         return inspect.State is { } state
             ? deployment.ProcessDeploymentStatus(state.ExitCode, null)
-            : deployment.Interrupt();
+            : deployment.Interrupt("The runner container state could not be read after the API restarted.");
     }
 
     private static string? GetRunId(ContainerListResponse container) =>
