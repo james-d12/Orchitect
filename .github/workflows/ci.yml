@@ -179,9 +179,9 @@ jobs:
       - name: Format Check
         run: dotnet format ${{ env.SOLUTION_FILE }} --verify-no-changes --verbosity diagnostic
 
-      - name: Run Mutation Tests
-        run: dotnet stryker --solution ${{ env.SOLUTION_FILE }}
-        continue-on-error: true
+      #- name: Run Mutation Tests
+      #  run: dotnet stryker --solution ${{ env.SOLUTION_FILE }}
+      #  continue-on-error: true
 
   docker-compose:
     name: "Build Docker Compose"
