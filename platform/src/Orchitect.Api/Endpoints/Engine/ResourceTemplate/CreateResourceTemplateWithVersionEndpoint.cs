@@ -16,14 +16,24 @@ public sealed class CreateResourceTemplateWithVersionEndpoint : IEndpoint
 
     public sealed record CreateResourceTemplateWithVersionResponse(Guid Id);
 
-    private static async Task<Results<Ok<CreateResourceTemplateWithVersionResponse>, InternalServerError>> HandleAsync(
+    private static async Task<Results<Ok<CreateResourceTemplateWithVersionResponse>, BadRequest<string>, InternalServerError>> HandleAsync(
         [FromBody]
         CreateResourceTemplateWithVersionRequest request,
         [FromServices]
         IResourceTemplateRepository repository,
         CancellationToken cancellationToken)
     {
-        var resourceTemplate = Orchitect.Domain.Engine.ResourceTemplate.ResourceTemplate.CreateWithVersion(request);
+        Orchitect.Domain.Engine.ResourceTemplate.ResourceTemplate resourceTemplate;
+
+        try
+        {
+            resourceTemplate = Orchitect.Domain.Engine.ResourceTemplate.ResourceTemplate.CreateWithVersion(request);
+        }
+        catch (ArgumentException exception)
+        {
+            return TypedResults.BadRequest(exception.Message);
+        }
+
         var resourceTemplateResponse = await repository.CreateAsync(resourceTemplate, cancellationToken);
 
         if (resourceTemplateResponse is null)

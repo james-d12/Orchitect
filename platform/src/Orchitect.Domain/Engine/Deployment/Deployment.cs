@@ -1,4 +1,5 @@
 using Orchitect.Domain.Engine.Environment;
+using Orchitect.Domain.Engine.Git;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Domain.Engine.Deployment;
@@ -22,6 +23,12 @@ public sealed record Deployment
 
     public static Deployment Create(ApplicationId applicationId, EnvironmentId environmentId, CommitId commitId)
     {
+        if (!GitValidator.IsValidCommitId(commitId.Value))
+        {
+            throw new ArgumentException($"Commit id '{commitId.Value}' is not a full git commit SHA.",
+                nameof(commitId));
+        }
+
         return new Deployment
         {
             Id = new DeploymentId(),

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using Microsoft.Extensions.Configuration;
@@ -14,16 +15,16 @@ public sealed class DockerExecutorTests : IDisposable
 {
     private const string ContainerId = "0123456789abcdef";
 
+    private readonly IDockerClient _docker = Substitute.For<IDockerClient>();
     private readonly IContainerOperations _containers = Substitute.For<IContainerOperations>();
     private readonly CancellationTokenSource _cancellation = new();
     private readonly DockerExecutor _executor;
 
     public DockerExecutorTests()
     {
-        var docker = Substitute.For<IDockerClient>();
         var images = Substitute.For<IImageOperations>();
-        docker.Containers.Returns(_containers);
-        docker.Images.Returns(images);
+        _docker.Containers.Returns(_containers);
+        _docker.Images.Returns(images);
 
         images.InspectImageAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new ImageInspectResponse { ID = "sha256:runner" });
@@ -37,14 +38,7 @@ public sealed class DockerExecutorTests : IDisposable
             .Returns(_ => new MultiplexedStream(new MemoryStream(), true));
         SetRunning(false);
 
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:orchitect"] = "Host=localhost;Port=41031;Database=orchitect"
-            })
-            .Build();
-
-        _executor = new DockerExecutor(NullLogger<DockerExecutor>.Instance, docker, configuration);
+        _executor = CreateExecutor();
     }
 
     public void Dispose() => _cancellation.Dispose();
@@ -96,6 +90,57 @@ public sealed class DockerExecutorTests : IDisposable
         Assert.Contains("Logging__LogLevel__Default=Information", created!.Env);
         Assert.DoesNotContain(created.Env, e => e.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
         Assert.DoesNotContain(created.Env, e => e.Contains("s3cr3t", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OtlpConfigured_PassesTraceContextAndKeepsHeadersOutOfEnv()
+    {
+        using var listener = ListenToAllSources();
+        var executor = CreateExecutor(new Dictionary<string, string?>
+        {
+            [RunnerEnvironment.OtlpEndpoint] = "https://localhost:21132",
+            [RunnerEnvironment.OtlpProtocol] = "grpc",
+            [RunnerEnvironment.OtlpHeaders] = "x-otlp-api-key=k3y"
+        });
+        CreateContainerParameters? created = null;
+        Dictionary<string, string>? copied = null;
+        _ = _containers.CreateContainerAsync(Arg.Do<CreateContainerParameters>(p => created = p),
+            Arg.Any<CancellationToken>());
+        _ = _containers.ExtractArchiveToContainerAsync(ContainerId, Arg.Any<CopyToContainerParameters>(),
+            Arg.Do<Stream>(archive => copied = ReadSecrets(archive)), Arg.Any<CancellationToken>());
+        SetWait(_ => Task.FromResult(new ContainerWaitResponse { StatusCode = 0 }));
+        using var parent = new Activity("request").Start();
+
+        await executor.ExecuteAsync(new ExecutorContext
+        {
+            Image = "orchitect-runner:test",
+            RunId = "run-1",
+            Arguments = [],
+            Configuration = new Dictionary<string, string>()
+        }, _cancellation.Token);
+
+        var traceParent = Assert.Single(created!.Env, e => e.StartsWith($"{RunnerEnvironment.TraceParent}=",
+            StringComparison.Ordinal));
+        Assert.True(ActivityContext.TryParse(traceParent.Split('=', 2)[1], null, out var context));
+        Assert.Equal(parent.TraceId, context.TraceId);
+        Assert.Contains($"{RunnerEnvironment.OtlpEndpoint}=https://host.docker.internal:21132", created.Env);
+        Assert.Contains($"{RunnerEnvironment.OtlpProtocol}=grpc", created.Env);
+        Assert.Contains($"{RunnerEnvironment.ServiceName}={DockerExecutor.RunnerServiceName}", created.Env);
+        Assert.DoesNotContain(created.Env, e => e.Contains("k3y", StringComparison.Ordinal));
+        Assert.Equal("x-otlp-api-key=k3y", copied![RunnerEnvironment.OtlpHeaders]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OtlpNotConfigured_PassesNoExporterSettings()
+    {
+        CreateContainerParameters? created = null;
+        _ = _containers.CreateContainerAsync(Arg.Do<CreateContainerParameters>(p => created = p),
+            Arg.Any<CancellationToken>());
+        SetWait(_ => Task.FromResult(new ContainerWaitResponse { StatusCode = 0 }));
+
+        await ExecuteAsync();
+
+        Assert.DoesNotContain(created!.Env, e => e.StartsWith("OTEL_", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -208,6 +253,30 @@ public sealed class DockerExecutorTests : IDisposable
             StopGracePeriod = stopGracePeriod
         }, _cancellation.Token);
 
+    private DockerExecutor CreateExecutor(Dictionary<string, string?>? settings = null)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:orchitect"] = "Host=localhost;Port=41031;Database=orchitect"
+            })
+            .AddInMemoryCollection(settings ?? [])
+            .Build();
+
+        return new DockerExecutor(NullLogger<DockerExecutor>.Instance, _docker, configuration);
+    }
+
+    private static ActivityListener ListenToAllSources()
+    {
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = _ => true,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded
+        };
+        ActivitySource.AddActivityListener(listener);
+        return listener;
+    }
+
     private static Dictionary<string, string> ReadSecrets(Stream archive)
     {
         using var reader = new System.Formats.Tar.TarReader(archive, leaveOpen: true);
@@ -293,5 +362,14 @@ public sealed class DockerExecutorTests : IDisposable
         Assert.Equal("postgres", builder.Host);
         Assert.Equal(5432, builder.Port);
         Assert.DoesNotContain("localhost", rewritten);
+    }
+
+    [Theory]
+    [InlineData("https://localhost:21132", "https://host.docker.internal:21132")]
+    [InlineData("http://127.0.0.1:4318/", "http://host.docker.internal:4318/")]
+    [InlineData("http://otel-collector:4317", "http://otel-collector:4317")]
+    public void RewriteOtlpEndpoint_LoopbackHost_PointsAtDockerHost(string endpoint, string expected)
+    {
+        Assert.Equal(expected, DockerExecutor.RewriteOtlpEndpoint(endpoint));
     }
 }

@@ -16,14 +16,24 @@ public sealed class CreateApplicationEndpoint : IEndpoint
 
     public sealed record CreateApplicationResponse(Guid Id);
 
-    private static async Task<Results<Ok<CreateApplicationResponse>, InternalServerError>> HandleAsync(
+    private static async Task<Results<Ok<CreateApplicationResponse>, BadRequest<string>, InternalServerError>> HandleAsync(
         [FromBody]
         CreateApplicationRequest request,
         [FromServices]
         IApplicationRepository repository,
         CancellationToken cancellationToken)
     {
-        var application = Orchitect.Domain.Engine.Application.Application.Create(request);
+        Orchitect.Domain.Engine.Application.Application application;
+
+        try
+        {
+            application = Orchitect.Domain.Engine.Application.Application.Create(request);
+        }
+        catch (ArgumentException exception)
+        {
+            return TypedResults.BadRequest(exception.Message);
+        }
+
         var applicationResponse = await repository.CreateAsync(application, cancellationToken);
 
         if (applicationResponse is null)
