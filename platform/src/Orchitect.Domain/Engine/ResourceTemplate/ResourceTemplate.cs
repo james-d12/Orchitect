@@ -1,4 +1,5 @@
 using Orchitect.Domain.Core.Organisation;
+using Orchitect.Domain.Engine.Git;
 
 namespace Orchitect.Domain.Engine.ResourceTemplate;
 
@@ -60,6 +61,8 @@ public sealed record ResourceTemplate
 
     public void AddVersion(CreateNewResourceTemplateVersionRequest versionRequest)
     {
+        ThrowIfInvalid(versionRequest.Source);
+
         if (_versions.Any(v => v.Version == versionRequest.Version))
         {
             throw new InvalidOperationException($"Version '{versionRequest.Version}' already exists.");
@@ -100,5 +103,21 @@ public sealed record ResourceTemplate
         Description = description;
         Provider = provider;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static void ThrowIfInvalid(ResourceTemplateVersionSource source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (!GitValidator.IsValidRepositoryUrl(source.BaseUrl))
+        {
+            throw new ArgumentException($"Source url '{source.BaseUrl}' is not a valid git repository url.",
+                nameof(source));
+        }
+
+        if (source.Tag.Length > 0 && !GitValidator.IsValidReference(source.Tag))
+        {
+            throw new ArgumentException($"Source tag '{source.Tag}' is not a valid git reference.", nameof(source));
+        }
     }
 }

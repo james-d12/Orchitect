@@ -25,7 +25,7 @@ public sealed class UpdateApplicationEndpoint : IEndpoint
         DateTime CreatedAt,
         DateTime UpdatedAt);
 
-    private static async Task<Results<Ok<UpdateApplicationResponse>, NotFound, InternalServerError>> HandleAsync(
+    private static async Task<Results<Ok<UpdateApplicationResponse>, BadRequest<string>, NotFound, InternalServerError>> HandleAsync(
         [FromRoute]
         Guid id,
         [FromBody]
@@ -49,7 +49,17 @@ public sealed class UpdateApplicationEndpoint : IEndpoint
             Provider = request.Repository.Provider
         };
 
-        var updatedApplication = existingApplication.Update(request.Name, updatedRepository);
+        Orchitect.Domain.Engine.Application.Application updatedApplication;
+
+        try
+        {
+            updatedApplication = existingApplication.Update(request.Name, updatedRepository);
+        }
+        catch (ArgumentException exception)
+        {
+            return TypedResults.BadRequest(exception.Message);
+        }
+
         var applicationResponse = await repository.UpdateAsync(updatedApplication, cancellationToken);
 
         if (applicationResponse is null)
