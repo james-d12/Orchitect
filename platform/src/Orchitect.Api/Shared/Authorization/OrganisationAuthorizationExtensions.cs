@@ -58,7 +58,8 @@ public static class OrganisationAuthorizationExtensions
         return builder.RequireOrganisationAccess<TEntity, TId, Guid>(toId, resolveOrganisationId);
     }
 
-    public static RouteHandlerBuilder HandlesOrganisationScope(this RouteHandlerBuilder builder)
+    public static TBuilder HandlesOrganisationScope<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
     {
         return builder.WithMetadata(new HandlesOrganisationScopeMetadata());
     }
