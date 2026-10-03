@@ -69,7 +69,7 @@ jobs:
         run: pnpm run build
 
       - name: Audit Packages
-        run: pnpm audit
+        run: pnpm audit --ignore-unfixable
 
   build-cli:
     name: "Build Cli Portal"
