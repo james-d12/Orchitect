@@ -5,7 +5,7 @@ workstream: runner
 milestone: "Runner Isolation"
 issues: [102, 103, 105, 106, 107, 110, 202, 203, 204]
 superseded_by: null
-last_reviewed: 2026-10-02
+last_reviewed: 2026-10-03
 ---
 
 # Orchitect Runner Architecture
@@ -213,7 +213,7 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
 
 | Method & path | Request | Response | Notes |
 |---|---|---|---|
-| `GET /` | – | `RunDescriptor` | Operation, application repo URL, commit, application/environment IDs. Moves the run to `Running`. |
+| `GET /` | – | `RunDescriptor` | Operation, application repo URL, commit, application/environment IDs. |
 | `POST /plan` | `ScoreSubmission` | `RunPlan` | See below. Idempotent: a repeat call returns the stored plan. |
 | `POST /complete` | `RunCompletion` | `204` | See §8. Idempotent: a repeat call for a completed run is a no-op. |
 
@@ -242,6 +242,13 @@ RunCompletion   { Outcome: Succeeded | Failed, ErrorSummary? }
 ```
 
 The round-trip test (#117) and the shared constants (#118) cover whatever env/arg contract is left (backend config, OTel).
+
+**Status (#203).** Implemented:
+
+- **Contracts.** `RunnerRoutes`, `RunnerContract` (header name, version and the shared JSON options), `RunDescriptor`, `ScoreSubmission`, `RunPlan`, `RunContext`, `RunInput`, `RunInputSource`, `RunCompletion` and `RunOutcome` are in `Orchitect.Engine.Contracts/Runner/Api/`. The score models (`ScoreFile` and friends) moved to `Orchitect.Engine.Contracts/Score/` so `ScoreSubmission` can carry the parsed score.
+- **Versioning.** `RunnerContractFilter` runs on every endpoint in `MapRunnerGroup` and returns `400` with the `RunnerContractMismatch` error code when the header is missing or different. Authentication runs first, so a request without a valid token still gets `401`.
+- **Descriptor.** `GET /internal/runs/{runId}` (`GetRunDescriptorEndpoint`). `DeploymentQueue` already moves the run to `Running` when it issues the token, so the endpoint only reads.
+- **Client.** `IRunnerApiClient` in `Orchitect.Engine.Execution`, registered by `AddRunnerApiClient(configuration)`. It reads `ORCHITECT_API_URL`, `ORCHITECT_RUN_ID` and `ORCHITECT_RUN_TOKEN`, sends the token and the contract header, and retries transient failures (5xx, 408, 429, network errors) with exponential backoff and jitter. It replaces the default resilience handler from `AddServiceDefaults`, so retries don't stack. The runner doesn't use it yet (#105), and nothing sets `ORCHITECT_API_URL` until #107.
 
 ---
 

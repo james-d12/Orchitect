@@ -1,16 +1,24 @@
+using System.Globalization;
+using System.Net.Http.Headers;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
+using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Secret;
 using Orchitect.Engine.Contracts.Terraform;
 using Orchitect.Engine.Execution.Configuration.Score;
 using Orchitect.Engine.Execution.Provisioner;
 using Orchitect.Engine.Execution.Provisioner.Helm;
 using Orchitect.Engine.Execution.Provisioner.Terraform;
+using Orchitect.Engine.Execution.RunnerApi;
 using Orchitect.Engine.Execution.Secret;
 using Orchitect.Engine.Execution.Secret.Azure;
 using Orchitect.Engine.Execution.Shared.CommandLine;
+using Polly;
 
 namespace Orchitect.Engine.Execution;
 
@@ -86,6 +94,55 @@ public static class ExecutionExtensions
                 throw new InvalidOperationException(
                     $"{SecretProviderOptions.SectionName}:Type '{options.Type}' is not supported.");
         }
+
+        return services;
+    }
+
+    public static IServiceCollection AddRunnerApiClient(this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddOptions<RunnerApiOptions>()
+            .Configure(options =>
+            {
+                options.BaseUrl = Uri.TryCreate(configuration[RunnerEnvironment.ApiBaseUrl], UriKind.Absolute,
+                    out var baseUrl)
+                    ? baseUrl
+                    : null;
+                options.RunId = Guid.TryParse(configuration[RunnerEnvironment.RunId], out var runId)
+                    ? runId
+                    : Guid.Empty;
+                options.Token = configuration[RunnerEnvironment.RunToken] ?? string.Empty;
+            })
+            .Validate(options => options.GetValidationError() is null,
+                "The runner API needs a base URL, a run ID and a run token.");
+
+        var httpClient = services.AddHttpClient<IRunnerApiClient, RunnerApiClient>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<IOptions<RunnerApiOptions>>().Value;
+                var baseUrl = options.BaseUrl!.ToString();
+
+                client.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : $"{baseUrl}/");
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.Token);
+                client.DefaultRequestHeaders.Add(RunnerContract.HeaderName,
+                    RunnerContract.Version.ToString(CultureInfo.InvariantCulture));
+            });
+
+#pragma warning disable EXTEXP0001
+        httpClient.RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+
+        httpClient.AddResilienceHandler("runner-api", (pipeline, context) =>
+        {
+            var options = context.ServiceProvider.GetRequiredService<IOptions<RunnerApiOptions>>().Value;
+
+            pipeline.AddRetry(new HttpRetryStrategyOptions
+            {
+                MaxRetryAttempts = options.MaxRetryAttempts,
+                Delay = options.RetryDelay,
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true
+            });
+        });
 
         return services;
     }

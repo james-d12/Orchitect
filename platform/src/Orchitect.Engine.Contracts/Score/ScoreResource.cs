@@ -1,4 +1,4 @@
-namespace Orchitect.Engine.Execution.Configuration.Score.Models;
+namespace Orchitect.Engine.Contracts.Score;
 
 public sealed record ScoreResource
 {
