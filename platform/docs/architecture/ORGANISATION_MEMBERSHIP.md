@@ -24,8 +24,8 @@ Branch `feature/organisation_membership_check`, PR #195. The first version (`868
   - Both return 400 `INVALID_ORGANISATION_ID` for an unparseable id and 403 when the caller isn't a member.
   - `.RequireOrganisationAccess<TEntity, TId>(id => new TId(id))` loads the entity named by the `id` route parameter through `IRepository<TEntity, TId>` and returns 404 when it is missing or belongs to another organisation. This hides whether the entity exists. `TEntity` must implement `IEntity`, or an overload takes a resolver for the organisation id. Organisations use the resolver (`Core/Organisation/OrganisationAuthorization`), and so do deployments, via their application (`Engine/Deployment/DeploymentAuthorization`).
   - `.HandlesOrganisationScope()` only adds metadata. It marks endpoints that scope organisations themselves: `POST /organisations`, `POST /deployments`, and the list endpoints without `organisationId` (`/organisations`, `/applications`, `/environments`, `/resource-templates`), which query only the caller's organisations in SQL.
-  - Filter factories find the bound parameter by type (and name) at startup, so a wrong declaration fails when the app maps its endpoints.
-- **`POST /deployments`** treats an application or environment in a foreign organisation as missing (400, same message as a missing id).
+  - Filter factories find the bound parameter by type (and name) and check that `IRepository<TEntity, TId>` is registered at startup, so a wrong declaration fails when the app maps its endpoints.
+- **`POST /deployments`** treats an application or environment in a foreign organisation as missing (400, same message as a missing id). The environment must also belong to the application's organisation, so a member of two organisations can't deploy across them.
 - **Fail-closed guard.** `OrganisationScopeCoverageTests` fails when an authorised endpoint has neither `OrganisationScopedMetadata` nor `HandlesOrganisationScopeMetadata`.
 
 ## Testing
@@ -38,6 +38,7 @@ Branch `feature/organisation_membership_check`, PR #195. The first version (`868
 - Endpoint filters rather than authorization policies, because policies run before model binding and can't see ids in a request body.
 - Each endpoint opts in explicitly, and the coverage test enforces it. There is no catch-all filter that guesses where the id is.
 - The entity filter and the handler both load the entity, so a request does two primary-key lookups. This keeps the handlers free of authorization code.
+- A deployment's organisation comes from its application. If the application is deleted, its deployments return 404 to everyone.
 - No data migration. Organisations created before this change have no members and are unreachable until members are added, because the creator was never stored.
 
 ## Outstanding

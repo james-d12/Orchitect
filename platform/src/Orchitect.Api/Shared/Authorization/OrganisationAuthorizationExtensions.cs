@@ -105,6 +105,7 @@ public static class OrganisationAuthorizationExtensions
         builder.AddEndpointFilterFactory((factoryContext, next) =>
         {
             var index = GetParameterIndex<TArgument>(factoryContext, IdParameterName);
+            EnsureServiceIsRegistered<IRepository<TEntity, TId>>(factoryContext);
 
             return async context =>
             {
@@ -147,6 +148,17 @@ public static class OrganisationAuthorizationExtensions
         where TEntity : IEntity
     {
         return Task.FromResult<OrganisationId?>(entity.OrganisationId);
+    }
+
+    private static void EnsureServiceIsRegistered<TService>(EndpointFilterFactoryContext context)
+    {
+        var isService = context.ApplicationServices.GetRequiredService<IServiceProviderIsService>();
+
+        if (!isService.IsService(typeof(TService)))
+        {
+            throw new InvalidOperationException(
+                $"{context.MethodInfo.DeclaringType?.Name}.{context.MethodInfo.Name} needs {typeof(TService).Name} to be registered.");
+        }
     }
 
     private static int GetParameterIndex<TArgument>(EndpointFilterFactoryContext context, string? parameterName)

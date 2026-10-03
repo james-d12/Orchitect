@@ -15,7 +15,6 @@ using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Services;
-using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Domain.Inventory.Discovery.Services;
 using Orchitect.Domain.Inventory.Identity.Services;
 using Orchitect.Domain.Inventory.Issue;
@@ -75,7 +74,6 @@ public static class OrchitectPersistenceExtensions
 
         services.AddEntityRepository<Organisation, OrganisationId, IOrganisationRepository>();
         services.AddEntityRepository<Credential, CredentialId, ICredentialRepository>();
-        services.AddEntityRepository<DiscoveryConfiguration, DiscoveryConfigurationId, IDiscoveryConfigurationRepository>();
         services.AddEntityRepository<Repository, RepositoryId, IRepositoryRepository>();
         services.AddEntityRepository<Pipeline, PipelineId, IPipelineRepository>();
         services.AddEntityRepository<PullRequest, PullRequestId, IPullRequestRepository>();

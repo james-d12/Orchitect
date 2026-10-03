@@ -56,6 +56,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
         var environment = await environmentRepository.GetByIdAsync(request.EnvironmentId, cancellationToken);
 
         if (environment is null ||
+            environment.OrganisationId != application.OrganisationId ||
             !await organisationAccess.IsMemberAsync(environment.OrganisationId, cancellationToken))
         {
             return TypedResults.BadRequest($"Environment with Id: {request.EnvironmentId} does not exist.");

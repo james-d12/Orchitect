@@ -308,6 +308,21 @@ public sealed class OrganisationMembershipIntegrationTests(WebApplicationFactory
     }
 
     [Fact]
+    public async Task DeploymentApi_WhenEnvironmentIsInAnotherOrganisation_ShouldReturn400BadRequest()
+    {
+        var member = await factory.CreateClient().AddAuthorisationHeader();
+        var applicationOrganisation = await member.CreateOrganisationAsync();
+        var environmentOrganisation = await member.CreateOrganisationAsync();
+        var application = await member.CreateApplicationAsync(applicationOrganisation.Id);
+        var environmentId = await CreateEnvironmentAsync(member, environmentOrganisation.Id);
+
+        var create = await member.PostAsJsonAsync("/deployments", new CreateDeploymentRequest(
+            new ApplicationId(application.Id), new EnvironmentId(environmentId), NewCommitId()));
+
+        Assert.Equal(HttpStatusCode.BadRequest, create.StatusCode);
+    }
+
+    [Fact]
     public async Task InventoryApi_WhenNotAMember_ShouldReturn404NotFound()
     {
         var (_, outsider, organisationId) = await CreateOrganisationWithOutsiderAsync();
