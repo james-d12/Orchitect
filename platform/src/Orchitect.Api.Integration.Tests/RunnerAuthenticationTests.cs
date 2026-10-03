@@ -37,6 +37,7 @@ public sealed class RunnerAuthenticationTests : IAsyncLifetime
         {
             ["JwtOptions:Issuer"] = Issuer,
             ["JwtOptions:Audience"] = Audience,
+            ["JwtOptions:ExpirationInMinutes"] = "5",
             ["JwtOptions:Secret"] = Secret
         });
         builder.Services.AddOrchitectAuthentication(builder.Configuration);

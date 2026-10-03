@@ -57,8 +57,6 @@ try
 
     builder.Services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<OrchitectDbContext>();
 
-    builder.Services.AddJwtOptions(builder.Configuration);
-
     builder.Services.AddHostedService<DiscoveryHostedService>();
 
     builder.Services.ConfigureHttpJsonOptions(options =>
