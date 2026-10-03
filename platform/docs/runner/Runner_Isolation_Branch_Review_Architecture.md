@@ -5,7 +5,7 @@ workstream: runner
 milestone: "Runner Isolation"
 issues: [102, 107, 109, 110, 113, 115, 116, 117, 118, 119, 120, 121, 122, 180]
 superseded_by: null
-last_reviewed: 2026-09-29
+last_reviewed: 2026-10-03
 ---
 
 # Runner Isolation Branch Review: Architecture
@@ -21,7 +21,7 @@ Severity: 🔴 high, 🟡 medium, 🟢 low.
 | # | Finding | Severity | Status | Issues |
 |---|---|---|---|---|
 | A1 | The branch works against the target architecture in `API_RUNNER_SEPARATION.md` (runner has DB access) | 🔴 | Decided: runner calls an internal API, no DB access | #102, #105 |
-| A2 | No "Run" concept in the domain | 🔴 | Open; prerequisite for the runner API | #110, #113 |
+| A2 | No "Run" concept in the domain | 🔴 | Fixed: `DeploymentRun` added; the run ID names and labels the runner container | #110, #113 |
 | A3 | `Orchitect.Infrastructure.Engine` mixes the control plane and the data plane | 🟡 | Fixed: split into `Orchitect.Engine.Contracts`, `.Dispatch` and `.Execution` | #115, #116 |
 | A4 | The API–runner contract is implicit and untested | 🟡 | Partial: round-trip test added (`db5994b`); argument and env key names moved to `Orchitect.Engine.Contracts` (A3) | #117, #118 |
 | A5 | The executor knows about the database | 🟡 | Open; becomes `ExecutorOptions:ApiBaseUrl` | #107 |
@@ -80,6 +80,8 @@ Deployment ID and run are the same thing: `RunId = DeploymentId` (`DeploymentQue
 | `LogLocation` | Pointer to stored run logs (A8) |
 
 The queue then persists runs instead of holding closures in memory, status updates attach to runs, and destroy becomes just another operation. This is the foundation for M3, H3 and E9, so it's the single change with the most leverage.
+
+**Fixed (#110):** every provision and destroy creates a `DeploymentRun` (table `DeploymentRuns`) with the fields above, plus `ErrorSummary`, `TokenHash` and `TokenExpiresAt` for the runner API. The run ID is the container name (`orchitect-runner-{runId}`), the `orchitect.run-id` label and `ORCHITECT_RUN_ID`. `DeploymentQueue` and `RunnerContainerSweepService` record the outcome on the run as well as the deployment, and `GET /deployments/{id}` returns the latest run. The queue itself is still in memory (H3, #111).
 
 ## A3. 🟡 `Orchitect.Infrastructure.Engine` mixes the control plane and the data plane
 
