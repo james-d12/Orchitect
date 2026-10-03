@@ -3,11 +3,18 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
+using Orchitect.Domain.Engine.Resource;
+using Orchitect.Domain.Engine.ResourceDependency;
+using Orchitect.Domain.Engine.ResourceInstance;
+using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Secret;
 using Orchitect.Engine.Dispatch.Auth;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
@@ -104,6 +111,33 @@ public sealed class DeploymentQueueTests
         Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Failed], _runs.Statuses);
         Assert.Equal(1, _runs.Run!.ExitCode);
         Assert.Equal("The runner exited with code 1.", _runs.Run.ErrorSummary);
+    }
+
+    [Theory]
+    [InlineData(RunOutcome.Succeeded, 1, DeploymentStatus.Deployed, DeploymentRunStatus.Succeeded)]
+    [InlineData(RunOutcome.Failed, 0, DeploymentStatus.Failed, DeploymentRunStatus.Failed)]
+    public async Task WorkItem_RunnerReportedBeforeExit_ReportDecidesAndExitCodeIsOnlyRecorded(RunOutcome outcome,
+        long exitCode, DeploymentStatus expected, DeploymentRunStatus expectedRun)
+    {
+        var (deployment, repository, services) = Setup();
+        var executor = new FakeExecutor
+        {
+            ExitCode = exitCode,
+            RunnerId = "container-1",
+            OnExecute = () => services.GetRequiredService<IRunCompletionHandler>()
+                .CompleteAsync(_runs.Run!.Id,
+                    RunResult.FromReport(new RunCompletion(outcome, "terraform apply failed")),
+                    CancellationToken.None)
+                .GetAwaiter().GetResult()
+        };
+        var workItem = await QueueAsync(deployment, executor);
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, expected], repository.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running, expectedRun, expectedRun], _runs.Statuses);
+        Assert.Equal(exitCode, _runs.Run!.ExitCode);
+        Assert.Equal("container-1", _runs.Run.RunnerId);
     }
 
     [Fact]
@@ -330,7 +364,7 @@ public sealed class DeploymentQueueTests
         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)),
                 "test@example.com")
             .Start()
-            .ProcessDeploymentStatus(0, null);
+            .Succeed();
 
     private (Deployment, RecordingDeploymentRepository, IServiceProvider) Setup(Deployment? existing = null,
         DeploymentRunOperation operation = DeploymentRunOperation.Provision)
@@ -341,8 +375,14 @@ public sealed class DeploymentQueueTests
         var repository = new RecordingDeploymentRepository { Deployment = deployment };
         _runs.Run = DeploymentRun.Queue(deployment.Id, operation);
         var services = new ServiceCollection()
+            .AddLogging()
             .AddSingleton<IDeploymentRepository>(repository)
             .AddSingleton<IDeploymentRunRepository>(_runs)
+            .AddSingleton(Substitute.For<IResourceInstanceRepository>())
+            .AddSingleton(Substitute.For<IResourceRepository>())
+            .AddSingleton(Substitute.For<IResourceTemplateRepository>())
+            .AddSingleton(Substitute.For<IResourceDependencyGraphRepository>())
+            .AddScoped<IRunCompletionHandler, RunCompletionHandler>()
             .BuildServiceProvider();
         return (deployment, repository, services);
     }
@@ -461,13 +501,25 @@ public sealed class DeploymentQueueTests
             return Task.FromResult<DeploymentRun?>(run);
         }
 
+        public async Task<bool> TryFinishAsync(DeploymentRun run, CancellationToken cancellationToken = default)
+        {
+            if (Run is not { IsActive: true })
+            {
+                return false;
+            }
+
+            await UpdateAsync(run, cancellationToken);
+            return true;
+        }
+
         public Task<DeploymentRun?> CreateAsync(DeploymentRun run, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public IEnumerable<DeploymentRun> GetAll() => throw new NotSupportedException();
 
         public Task<DeploymentRun?> GetLatestAsync(DeploymentId deploymentId,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Run?.DeploymentId == deploymentId ? Run : null);
 
         public Task<DeploymentRun?> GetByTokenHashAsync(string tokenHash,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();

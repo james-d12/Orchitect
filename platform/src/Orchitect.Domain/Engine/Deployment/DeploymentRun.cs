@@ -1,3 +1,5 @@
+using Orchitect.Domain.Engine.ResourceInstance;
+
 namespace Orchitect.Domain.Engine.Deployment;
 
 /// <summary>
@@ -18,11 +20,14 @@ public sealed record DeploymentRun
     public string? LogLocation { get; init; }
     public string? TokenHash { get; init; }
     public DateTime? TokenExpiresAt { get; init; }
+    public string? ProjectName { get; init; }
+    public IReadOnlyList<ResourceInstanceId> InstanceIds { get; init; } = [];
 
     public const int ErrorSummaryMaxLength = 2000;
     public const int RunnerIdMaxLength = 256;
     public const int LogLocationMaxLength = 2048;
     public const int TokenHashMaxLength = 256;
+    public const int ProjectNameMaxLength = 256;
 
     private DeploymentRun()
     {
@@ -74,46 +79,68 @@ public sealed record DeploymentRun
         };
     }
 
-    public DeploymentRun Interrupt(string reason)
-    {
-        if (!IsActive)
-        {
-            throw new InvalidOperationException($"Run '{Id.Value}' cannot be interrupted while {Status}.");
-        }
-
-        return Finish(DeploymentRunStatus.Failed, null, reason);
-    }
-
-    public DeploymentRun Complete(long? exitCode, Exception? exception, string? runnerId = null)
+    public DeploymentRun RecordPlan(string projectName, IReadOnlyList<ResourceInstanceId> instanceIds)
     {
         if (Status != DeploymentRunStatus.Running)
         {
-            throw new InvalidOperationException($"Run '{Id.Value}' cannot complete while {Status}.");
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot record a plan while {Status}.");
         }
 
-        if (exitCode is null && exception is null)
-        {
-            throw new ArgumentException("A run result needs an exit code or an exception.");
-        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectName);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(projectName.Length, ProjectNameMaxLength, nameof(projectName));
 
-        var run = runnerId is null ? this : this with { RunnerId = runnerId };
-
-        return exception switch
+        return this with
         {
-            OperationCanceledException => run,
-            not null => run.Finish(DeploymentRunStatus.Failed, exitCode, exception.Message),
-            null when exitCode == 0 => run.Finish(DeploymentRunStatus.Succeeded, exitCode, null),
-            _ => run.Finish(DeploymentRunStatus.Failed, exitCode, $"The runner exited with code {exitCode}.")
+            ProjectName = projectName,
+            InstanceIds = instanceIds.Distinct().ToList()
         };
     }
 
-    private DeploymentRun Finish(DeploymentRunStatus status, long? exitCode, string? errorSummary)
+    public DeploymentRun Succeed(long? exitCode = null, string? runnerId = null)
+    {
+        if (Status != DeploymentRunStatus.Running)
+        {
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot succeed while {Status}.");
+        }
+
+        return Finish(DeploymentRunStatus.Succeeded, exitCode, null, runnerId);
+    }
+
+    public DeploymentRun Fail(string errorSummary, long? exitCode = null, string? runnerId = null)
+    {
+        if (!IsActive)
+        {
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot fail while {Status}.");
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorSummary);
+
+        return Finish(DeploymentRunStatus.Failed, exitCode, errorSummary, runnerId);
+    }
+
+    public DeploymentRun RecordExit(long exitCode, string? runnerId = null)
+    {
+        if (IsActive)
+        {
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot record its exit while {Status}.");
+        }
+
+        return this with
+        {
+            ExitCode = ExitCode ?? exitCode,
+            RunnerId = RunnerId ?? runnerId
+        };
+    }
+
+    private DeploymentRun Finish(DeploymentRunStatus status, long? exitCode, string? errorSummary,
+        string? runnerId)
     {
         return this with
         {
             Status = status,
             FinishedAt = DateTime.UtcNow,
             ExitCode = exitCode,
+            RunnerId = runnerId ?? RunnerId,
             TokenHash = null,
             TokenExpiresAt = null,
             ErrorSummary = errorSummary is { Length: > ErrorSummaryMaxLength }

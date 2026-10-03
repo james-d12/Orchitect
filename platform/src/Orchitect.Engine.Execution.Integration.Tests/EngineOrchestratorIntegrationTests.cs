@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
@@ -6,22 +7,43 @@ using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceDependency;
 using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Engine.Contracts.Score;
-using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
+using Orchitect.Persistence;
+using Environment = Orchitect.Domain.Engine.Environment.Environment;
 
 namespace Orchitect.Engine.Execution.Integration.Tests;
 
 public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture fixture)
-    : IClassFixture<EngineOrchestratorFixture>, IDisposable
+    : IClassFixture<EngineOrchestratorFixture>, IAsyncLifetime
 {
-    private readonly Application _application = Application.Create("orders", new Repository
-    {
-        Name = "orders",
-        Url = new Uri("https://example.com/orders.git"),
-        Provider = RepositoryProvider.GitHub
-    }, fixture.Organisation.Id);
+    private readonly Organisation _organisation = Organisation.Create($"orders-{Guid.NewGuid():N}");
+    private Application _application = null!;
+    private Environment _environment = null!;
 
-    private readonly Deployment _deployment =
-        Deployment.Create(new ApplicationId(), new EnvironmentId(Guid.NewGuid()), new CommitId(new string('a', 40)), "test@example.com");
+    private Deployment _deployment = null!;
+    private DeploymentRun _run = null!;
+
+    public async Task InitializeAsync()
+    {
+        _application = Application.Create("orders", new Repository
+        {
+            Name = "orders",
+            Url = new Uri("https://example.com/orders.git"),
+            Provider = RepositoryProvider.GitHub
+        }, _organisation.Id);
+        _environment = Environment.Create("orders", "Orchestrator tests.", _organisation.Id);
+        _deployment = Deployment.Create(_application.Id, _environment.Id, new CommitId(new string('a', 40)),
+            "test@example.com").Start();
+        _run = DeploymentRun.Queue(_deployment.Id, DeploymentRunOperation.Provision).Start();
+
+        using var scope = fixture.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<OrchitectDbContext>();
+        dbContext.Organisations.Add(_organisation);
+        dbContext.Applications.Add(_application);
+        dbContext.Environments.Add(_environment);
+        dbContext.Deployments.Add(_deployment);
+        dbContext.DeploymentRuns.Add(_run);
+        await dbContext.SaveChangesAsync();
+    }
 
     [Fact]
     public async Task StartAsync_MultiResourceScoreFile_RecordsResourcesInstancesAndGraph()
@@ -33,11 +55,13 @@ public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture
         var (resources, instances, graph) = await LoadStateAsync();
         Assert.Equal(["orders-database", "orders-storage", "orders-vault"],
             resources.Select(r => r.Slug).Order());
-        Assert.All(resources, r => Assert.Equal(fixture.Organisation.Id, r.OrganisationId));
+        Assert.All(resources, r => Assert.Equal(_organisation.Id, r.OrganisationId));
 
         Assert.Equal(3, instances.Count);
-        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Active, i.Status));
-        Assert.All(instances, i => Assert.Equal("orders", i.Output!.Workspace));
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Provisioning, i.Status));
+        var run = await LoadRunAsync();
+        Assert.Equal("orders", run.ProjectName);
+        Assert.Equal(instances.Select(i => i.Id).OrderBy(id => id.Value), run.InstanceIds.OrderBy(id => id.Value));
         var storage = resources.Single(r => r.Slug == "orders-storage");
         Assert.Equal("Standard_LRS",
             instances.Single(i => i.ResourceId == storage.Id).InputParameters["sku"].GetString());
@@ -53,7 +77,7 @@ public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture
     }
 
     [Fact]
-    public async Task StartAsync_ProvisionFails_PersistsFailedInstances()
+    public async Task StartAsync_ProvisionFails_LeavesPlannedInstancesForTheRunToSettle()
     {
         fixture.ScoreDriver.ScoreFile = MultiResourceScore("Standard_LRS");
         fixture.Provisioner.Failure = new InvalidOperationException("terraform apply failed");
@@ -63,7 +87,8 @@ public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture
         var (resources, instances, _) = await LoadStateAsync();
         Assert.Equal(3, resources.Count);
         Assert.Equal(3, instances.Count);
-        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Failed, i.Status));
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Provisioning, i.Status));
+        Assert.Equal(3, (await LoadRunAsync()).InstanceIds.Count);
     }
 
     [Fact]
@@ -78,7 +103,7 @@ public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture
         var (resources, instances, _) = await LoadStateAsync();
         Assert.Equal(3, resources.Count);
         Assert.Equal(3, instances.Count);
-        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Active, i.Status));
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Provisioning, i.Status));
         var storage = resources.Single(r => r.Slug == "orders-storage");
         Assert.Equal("Standard_GRS",
             instances.Single(i => i.ResourceId == storage.Id).InputParameters["sku"].GetString());
@@ -103,7 +128,7 @@ public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture
     }
 
     [Fact]
-    public async Task DestroyAsync_AfterFailedDeploy_PersistsRemovedInstances()
+    public async Task DestroyAsync_AfterFailedDeploy_PersistsRemovingInstances()
     {
         fixture.ScoreDriver.ScoreFile = MultiResourceScore("Standard_LRS");
         fixture.Provisioner.Failure = new InvalidOperationException("terraform apply failed");
@@ -113,11 +138,11 @@ public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture
         await DestroyAsync();
 
         var (_, instances, _) = await LoadStateAsync();
-        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Removed, i.Status));
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Removing, i.Status));
     }
 
     [Fact]
-    public async Task DestroyAsync_AfterDeploy_PersistsRemovedInstances()
+    public async Task DestroyAsync_AfterDeploy_RecordsRemovingInstancesAndKeepsResourcesForTheRun()
     {
         fixture.ScoreDriver.ScoreFile = MultiResourceScore("Standard_LRS");
         await StartAsync();
@@ -126,31 +151,40 @@ public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture
 
         var (resources, instances, graph) = await LoadStateAsync();
         Assert.Equal(3, instances.Count);
-        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Removed, i.Status));
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Removing, i.Status));
+        Assert.Equal(3, (await LoadRunAsync()).InstanceIds.Count);
         Assert.Equal(3, resources.Count);
-        Assert.All(resources, r => Assert.Empty(r.Consumers));
+        Assert.All(resources, r => Assert.Equal([_application.Id], r.Consumers));
         Assert.NotNull(graph);
-        Assert.All(resources, r => Assert.False(graph.ContainsResource(r.Id)));
+        Assert.All(resources, r => Assert.True(graph.ContainsResource(r.Id)));
     }
 
-    public void Dispose()
+    public Task DisposeAsync()
     {
         fixture.ScoreDriver.ScoreFile = null;
         fixture.Provisioner.Failure = null;
+        return Task.CompletedTask;
     }
 
     private async Task StartAsync()
     {
         using var scope = fixture.CreateScope();
         await scope.ServiceProvider.GetRequiredService<IEngineOrchestrator>()
-            .StartAsync(_application, _deployment, CancellationToken.None);
+            .StartAsync(_application, _deployment, _run.Id, CancellationToken.None);
     }
 
     private async Task DestroyAsync()
     {
         using var scope = fixture.CreateScope();
         await scope.ServiceProvider.GetRequiredService<IEngineOrchestrator>()
-            .DestroyAsync(_application, _deployment, CancellationToken.None);
+            .DestroyAsync(_application, _deployment, _run.Id, CancellationToken.None);
+    }
+
+    private async Task<DeploymentRun> LoadRunAsync()
+    {
+        using var scope = fixture.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>().GetByIdAsync(_run.Id)
+               ?? throw new InvalidOperationException("The run was not found.");
     }
 
     private async Task<(IReadOnlyList<Resource> Resources, IReadOnlyList<ResourceInstance> Instances,

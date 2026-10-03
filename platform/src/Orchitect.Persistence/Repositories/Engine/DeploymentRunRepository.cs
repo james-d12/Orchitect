@@ -69,4 +69,21 @@ public sealed class DeploymentRunRepository : IDeploymentRunRepository
 
         return run;
     }
+
+    public async Task<bool> TryFinishAsync(DeploymentRun run, CancellationToken cancellationToken = default)
+    {
+        var updated = await _dbContext.DeploymentRuns
+            .Where(r => r.Id == run.Id &&
+                        (r.Status == DeploymentRunStatus.Queued || r.Status == DeploymentRunStatus.Running))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(r => r.Status, run.Status)
+                .SetProperty(r => r.FinishedAt, run.FinishedAt)
+                .SetProperty(r => r.ExitCode, run.ExitCode)
+                .SetProperty(r => r.ErrorSummary, run.ErrorSummary)
+                .SetProperty(r => r.RunnerId, run.RunnerId)
+                .SetProperty(r => r.TokenHash, run.TokenHash)
+                .SetProperty(r => r.TokenExpiresAt, run.TokenExpiresAt), cancellationToken);
+
+        return updated == 1;
+    }
 }

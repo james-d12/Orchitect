@@ -551,4 +551,5 @@ Console.WriteLine($"AKS transitively blocked by VNet change: {aksBlockedByVnet}"
 
 // Demonstrate the ResourceProvisioner flow via a score.yaml-driven deployment.
 var engineOrchestrator = host.Services.GetRequiredService<IEngineOrchestrator>();
-await engineOrchestrator.StartAsync(orderService, deployment, CancellationToken.None);
+var run = DeploymentRun.Queue(deployment.Id, DeploymentRunOperation.Provision);
+await engineOrchestrator.StartAsync(orderService, deployment, run.Id, CancellationToken.None);

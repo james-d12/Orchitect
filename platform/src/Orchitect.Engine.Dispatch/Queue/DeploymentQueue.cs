@@ -6,6 +6,7 @@ using Orchitect.Common.Observability;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Dispatch.Auth;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Secret;
 
@@ -45,22 +46,23 @@ public sealed class DeploymentQueue : IDeploymentQueue
 
             var deployments = sp.GetRequiredService<IDeploymentRepository>();
             var runs = sp.GetRequiredService<IDeploymentRunRepository>();
+            var completion = sp.GetRequiredService<IRunCompletionHandler>();
 
             try
             {
-                await RunAsync(deployments, runs, request, activity, ct);
+                await RunAsync(deployments, runs, completion, request, activity, ct);
             }
             catch (Exception exception) when (!ct.IsCancellationRequested)
             {
                 activity.RecordException(exception);
-                await FailOwnedRunAsync(deployments, runs, request, exception);
+                await FailRunAsync(completion, request, exception);
                 throw;
             }
         });
     }
 
     private async Task RunAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
-        DeploymentQueueRequest request, Activity? activity, CancellationToken ct)
+        IRunCompletionHandler completion, DeploymentQueueRequest request, Activity? activity, CancellationToken ct)
     {
         var deployment = await deployments.GetByIdAsync(request.DeploymentId, ct)
                          ?? throw new InvalidOperationException(
@@ -90,57 +92,39 @@ public sealed class DeploymentQueue : IDeploymentQueue
         await runs.UpdateAsync(run, ct);
 
         var result = await ExecuteAsync(request, run, token, ct);
-        var exception = result.Exception is OperationCanceledException && !ct.IsCancellationRequested
-            ? new TimeoutException(
+
+        if (result.Exception is OperationCanceledException && ct.IsCancellationRequested)
+        {
+            _logger.LogInformation(
+                "Run {RunId} of deployment {DeploymentId} was left running because the API is shutting down.",
+                run.Id.Value, deployment.Id.Value);
+            return;
+        }
+
+        var runResult = result switch
+        {
+            { Exception: OperationCanceledException } => RunResult.Failure(
                 $"Deployment '{deployment.Id.Value}' was cancelled without the API shutting down.",
-                result.Exception)
-            : result.Exception;
+                result.ExitCode, result.RunnerId),
+            { Exception: { } exception } => RunResult.Failure(exception.Message, result.ExitCode, result.RunnerId),
+            { ExitCode: { } exitCode } => RunResult.FromExitCode(exitCode, result.RunnerId),
+            _ => throw new InvalidOperationException("A run result needs an exit code or an exception.")
+        };
 
-        var processed = deployment.ProcessDeploymentStatus(result.ExitCode, exception);
-        if (processed != deployment)
-        {
-            await deployments.UpdateAsync(processed, CancellationToken.None);
-        }
+        var completed = await completion.CompleteAsync(run.Id, runResult, CancellationToken.None);
 
-        var completed = run.Complete(result.ExitCode, exception, result.RunnerId);
-        if (completed != run)
-        {
-            await runs.UpdateAsync(completed, CancellationToken.None);
-        }
-
-        _logger.LogInformation("Deployment {DeploymentId} is {Status} after run {RunId} {RunStatus}.",
-            processed.Id.Value, processed.Status, completed.Id.Value, completed.Status);
+        _logger.LogInformation(
+            "Run {RunId} of deployment {DeploymentId} exited with {ExitCode}; {Source} decided its outcome.",
+            run.Id.Value, deployment.Id.Value, result.ExitCode, completed ? "the exit code" : "the runner's report");
     }
 
-    private async Task FailOwnedRunAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
-        DeploymentQueueRequest request, Exception failure)
+    private async Task FailRunAsync(IRunCompletionHandler completion, DeploymentQueueRequest request,
+        Exception failure)
     {
         try
         {
-            var run = await runs.GetByIdAsync(request.RunId, CancellationToken.None);
-
-            if (run is null)
-            {
-                return;
-            }
-
-            var deployment = await deployments.GetByIdAsync(request.DeploymentId, CancellationToken.None);
-            var owned = run.Operation == DeploymentRunOperation.Destroy
-                ? deployment?.Status == DeploymentStatus.Destroying
-                : deployment?.Status is DeploymentStatus.Pending or DeploymentStatus.Deploying;
-
-            if (deployment is not null && owned)
-            {
-                await deployments.UpdateAsync(deployment.Interrupt(failure.Message), CancellationToken.None);
-                _logger.LogWarning(
-                    "Deployment {DeploymentId} was {Status} when its work item failed and is now Failed.",
-                    deployment.Id.Value, deployment.Status);
-            }
-
-            if (run.IsActive)
-            {
-                await runs.UpdateAsync(run.Interrupt(failure.Message), CancellationToken.None);
-            }
+            await completion.CompleteAsync(request.RunId, RunResult.Failure(failure.Message),
+                CancellationToken.None);
         }
         catch (Exception exception)
         {

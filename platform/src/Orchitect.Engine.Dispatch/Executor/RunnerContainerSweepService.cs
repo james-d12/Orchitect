@@ -5,6 +5,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orchitect.Domain.Engine.Deployment;
+using Orchitect.Engine.Contracts.Runner.Api;
+using Orchitect.Engine.Dispatch.Completion;
 
 namespace Orchitect.Engine.Dispatch.Executor;
 
@@ -13,7 +15,6 @@ public sealed class RunnerContainerSweepService : BackgroundService
     private static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(10);
     private static readonly string[] FinishedStates = ["exited", "created", "dead"];
     private const string ExitedState = "exited";
-    private const string InterruptedRunReason = "The API restarted before the run finished.";
 
     private readonly IServiceProvider _serviceProvider;
     private readonly ExecutorOptions _options;
@@ -113,6 +114,7 @@ public sealed class RunnerContainerSweepService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var deployments = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
         var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
+        var completion = scope.ServiceProvider.GetRequiredService<IRunCompletionHandler>();
         var active = await deployments.GetActiveAsync(_startedAt, cancellationToken);
         var unreconciled = new HashSet<string>();
 
@@ -134,28 +136,24 @@ public sealed class RunnerContainerSweepService : BackgroundService
                     continue;
                 }
 
-                var reconciled = outcome.ExitCode is { } exitCode
-                    ? deployment.ProcessDeploymentStatus(exitCode, null)
-                    : deployment.Interrupt(outcome.Reason!);
+                var result = outcome.ExitCode is { } exitCode
+                    ? RunResult.FromExitCode(exitCode, container?.ID)
+                    : RunResult.Failure(outcome.Reason!);
 
-                await deployments.UpdateAsync(reconciled, cancellationToken);
-
-                var reconciledRun = run switch
+                if (run is null)
                 {
-                    { Status: DeploymentRunStatus.Running } when outcome.ExitCode is { } runExitCode =>
-                        run.Complete(runExitCode, null, container?.ID),
-                    { IsActive: true } => run.Interrupt(reconciled.ErrorSummary ?? InterruptedRunReason),
-                    _ => null
-                };
-
-                if (reconciledRun is not null)
+                    await deployments.UpdateAsync(result.Outcome == RunOutcome.Succeeded
+                        ? deployment.Succeed()
+                        : deployment.Fail(result.ErrorSummary!), cancellationToken);
+                }
+                else
                 {
-                    await runs.UpdateAsync(reconciledRun, cancellationToken);
+                    await completion.CompleteAsync(run.Id, result, cancellationToken);
                 }
 
                 _logger.LogInformation(
-                    "Deployment {DeploymentId} was left {PreviousStatus} by an earlier API process and is now {Status}.",
-                    deployment.Id.Value, deployment.Status, reconciled.Status);
+                    "Deployment {DeploymentId} was left {PreviousStatus} by an earlier API process and run {RunId} is now {Outcome}.",
+                    deployment.Id.Value, deployment.Status, runId, result.Outcome);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {

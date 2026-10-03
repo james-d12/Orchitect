@@ -128,7 +128,7 @@ public sealed class DeploymentIntegrationTests
             new CreateDeploymentRequest(applicationId, environmentId, NewCommitId()));
         var deploymentId = Assert.Single(_queue.Requests).DeploymentId;
         var provisionRun = await GetLatestRunAsync(deploymentId);
-        await UpdateDeploymentAsync((await GetDeploymentAsync(deploymentId)).Start().ProcessDeploymentStatus(0, null));
+        await UpdateDeploymentAsync((await GetDeploymentAsync(deploymentId)).Start().Succeed());
         await client.DeleteAsync($"{DeploymentsUrl}/{deploymentId.Value}");
 
         // Act
@@ -334,7 +334,7 @@ public sealed class DeploymentIntegrationTests
         {
             var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
             await runs.CreateAsync(run);
-            await runs.UpdateAsync(run.Start().Complete(1, null, "container-1"));
+            await runs.UpdateAsync(run.Start().Fail("The runner exited with code 1.", 1, "container-1"));
         }
 
         // Assert
@@ -363,7 +363,7 @@ public sealed class DeploymentIntegrationTests
 
         // Act
         var issued = await runs.GetByTokenHashAsync(token.Hash);
-        await runs.UpdateAsync(run.Complete(0, null));
+        await runs.UpdateAsync(run.Succeed(0));
         var revoked = await runs.GetByTokenHashAsync(token.Hash);
 
         // Assert
@@ -467,7 +467,7 @@ public sealed class DeploymentIntegrationTests
         var created = await response.ReadFromJsonAsync<GetDeploymentEndpoint.GetDeploymentResponse>();
         Assert.NotNull(created);
         var retry = await GetDeploymentAsync(new DeploymentId(created.Id));
-        await UpdateDeploymentAsync(retry.Start().ProcessDeploymentStatus(1, null));
+        await UpdateDeploymentAsync(retry.Start().Fail("The runner exited with code 1."));
 
         // Assert
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -606,11 +606,11 @@ public sealed class DeploymentIntegrationTests
         {
             DeploymentStatus.Pending => created,
             DeploymentStatus.Deploying => created.Start(),
-            DeploymentStatus.Deployed => created.Start().ProcessDeploymentStatus(0, null),
-            DeploymentStatus.Failed => created.Start().ProcessDeploymentStatus(1, null),
-            DeploymentStatus.Destroying => created.Start().ProcessDeploymentStatus(0, null).StartDestroy(),
-            DeploymentStatus.Destroyed => created.Start().ProcessDeploymentStatus(0, null).StartDestroy()
-                .ProcessDeploymentStatus(0, null),
+            DeploymentStatus.Deployed => created.Start().Succeed(),
+            DeploymentStatus.Failed => created.Start().Fail("The runner exited with code 1."),
+            DeploymentStatus.Destroying => created.Start().Succeed().StartDestroy(),
+            DeploymentStatus.Destroyed => created.Start().Succeed().StartDestroy()
+                .Succeed(),
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
         };
 

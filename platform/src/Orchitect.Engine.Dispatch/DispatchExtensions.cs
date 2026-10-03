@@ -3,6 +3,7 @@ using Docker.DotNet;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
@@ -17,6 +18,7 @@ public static class DispatchExtensions
     {
         services.AddExecutorServices(configuration);
         services.AddQueueServices();
+        services.AddScoped<IRunCompletionHandler, RunCompletionHandler>();
         return services;
     }
 

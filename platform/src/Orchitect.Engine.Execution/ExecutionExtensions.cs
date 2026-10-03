@@ -116,6 +116,7 @@ public static class ExecutionExtensions
             .ValidateOnStart();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<RunnerApiOptions>, RunnerApiOptionsValidator>());
+        services.TryAddTransient<IRunCompletionReporter, RunCompletionReporter>();
 
         var httpClient = services.AddHttpClient<IRunnerApiClient, RunnerApiClient>((provider, client) =>
             {
