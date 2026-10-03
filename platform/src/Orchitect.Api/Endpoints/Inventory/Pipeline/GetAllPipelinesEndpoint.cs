@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Pipeline;
 using Orchitect.Domain.Inventory.Pipeline.Requests;
@@ -15,6 +16,7 @@ public sealed class GetAllPipelinesEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/", Handle)
+        .RequireOrganisationMember<PipelineQueryRequest>(q => q.OrganisationId)
         .WithSummary("Gets all pipelines by query parameters.");
 
     public sealed record GetAllPipelinesResponse(

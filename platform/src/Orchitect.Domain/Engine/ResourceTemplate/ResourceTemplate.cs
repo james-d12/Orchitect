@@ -1,9 +1,10 @@
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Git;
 
 namespace Orchitect.Domain.Engine.ResourceTemplate;
 
-public sealed record ResourceTemplate
+public sealed record ResourceTemplate : IEntity
 {
     public ResourceTemplateId Id { get; private init; }
     public OrganisationId OrganisationId { get; private init; }

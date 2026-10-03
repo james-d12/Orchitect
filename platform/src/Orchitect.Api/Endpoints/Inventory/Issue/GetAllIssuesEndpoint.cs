@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Issue.Requests;
 using Orchitect.Domain.Inventory.Issue.Services;
@@ -14,6 +15,7 @@ public sealed class GetAllIssuesEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/", Handle)
+        .RequireOrganisationMember<IssueQueryRequest>(q => q.OrganisationId)
         .WithSummary("Gets all issues by query parameters.");
 
     public sealed record GetAllIssuesResponse(

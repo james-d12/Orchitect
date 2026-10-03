@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Requests;
@@ -15,6 +16,7 @@ public sealed class GetAllCloudResourcesEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/", Handle)
+        .RequireOrganisationMember<CloudResourceQueryRequest>(q => q.OrganisationId)
         .WithSummary("Gets all cloud resources by query parameters.");
 
     public sealed record GetAllCloudResourcesResponse(

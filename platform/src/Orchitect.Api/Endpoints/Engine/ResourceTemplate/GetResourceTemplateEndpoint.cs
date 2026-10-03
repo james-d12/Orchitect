@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
@@ -13,6 +14,8 @@ public sealed class GetResourceTemplateEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Engine.ResourceTemplate.ResourceTemplate, ResourceTemplateId>(
+            id => new ResourceTemplateId(id))
         .WithSummary("Gets an existing resource template by id.");
 
     public sealed record GetResourceTemplateResponse(

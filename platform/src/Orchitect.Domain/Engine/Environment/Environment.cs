@@ -1,3 +1,4 @@
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Domain.Engine.Environment;
@@ -6,7 +7,7 @@ namespace Orchitect.Domain.Engine.Environment;
 /// Represents a deployment environment. E.g. a Kubernetes Cluster, an ArgoCD Environment, etc.
 /// E.g DEV, UAT, PROD
 /// </summary>
-public sealed record Environment
+public sealed record Environment : IEntity
 {
     public required EnvironmentId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }

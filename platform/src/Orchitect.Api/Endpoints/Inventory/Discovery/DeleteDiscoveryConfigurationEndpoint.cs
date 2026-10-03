@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Domain.Inventory.Discovery.Services;
@@ -14,6 +15,7 @@ public sealed class DeleteDiscoveryConfigurationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapDelete("/{id}", HandleAsync)
+        .RequireOrganisationMember()
         .WithName("DeleteDiscoveryConfiguration")
         .WithSummary("Delete a discovery configuration")
         .Produces(StatusCodes.Status204NoContent)
@@ -23,12 +25,12 @@ public sealed class DeleteDiscoveryConfigurationEndpoint : IEndpoint
         [FromRoute]
         Guid id,
         [FromQuery]
-        string organisationId,
+        Guid organisationId,
         [FromServices]
         IDiscoveryConfigurationRepository repository,
         CancellationToken cancellationToken)
     {
-        var orgId = new OrganisationId(Guid.Parse(organisationId));
+        var orgId = new OrganisationId(organisationId);
         var configId = new DiscoveryConfigurationId(id);
 
         var existing = await repository.GetByIdAsync(configId, cancellationToken);

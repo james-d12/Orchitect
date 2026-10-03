@@ -14,6 +14,7 @@ using Orchitect.Api.Encryption;
 using Orchitect.Api.Endpoints;
 using Orchitect.Api.Jobs;
 using Orchitect.Api.Settings;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Engine.Dispatch;
 using Orchitect.Infrastructure.Inventory;
@@ -50,6 +51,8 @@ try
         .AddEngineDispatchServices(builder.Configuration);
 
     builder.Services.TryAddSingleton<IEncryptionService, AesEncryptionService>();
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.TryAddScoped<IOrganisationAccess, OrganisationAccess>();
     builder.Services.AddOptions<EncryptionOptions>()
             .Bind(builder.Configuration.GetSection(EncryptionOptions.SectionName))
             .ValidateDataAnnotations()

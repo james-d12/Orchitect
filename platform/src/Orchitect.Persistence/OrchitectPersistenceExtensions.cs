@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
@@ -12,15 +13,23 @@ using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceDependency;
 using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Services;
 using Orchitect.Domain.Inventory.Discovery.Services;
 using Orchitect.Domain.Inventory.Identity.Services;
+using Orchitect.Domain.Inventory.Issue;
 using Orchitect.Domain.Inventory.Issue.Services;
+using Orchitect.Domain.Inventory.Pipeline;
 using Orchitect.Domain.Inventory.Pipeline.Services;
+using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Domain.Inventory.SourceControl.Services;
 using Orchitect.Persistence.Repositories.Core;
 using Orchitect.Persistence.Repositories.Engine;
 using Orchitect.Persistence.Repositories.Inventory;
+using Application = Orchitect.Domain.Engine.Application.Application;
+using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
+using Environment = Orchitect.Domain.Engine.Environment.Environment;
+using Repository = Orchitect.Domain.Inventory.SourceControl.Repository;
 
 namespace Orchitect.Persistence;
 
@@ -64,7 +73,26 @@ public static class OrchitectPersistenceExtensions
         services.TryAddScoped<IResourceInstanceRepository, ResourceInstanceRepository>();
         services.TryAddScoped<IResourceDependencyGraphRepository, ResourceDependencyGraphRepository>();
 
+        services.AddEntityRepository<Organisation, OrganisationId, IOrganisationRepository>();
+        services.AddEntityRepository<Credential, CredentialId, ICredentialRepository>();
+        services.AddEntityRepository<Repository, RepositoryId, IRepositoryRepository>();
+        services.AddEntityRepository<Pipeline, PipelineId, IPipelineRepository>();
+        services.AddEntityRepository<PullRequest, PullRequestId, IPullRequestRepository>();
+        services.AddEntityRepository<CloudResource, CloudResourceId, ICloudResourceRepository>();
+        services.AddEntityRepository<CloudSecret, CloudSecretId, ICloudSecretRepository>();
+        services.AddEntityRepository<Issue, IssueId, IIssueRepository>();
+        services.AddEntityRepository<ResourceTemplate, ResourceTemplateId, IResourceTemplateRepository>();
+        services.AddEntityRepository<Application, ApplicationId, IApplicationRepository>();
+        services.AddEntityRepository<Environment, EnvironmentId, IEnvironmentRepository>();
+        services.AddEntityRepository<Deployment, DeploymentId, IDeploymentRepository>();
+
         return services;
+    }
+
+    private static void AddEntityRepository<TEntity, TId, TRepository>(this IServiceCollection services)
+        where TRepository : class, IRepository<TEntity, TId>
+    {
+        services.TryAddScoped<IRepository<TEntity, TId>>(sp => sp.GetRequiredService<TRepository>());
     }
 
     public static async Task ApplyMigrations(this IServiceCollection services)

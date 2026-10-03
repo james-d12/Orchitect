@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
@@ -12,6 +13,7 @@ public sealed class CreateResourceTemplateWithVersionEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/with-version", HandleAsync)
+        .RequireOrganisationMember<CreateResourceTemplateWithVersionRequest>(r => r.OrganisationId)
         .WithSummary("Creates a new resource template with the specified version");
 
     public sealed record CreateResourceTemplateWithVersionResponse(Guid Id);

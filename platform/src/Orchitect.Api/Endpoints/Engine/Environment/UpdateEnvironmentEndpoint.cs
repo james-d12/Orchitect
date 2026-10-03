@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Environment;
 
 namespace Orchitect.Api.Endpoints.Engine.Environment;
@@ -12,6 +13,7 @@ public sealed class UpdateEnvironmentEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPut("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Engine.Environment.Environment, EnvironmentId>(id => new EnvironmentId(id))
         .WithSummary("Updates an existing environment.");
 
     public sealed record UpdateEnvironmentRequest(string Name, string Description);

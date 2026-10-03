@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Application;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
@@ -13,6 +14,8 @@ public sealed class GetApplicationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Engine.Application.Application, Orchitect.Domain.Engine.Application.ApplicationId>(
+            id => new Orchitect.Domain.Engine.Application.ApplicationId(id))
         .WithSummary("Gets an application by Id.");
 
     public sealed record GetApplicationResponse(

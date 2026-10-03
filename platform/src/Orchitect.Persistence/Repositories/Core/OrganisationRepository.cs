@@ -52,4 +52,21 @@ public sealed class OrganisationRepository : IOrganisationRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
+
+    public async Task<IReadOnlyList<Organisation>> GetByIdsAsync(IReadOnlyCollection<OrganisationId> ids,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Organisations.AsNoTracking()
+            .Where(o => ids.Contains(o.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<OrganisationId>> GetIdsForMemberAsync(string identityUserId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Set<OrganisationUser>()
+            .Where(u => u.IdentityUserId == identityUserId)
+            .Select(u => u.OrganisationId)
+            .ToListAsync(cancellationToken);
+    }
 }

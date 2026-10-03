@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
@@ -24,6 +25,7 @@ public sealed class CreateDiscoveryConfigurationEndpoint : IEndpoint
 
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/", HandleAsync)
+        .RequireOrganisationMember<CreateDiscoveryConfigurationRequest>(r => r.OrganisationId)
         .WithName("CreateDiscoveryConfiguration")
         .WithSummary("Create a discovery configuration for the current organisation")
         .WithDescription("Links a credential to a discovery platform with optional configuration")

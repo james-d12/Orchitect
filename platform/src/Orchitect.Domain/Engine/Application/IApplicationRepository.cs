@@ -13,4 +13,10 @@ public interface IApplicationRepository : IRepository<Application, ApplicationId
     /// </summary>
     Task<IReadOnlyList<Application>> GetByOrganisationAsync(OrganisationId organisationId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the applications that belong to any of the organisations.
+    /// </summary>
+    Task<IReadOnlyList<Application>> GetByOrganisationIdsAsync(IReadOnlyCollection<OrganisationId> organisationIds,
+        CancellationToken cancellationToken = default);
 }

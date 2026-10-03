@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Inventory.Pipeline;
 using Orchitect.Domain.Inventory.Pipeline.Services;
 
@@ -13,6 +14,7 @@ public sealed class GetPipelineEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/{id}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Inventory.Pipeline.Pipeline, PipelineId>(id => new PipelineId(id))
         .WithSummary("Gets a pipeline by id.");
 
     public sealed record GetPipelineResponse(

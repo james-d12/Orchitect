@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 
@@ -13,6 +14,7 @@ public sealed class GetAllCredentialsEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/", Handle)
+        .RequireOrganisationMember()
         .WithSummary("Gets all credentials for an organisation.");
 
     public sealed record GetAllCredentialsResponse(List<CredentialResponse> Credentials);

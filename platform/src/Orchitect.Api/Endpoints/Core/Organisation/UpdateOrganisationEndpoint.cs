@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Api.Endpoints.Core.Organisation;
@@ -12,6 +13,7 @@ public sealed class UpdateOrganisationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPut("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess()
         .WithSummary("Updates an existing organisation.");
 
     public sealed record UpdateOrganisationRequest(string Name);

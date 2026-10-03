@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Credential;
 
 namespace Orchitect.Api.Endpoints.Core.Credential;
@@ -12,6 +13,7 @@ public sealed class GetCredentialEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Core.Credential.Credential, CredentialId>(id => new CredentialId(id))
         .WithSummary("Gets a credential by Id.");
 
     private static async Task<Results<Ok<CredentialResponse>, NotFound>> HandleAsync(

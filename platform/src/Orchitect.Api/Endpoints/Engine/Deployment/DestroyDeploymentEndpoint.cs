@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Dispatch.Queue;
 
@@ -13,6 +14,7 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapDelete("/{id:guid}", HandleAsync)
+        .RequireDeploymentAccess()
         .WithSummary(
             "Destroys the resources of the latest deployment of an application to an environment. " +
             "The deployment record is kept and moves to Destroyed.");

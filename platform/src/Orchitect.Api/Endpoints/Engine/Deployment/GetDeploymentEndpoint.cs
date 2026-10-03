@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Deployment;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
@@ -12,6 +13,7 @@ public sealed class GetDeploymentEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/{id:guid}", HandleAsync)
+        .RequireDeploymentAccess()
         .WithSummary("Gets a deployment and its status by Id.");
 
     public sealed record GetDeploymentResponse(

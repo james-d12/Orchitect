@@ -32,6 +32,7 @@ GitHub issues hold the work; these docs hold the design and the reasoning behind
 | [architecture/HIGH_LEVEL_ARCHITECTURE.md](architecture/HIGH_LEVEL_ARCHITECTURE.md) | reference | architecture | Core plus capabilities, and the dependency rules |
 | [architecture/High Level Diagram.drawio](architecture/High%20Level%20Diagram.drawio) | reference | architecture | Architecture diagram |
 | [architecture/JWT_BEST_PRACTICES.md](architecture/JWT_BEST_PRACTICES.md) | reference | security | JWT / RFC 8725 guidance |
+| [architecture/ORGANISATION_MEMBERSHIP.md](architecture/ORGANISATION_MEMBERSHIP.md) | active | security | Organisation membership endpoint filters (#175, PR #195) and follow-ups |
 
 ## Archive
 

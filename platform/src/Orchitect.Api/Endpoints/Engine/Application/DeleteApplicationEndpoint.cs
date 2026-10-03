@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Application;
 
 namespace Orchitect.Api.Endpoints.Engine.Application;
@@ -12,6 +13,8 @@ public sealed class DeleteApplicationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapDelete("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Engine.Application.Application, Orchitect.Domain.Engine.Application.ApplicationId>(
+            id => new Orchitect.Domain.Engine.Application.ApplicationId(id))
         .WithSummary("Deletes an application by Id.");
 
     private static async Task<Results<NoContent, NotFound>> HandleAsync(

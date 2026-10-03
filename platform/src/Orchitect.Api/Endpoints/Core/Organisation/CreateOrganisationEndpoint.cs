@@ -1,9 +1,12 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Orchitect.Api.Extensions;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Api.Endpoints.Core.Organisation;
@@ -12,6 +15,7 @@ public sealed class CreateOrganisationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/", HandleAsync)
+        .HandlesOrganisationScope()
         .WithSummary("Creates a new organisation.");
 
     public sealed record CreateOrganisationRequest(string Name);
@@ -23,9 +27,11 @@ public sealed class CreateOrganisationEndpoint : IEndpoint
         CreateOrganisationRequest request,
         [FromServices]
         IOrganisationRepository repository,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
-        var organisation = Orchitect.Domain.Core.Organisation.Organisation.Create(request.Name);
+        var organisation = Orchitect.Domain.Core.Organisation.Organisation.Create(request.Name)
+            .AddUser(user.GetUserId());
         var organisationResponse = await repository.CreateAsync(organisation, cancellationToken);
 
         if (organisationResponse is null)

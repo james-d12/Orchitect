@@ -368,6 +368,10 @@ public sealed class EngineOrchestratorTests
 
         public IEnumerable<ResourceTemplate> GetAll() => throw new NotSupportedException();
 
+        public Task<IReadOnlyList<ResourceTemplate>> GetByOrganisationIdsAsync(
+            IReadOnlyCollection<OrganisationId> organisationIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<ResourceTemplate?> GetByIdAsync(ResourceTemplateId id,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 

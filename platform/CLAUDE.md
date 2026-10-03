@@ -148,6 +148,8 @@ public static IServiceCollection AddPersistenceServices(this IServiceCollection 
 
 **Endpoint groups**: `MapPrivateGroup()` for authenticated endpoints, `MapPublicGroup()` for anonymous.
 
+**Organisation membership**: every authorised endpoint declares how it is scoped in its `Map`. Use `.RequireOrganisationMember()` for a `Guid organisationId` parameter, `.RequireOrganisationMember<TRequest>(r => r.OrganisationId)` for an id in a request (both 403), `.RequireOrganisationAccess<TEntity, TId>(...)` for an entity loaded by `id` (404), or `.HandlesOrganisationScope()` when the handler filters to `IOrganisationAccess.GetOrganisationIdsAsync()` itself (see `Shared/Authorization`). `OrganisationScopeCoverageTests` fails for an endpoint that declares none. Creating an organisation makes the caller a member.
+
 ## Documentation
 
 Design docs live in `docs/`, grouped by workstream (`runner/`, `resource/`, `architecture/`), with finished or superseded docs in `docs/archive/`. `docs/README.md` is the index. Outstanding work is tracked as GitHub issues on `james-d12/Orchitect` (one milestone per workstream), and each doc lists its issues in YAML front matter. Use the `/orchitect-docs` skill to read, create or update docs so the docs, the index and the issues stay consistent.

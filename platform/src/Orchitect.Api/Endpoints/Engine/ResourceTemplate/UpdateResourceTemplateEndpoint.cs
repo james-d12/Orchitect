@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
@@ -12,6 +13,8 @@ public sealed class UpdateResourceTemplateEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPut("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Engine.ResourceTemplate.ResourceTemplate, ResourceTemplateId>(
+            id => new ResourceTemplateId(id))
         .WithSummary("Updates an existing resource template.");
 
     public sealed record UpdateResourceTemplateRequest(string Name, string Type, string Description, ResourceTemplateProvider Provider);
