@@ -18,14 +18,17 @@ public interface IEngineOrchestrator
 {
     /// <summary>
     /// Provisions a deployment's resources, recording each as a resource, an instance and a node in the
-    /// environment's dependency graph, with instance statuses following the provisioning result.
+    /// environment's dependency graph, and records the instances on the run, which settles them when it completes.
     /// </summary>
-    Task StartAsync(Application application, Deployment deployment, CancellationToken cancellationToken);
+    Task StartAsync(Application application, Deployment deployment, DeploymentRunId runId,
+        CancellationToken cancellationToken);
 
     /// <summary>
-    /// Destroys a deployment's resources using the same project and state as <see cref="StartAsync"/>.
+    /// Destroys a deployment's resources using the same project and state as <see cref="StartAsync"/>, and records
+    /// the instances being removed on the run, which settles them and releases the resources when it completes.
     /// </summary>
-    Task DestroyAsync(Application application, Deployment deployment, CancellationToken cancellationToken);
+    Task DestroyAsync(Application application, Deployment deployment, DeploymentRunId runId,
+        CancellationToken cancellationToken);
 }
 
 public sealed partial class EngineOrchestrator : IEngineOrchestrator
@@ -35,13 +38,15 @@ public sealed partial class EngineOrchestrator : IEngineOrchestrator
     private readonly IResourceRepository _resourceRepository;
     private readonly IResourceInstanceRepository _resourceInstanceRepository;
     private readonly IResourceDependencyGraphRepository _resourceDependencyGraphRepository;
+    private readonly IDeploymentRunRepository _deploymentRunRepository;
     private readonly IEngineProvisioner _engineProvisioner;
     private readonly IScoreDriver _scoreDriver;
 
     public EngineOrchestrator(ILogger<EngineOrchestrator> logger, IScoreDriver scoreDriver,
         IResourceTemplateRepository resourceTemplateRepository, IResourceRepository resourceRepository,
         IResourceInstanceRepository resourceInstanceRepository,
-        IResourceDependencyGraphRepository resourceDependencyGraphRepository, IEngineProvisioner engineProvisioner)
+        IResourceDependencyGraphRepository resourceDependencyGraphRepository,
+        IDeploymentRunRepository deploymentRunRepository, IEngineProvisioner engineProvisioner)
     {
         _logger = logger;
         _scoreDriver = scoreDriver;
@@ -49,10 +54,12 @@ public sealed partial class EngineOrchestrator : IEngineOrchestrator
         _resourceRepository = resourceRepository;
         _resourceInstanceRepository = resourceInstanceRepository;
         _resourceDependencyGraphRepository = resourceDependencyGraphRepository;
+        _deploymentRunRepository = deploymentRunRepository;
         _engineProvisioner = engineProvisioner;
     }
 
-    public async Task StartAsync(Application application, Deployment deployment, CancellationToken cancellationToken)
+    public async Task StartAsync(Application application, Deployment deployment, DeploymentRunId runId,
+        CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
 
@@ -63,25 +70,12 @@ public sealed partial class EngineOrchestrator : IEngineOrchestrator
             var instances = await RecordResourcesAsync(application, deployment, provisionRequest.ScoreFile,
                 provisionRequest.Inputs, cancellationToken);
 
+            await RecordPlanAsync(runId, provisionRequest.Context, instances, cancellationToken);
             await TransitionAsync(instances, BeginProvisioning, cancellationToken);
 
             _logger.LogInformation("Provisioning Resources for score file");
 
-            try
-            {
-                await _engineProvisioner.ProvisionAsync(provisionRequest.Inputs, provisionRequest.Context,
-                    cancellationToken);
-            }
-            catch
-            {
-                await TransitionAsync(instances, i => i.Transition(ResourceInstanceStatus.Failed),
-                    CancellationToken.None);
-                throw;
-            }
-
-            await TransitionAsync(instances,
-                i => i.Transition(ResourceInstanceStatus.Active,
-                    CreateOutput(i, provisionRequest.Inputs, provisionRequest.Context)),
+            await _engineProvisioner.ProvisionAsync(provisionRequest.Inputs, provisionRequest.Context,
                 cancellationToken);
         }
         catch (Exception exception)
@@ -92,7 +86,7 @@ public sealed partial class EngineOrchestrator : IEngineOrchestrator
         }
     }
 
-    public async Task DestroyAsync(Application application, Deployment deployment,
+    public async Task DestroyAsync(Application application, Deployment deployment, DeploymentRunId runId,
         CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();
@@ -105,24 +99,13 @@ public sealed partial class EngineOrchestrator : IEngineOrchestrator
                 provisionRequest.Inputs, cancellationToken);
             var instances = await FindRemovableInstancesAsync(resources, cancellationToken);
 
+            await RecordPlanAsync(runId, provisionRequest.Context, instances, cancellationToken);
             await TransitionAsync(instances, BeginRemoval, cancellationToken);
 
             _logger.LogInformation("Destroying Resources for score file");
 
-            try
-            {
-                await _engineProvisioner.DeleteAsync(provisionRequest.Inputs, provisionRequest.Context,
-                    cancellationToken);
-            }
-            catch
-            {
-                await TransitionAsync(instances, i => i.Transition(ResourceInstanceStatus.RemovalFailed),
-                    CancellationToken.None);
-                throw;
-            }
-
-            await TransitionAsync(instances, i => i.Transition(ResourceInstanceStatus.Removed), cancellationToken);
-            await ReleaseResourcesAsync(application, deployment, resources, cancellationToken);
+            await _engineProvisioner.DeleteAsync(provisionRequest.Inputs, provisionRequest.Context,
+                cancellationToken);
         }
         catch (Exception exception)
         {
@@ -323,29 +306,14 @@ public sealed partial class EngineOrchestrator : IEngineOrchestrator
         return instances;
     }
 
-    private async Task ReleaseResourcesAsync(Application application, Deployment deployment,
-        List<Resource> resources, CancellationToken cancellationToken)
+    private async Task RecordPlanAsync(DeploymentRunId runId, ProvisionContext context,
+        List<ResourceInstance> instances, CancellationToken cancellationToken)
     {
-        foreach (var resource in resources)
-        {
-            resource.RemoveConsumer(application.Id);
-            await _resourceRepository.UpdateAsync(resource, cancellationToken);
-        }
+        var run = await _deploymentRunRepository.GetByIdAsync(runId, cancellationToken)
+                  ?? throw new InvalidOperationException($"Run '{runId.Value}' was not found.");
 
-        var graph = await _resourceDependencyGraphRepository.GetByEnvironmentAsync(deployment.EnvironmentId,
-            cancellationToken);
-
-        if (graph is null)
-        {
-            return;
-        }
-
-        foreach (var resource in resources)
-        {
-            graph.RemoveResource(resource.Id);
-        }
-
-        await _resourceDependencyGraphRepository.UpdateAsync(graph, cancellationToken);
+        await _deploymentRunRepository.UpdateAsync(
+            run.RecordPlan(context.ProjectName, instances.Select(i => i.Id).ToList()), cancellationToken);
     }
 
     private async Task TransitionAsync(List<ResourceInstance> instances, Action<ResourceInstance> transition,
@@ -391,16 +359,6 @@ public sealed partial class EngineOrchestrator : IEngineOrchestrator
         }
 
         instance.Transition(ResourceInstanceStatus.Removing);
-    }
-
-    private static ResourceInstanceOutput CreateOutput(ResourceInstance instance, List<ProvisionInput> inputs,
-        ProvisionContext context)
-    {
-        var version = inputs
-            .SelectMany(i => i.Template.Versions)
-            .First(v => v.Id == instance.TemplateVersionId);
-
-        return new ResourceInstanceOutput { Location = version.Source.BaseUrl, Workspace = context.ProjectName };
     }
 
     private static string ResolveResourceName(Application application, string key, ScoreResource scoreResource) =>

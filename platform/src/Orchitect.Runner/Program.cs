@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Contracts.Terraform;
 using Orchitect.Engine.Execution;
+using Orchitect.Engine.Execution.RunnerApi;
 using Orchitect.Engine.Execution.Secret;
 using Orchitect.Persistence;
 using Orchitect.ServiceDefaults;
@@ -27,6 +29,11 @@ builder.Services.Configure<ConsoleLifetimeOptions>(options => options.SuppressSt
 builder.Services.AddEngineProvisioningServices();
 builder.Services.AddPersistenceServices();
 builder.Services.AddRunnerServices(builder.Configuration);
+
+if (!string.IsNullOrWhiteSpace(builder.Configuration[RunnerEnvironment.ApiBaseUrl]))
+{
+    builder.Services.AddRunnerApiClient(builder.Configuration);
+}
 
 using var host = builder.Build();
 
@@ -59,6 +66,10 @@ rootCommand.SetAction(async (parseResult, cancellationToken) =>
     var applicationId = new ApplicationId(parseResult.GetRequiredValue(applicationIdOption));
     var deploymentId = new DeploymentId(parseResult.GetRequiredValue(deploymentIdOption));
     var operation = parseResult.GetValue(operationOption);
+    var runId = Guid.TryParse(host.Services.GetRequiredService<IConfiguration>()[RunnerEnvironment.RunId],
+        out var runGuid)
+        ? new DeploymentRunId(runGuid)
+        : throw new InvalidOperationException($"{RunnerEnvironment.RunId} must be a non-empty GUID.");
 
     ActivityContext.TryParse(
         Environment.GetEnvironmentVariable(RunnerEnvironment.TraceParent),
@@ -68,46 +79,59 @@ rootCommand.SetAction(async (parseResult, cancellationToken) =>
 
     using var activity = Tracing.StartActivity(parentContext, "Run");
     activity?.SetTag("orchitect.deployment.id", deploymentId.Value);
+    activity?.SetTag("orchitect.run.id", runId.Value);
     activity?.SetTag("orchitect.run.operation", operation.ToString());
 
     using var scope = host.Services.CreateScope();
 
-    var applicationRepository = scope.ServiceProvider.GetRequiredService<IApplicationRepository>();
-    var deploymentRepository = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
-
-    var application = await applicationRepository.GetByIdAsync(applicationId, cancellationToken);
-    var deployment = await deploymentRepository.GetByIdAsync(deploymentId, cancellationToken);
-
-    if (application is null || deployment is null)
+    async Task RunAsync(CancellationToken ct)
     {
-        throw new ArgumentException(
-            $"Application {applicationId.Value} or Deployment {deploymentId.Value} not found.");
+        var applicationRepository = scope.ServiceProvider.GetRequiredService<IApplicationRepository>();
+        var deploymentRepository = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
+
+        var application = await applicationRepository.GetByIdAsync(applicationId, ct);
+        var deployment = await deploymentRepository.GetByIdAsync(deploymentId, ct);
+
+        if (application is null || deployment is null)
+        {
+            throw new ArgumentException(
+                $"Application {applicationId.Value} or Deployment {deploymentId.Value} not found.");
+        }
+
+        var backendOptions = scope.ServiceProvider.GetRequiredService<IOptions<TerraformBackendOptions>>().Value;
+
+        if (!backendOptions.IsRemote)
+        {
+            scope.ServiceProvider.GetRequiredService<ILogger<Program>>().LogWarning(
+                "TerraformBackend:Mode is Local. State will be lost when this runner " +
+                "container is removed, so later provision/destroy runs will not see these resources.");
+        }
+
+        var secretEnvironmentLoader = scope.ServiceProvider.GetRequiredService<ISecretEnvironmentLoader>();
+        await secretEnvironmentLoader.LoadAsync(ct);
+
+        var orchestrator = scope.ServiceProvider.GetRequiredService<IEngineOrchestrator>();
+
+        switch (operation)
+        {
+            case RunnerOperation.Provision:
+                await orchestrator.StartAsync(application, deployment, runId, ct);
+                break;
+            case RunnerOperation.Destroy:
+                await orchestrator.DestroyAsync(application, deployment, runId, ct);
+                break;
+            default:
+                throw new InvalidOperationException($"Unsupported runner operation '{operation}'.");
+        }
     }
 
-    var backendOptions = scope.ServiceProvider.GetRequiredService<IOptions<TerraformBackendOptions>>().Value;
-
-    if (!backendOptions.IsRemote)
+    if (scope.ServiceProvider.GetService<IRunCompletionReporter>() is { } reporter)
     {
-        scope.ServiceProvider.GetRequiredService<ILogger<Program>>().LogWarning(
-            "TerraformBackend:Mode is Local. State will be lost when this runner " +
-            "container is removed, so later provision/destroy runs will not see these resources.");
+        await reporter.RunAsync(RunAsync, cancellationToken);
     }
-
-    var secretEnvironmentLoader = scope.ServiceProvider.GetRequiredService<ISecretEnvironmentLoader>();
-    await secretEnvironmentLoader.LoadAsync(cancellationToken);
-
-    var orchestrator = scope.ServiceProvider.GetRequiredService<IEngineOrchestrator>();
-
-    switch (operation)
+    else
     {
-        case RunnerOperation.Provision:
-            await orchestrator.StartAsync(application, deployment, cancellationToken);
-            break;
-        case RunnerOperation.Destroy:
-            await orchestrator.DestroyAsync(application, deployment, cancellationToken);
-            break;
-        default:
-            throw new InvalidOperationException($"Unsupported runner operation '{operation}'.");
+        await RunAsync(cancellationToken);
     }
 });
 

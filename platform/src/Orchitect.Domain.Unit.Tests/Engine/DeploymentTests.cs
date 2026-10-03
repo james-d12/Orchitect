@@ -24,72 +24,41 @@ public sealed class DeploymentTests
         Assert.Throws<InvalidOperationException>(() => Deploying().Start());
     }
 
-    [Theory]
-    [InlineData(0, DeploymentStatus.Deployed)]
-    [InlineData(1, DeploymentStatus.Failed)]
-    [InlineData(137, DeploymentStatus.Failed)]
-    [InlineData(-1, DeploymentStatus.Failed)]
-    public void ProcessDeploymentStatus_ExitCode_DecidesStatus(long exitCode, DeploymentStatus expected)
+    [Fact]
+    public void Succeed_Deploying_BecomesDeployed()
     {
-        var processed = Deploying().ProcessDeploymentStatus(exitCode, null);
-
-        Assert.Equal(expected, processed.Status);
+        Assert.Equal(DeploymentStatus.Deployed, Deploying().Succeed().Status);
     }
 
     [Fact]
-    public void ProcessDeploymentStatus_Exception_Fails()
+    public void Fail_Deploying_BecomesFailed()
     {
-        var processed = Deploying().ProcessDeploymentStatus(null, new InvalidOperationException("image missing"));
-
-        Assert.Equal(DeploymentStatus.Failed, processed.Status);
+        Assert.Equal(DeploymentStatus.Failed, Deploying().Fail("terraform apply failed").Status);
     }
 
     [Fact]
-    public void ProcessDeploymentStatus_ExceptionWithZeroExitCode_Fails()
+    public void Succeed_NotStarted_Throws()
     {
-        var processed = Deploying().ProcessDeploymentStatus(0, new InvalidOperationException("boom"));
-
-        Assert.Equal(DeploymentStatus.Failed, processed.Status);
-    }
-
-    [Fact]
-    public void ProcessDeploymentStatus_TimedOut_Fails()
-    {
-        var processed = Deploying().ProcessDeploymentStatus(null, new TimeoutException("too slow"));
-
-        Assert.Equal(DeploymentStatus.Failed, processed.Status);
-    }
-
-    [Fact]
-    public void ProcessDeploymentStatus_Cancelled_Unchanged()
-    {
-        var deploying = Deploying();
-
-        var processed = deploying.ProcessDeploymentStatus(null, new OperationCanceledException());
-
-        Assert.Same(deploying, processed);
-    }
-
-    [Fact]
-    public void ProcessDeploymentStatus_NoExitCodeOrException_Throws()
-    {
-        Assert.Throws<ArgumentException>(() => Deploying().ProcessDeploymentStatus(null, null));
-    }
-
-    [Fact]
-    public void ProcessDeploymentStatus_NotStarted_Throws()
-    {
-        Assert.Throws<InvalidOperationException>(() => NewDeployment().ProcessDeploymentStatus(0, null));
+        Assert.Throws<InvalidOperationException>(() => NewDeployment().Succeed());
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    public void ProcessDeploymentStatus_Finished_RejectsFurtherResults(long exitCode)
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Fail_BlankErrorSummary_Throws(string errorSummary)
     {
-        var finished = Deploying().ProcessDeploymentStatus(exitCode, null);
+        Assert.Throws<ArgumentException>(() => Deploying().Fail(errorSummary));
+    }
 
-        Assert.Throws<InvalidOperationException>(() => finished.ProcessDeploymentStatus(0, null));
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Finished_RejectsFurtherResults(bool succeeded)
+    {
+        var finished = Finish(Deploying(), succeeded);
+
+        Assert.Throws<InvalidOperationException>(() => finished.Succeed());
+        Assert.Throws<InvalidOperationException>(() => finished.Fail("late"));
         Assert.Throws<InvalidOperationException>(() => finished.Start());
     }
 
@@ -98,7 +67,7 @@ public sealed class DeploymentTests
     [InlineData(1)]
     public void StartDestroy_DeployedOrFailed_BecomesDestroying(long exitCode)
     {
-        var finished = Deploying().ProcessDeploymentStatus(exitCode, null);
+        var finished = Finish(Deploying(), exitCode == 0);
 
         Assert.True(finished.CanDestroy);
         Assert.Equal(DeploymentStatus.Destroying, finished.StartDestroy().Status);
@@ -111,29 +80,21 @@ public sealed class DeploymentTests
         Assert.Throws<InvalidOperationException>(() => NewDeployment().StartDestroy());
         Assert.Throws<InvalidOperationException>(() => Deploying().StartDestroy());
         Assert.Throws<InvalidOperationException>(() => Destroying().StartDestroy());
-        Assert.Throws<InvalidOperationException>(() => Destroying().ProcessDeploymentStatus(0, null).StartDestroy());
+        Assert.Throws<InvalidOperationException>(() => Destroying().Succeed().StartDestroy());
     }
 
     [Theory]
-    [InlineData(0, DeploymentStatus.Destroyed)]
-    [InlineData(1, DeploymentStatus.Failed)]
-    public void ProcessDeploymentStatus_Destroying_DecidesStatus(long exitCode, DeploymentStatus expected)
+    [InlineData(true, DeploymentStatus.Destroyed)]
+    [InlineData(false, DeploymentStatus.Failed)]
+    public void Finish_Destroying_DecidesStatus(bool succeeded, DeploymentStatus expected)
     {
-        Assert.Equal(expected, Destroying().ProcessDeploymentStatus(exitCode, null).Status);
-    }
-
-    [Fact]
-    public void ProcessDeploymentStatus_DestroyingCancelled_Unchanged()
-    {
-        var destroying = Destroying();
-
-        Assert.Same(destroying, destroying.ProcessDeploymentStatus(null, new OperationCanceledException()));
+        Assert.Equal(expected, Finish(Destroying(), succeeded).Status);
     }
 
     [Fact]
     public void StartDestroy_AfterFailedDestroy_CanRetry()
     {
-        var failed = Destroying().ProcessDeploymentStatus(1, null);
+        var failed = Destroying().Fail("terraform destroy failed");
 
         Assert.Equal(DeploymentStatus.Destroying, failed.StartDestroy().Status);
     }
@@ -144,24 +105,17 @@ public sealed class DeploymentTests
         Assert.True(NewDeployment().IsActive);
         Assert.True(Deploying().IsActive);
         Assert.True(Destroying().IsActive);
-        Assert.False(Deploying().ProcessDeploymentStatus(0, null).IsActive);
-        Assert.False(Deploying().ProcessDeploymentStatus(1, null).IsActive);
-        Assert.False(Destroying().ProcessDeploymentStatus(0, null).IsActive);
+        Assert.False(Deploying().Succeed().IsActive);
+        Assert.False(Deploying().Fail("failed").IsActive);
+        Assert.False(Destroying().Succeed().IsActive);
     }
 
     [Fact]
-    public void Interrupt_Active_BecomesFailed()
+    public void Fail_Active_BecomesFailed()
     {
-        Assert.Equal(DeploymentStatus.Failed, NewDeployment().Interrupt("stopped").Status);
-        Assert.Equal(DeploymentStatus.Failed, Deploying().Interrupt("stopped").Status);
-        Assert.Equal(DeploymentStatus.Failed, Destroying().Interrupt("stopped").Status);
-    }
-
-    [Fact]
-    public void Interrupt_Finished_Throws()
-    {
-        Assert.Throws<InvalidOperationException>(() => Deploying().ProcessDeploymentStatus(0, null).Interrupt("stopped"));
-        Assert.Throws<InvalidOperationException>(() => Deploying().ProcessDeploymentStatus(1, null).Interrupt("stopped"));
+        Assert.Equal(DeploymentStatus.Failed, NewDeployment().Fail("stopped").Status);
+        Assert.Equal(DeploymentStatus.Failed, Deploying().Fail("stopped").Status);
+        Assert.Equal(DeploymentStatus.Failed, Destroying().Fail("stopped").Status);
     }
 
     [Theory]
@@ -214,11 +168,11 @@ public sealed class DeploymentTests
     }
 
     [Fact]
-    public void ProcessDeploymentStatus_Succeeded_SetsCompletedAtWithoutError()
+    public void Succeed_SetsCompletedAtWithoutError()
     {
         var deploying = Deploying();
 
-        var deployed = deploying.ProcessDeploymentStatus(0, null);
+        var deployed = deploying.Succeed();
 
         Assert.Equal(deploying.StartedAt, deployed.StartedAt);
         Assert.NotNull(deployed.CompletedAt);
@@ -227,56 +181,36 @@ public sealed class DeploymentTests
     }
 
     [Fact]
-    public void ProcessDeploymentStatus_NonZeroExitCode_SetsErrorSummary()
+    public void Fail_SetsCompletedAtAndErrorSummary()
     {
-        var failed = Deploying().ProcessDeploymentStatus(137, null);
+        var failed = Deploying().Fail("The runner exited with code 137.");
 
         Assert.NotNull(failed.CompletedAt);
         Assert.Equal("The runner exited with code 137.", failed.ErrorSummary);
     }
 
     [Fact]
-    public void ProcessDeploymentStatus_Exception_SetsErrorSummaryFromMessage()
+    public void Fail_LongErrorSummary_IsTruncated()
     {
-        var failed = Deploying().ProcessDeploymentStatus(null, new InvalidOperationException("image missing"));
-
-        Assert.NotNull(failed.CompletedAt);
-        Assert.Equal("image missing", failed.ErrorSummary);
-    }
-
-    [Fact]
-    public void ProcessDeploymentStatus_LongExceptionMessage_TruncatesErrorSummary()
-    {
-        var message = new string('x', Deployment.ErrorSummaryMaxLength + 10);
-
-        var failed = Deploying().ProcessDeploymentStatus(null, new InvalidOperationException(message));
+        var failed = Deploying().Fail(new string('x', Deployment.ErrorSummaryMaxLength + 10));
 
         Assert.Equal(Deployment.ErrorSummaryMaxLength, failed.ErrorSummary?.Length);
     }
 
     [Fact]
-    public void ProcessDeploymentStatus_Cancelled_KeepsCompletedAtUnset()
+    public void Fail_Pending_SetsCompletedAtWithoutStartedAt()
     {
-        var processed = Deploying().ProcessDeploymentStatus(null, new OperationCanceledException());
+        var failed = NewDeployment().Fail("could not queue");
 
-        Assert.Null(processed.CompletedAt);
-        Assert.Null(processed.ErrorSummary);
-    }
-
-    [Fact]
-    public void Interrupt_SetsCompletedAtAndErrorSummary()
-    {
-        var interrupted = NewDeployment().Interrupt("could not queue");
-
-        Assert.Null(interrupted.StartedAt);
-        Assert.NotNull(interrupted.CompletedAt);
-        Assert.Equal("could not queue", interrupted.ErrorSummary);
+        Assert.Null(failed.StartedAt);
+        Assert.NotNull(failed.CompletedAt);
+        Assert.Equal("could not queue", failed.ErrorSummary);
     }
 
     [Fact]
     public void StartDestroy_AfterFailure_ResetsRunFields()
     {
-        var failed = Deploying().ProcessDeploymentStatus(1, null);
+        var failed = Deploying().Fail("terraform apply failed");
 
         var destroying = failed.StartDestroy();
 
@@ -287,9 +221,9 @@ public sealed class DeploymentTests
     }
 
     [Fact]
-    public void ProcessDeploymentStatus_Destroyed_SetsCompletedAt()
+    public void Succeed_Destroying_SetsCompletedAt()
     {
-        var destroyed = Destroying().ProcessDeploymentStatus(0, null);
+        var destroyed = Destroying().Succeed();
 
         Assert.NotNull(destroyed.CompletedAt);
         Assert.Null(destroyed.ErrorSummary);
@@ -300,5 +234,8 @@ public sealed class DeploymentTests
 
     private static Deployment Deploying() => NewDeployment().Start();
 
-    private static Deployment Destroying() => Deploying().ProcessDeploymentStatus(0, null).StartDestroy();
+    private static Deployment Destroying() => Deploying().Succeed().StartDestroy();
+
+    private static Deployment Finish(Deployment deployment, bool succeeded) =>
+        succeeded ? deployment.Succeed() : deployment.Fail("The runner exited with code 1.");
 }

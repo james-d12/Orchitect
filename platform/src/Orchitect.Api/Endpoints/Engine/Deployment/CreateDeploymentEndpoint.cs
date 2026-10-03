@@ -102,11 +102,11 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
         catch
         {
             const string reason = "The deployment could not be queued.";
-            await repository.UpdateAsync(deploymentResponse.Interrupt(reason), CancellationToken.None);
+            await repository.UpdateAsync(deploymentResponse.Fail(reason), CancellationToken.None);
 
             if (run is not null)
             {
-                await runRepository.UpdateAsync(run.Interrupt(reason), CancellationToken.None);
+                await runRepository.UpdateAsync(run.Fail(reason), CancellationToken.None);
             }
 
             throw;

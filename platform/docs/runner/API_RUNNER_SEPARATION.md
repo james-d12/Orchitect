@@ -273,6 +273,14 @@ Three callers share that handler:
 
 So a run whose report never reaches the API (API down, network failure) still ends in a consistent state. The runner retries `/complete` with backoff before it exits.
 
+**Status (#106).** Implemented:
+
+- **Handler.** `IRunCompletionHandler` (Dispatch, `Completion/`) takes a `RunResult`: the outcome, an error summary, and the exit code and container ID when they are known. It claims the run with `IDeploymentRunRepository.TryFinishAsync`, a conditional update that only succeeds while the run is still `Queued` or `Running`. Only the caller that claims the run moves its instances, so a report and the exit-code fallback that race can't both settle them. The handler updates the `Deployment` only while it is still active for this run's operation and this is the deployment's latest run.
+- **Repeat calls.** For a run that has already completed, the handler only fills in a missing exit code and container ID, and returns `false`. A repeat `POST /complete` never reaches the handler, because completion revoked the token: it gets `401`.
+- **Which instances.** Until #204 moves recording into the API, `EngineOrchestrator` in the runner records the run's plan on `DeploymentRun` (`ProjectName` and `InstanceIds`) before it moves the instances to `Provisioning` or `Removing`. The handler settles only those instances that are still in flight. The instance output's workspace comes from `ProjectName`. The runner no longer makes the final transitions or releases resources itself, so a runner that crashes mid-run no longer leaves instances stuck in `Provisioning`.
+- **Endpoint.** `POST /internal/runs/{runId}/complete` (`CompleteRunEndpoint`) returns `204`, or `400` with `InvalidRunOutcome` for an outcome outside `Succeeded`/`Failed`.
+- **Runner.** `IRunCompletionReporter` wraps the run, reports `Succeeded`, or `Failed` with the exception message, through `IRunnerApiClient.CompleteAsync` (which retries with backoff), and rethrows so the exit code still matches. A report that can't be delivered is only logged. The runner reports only when `ORCHITECT_API_URL` is set, and nothing sets it until #107. Until then every run ends through the exit-code fallback.
+
 ---
 
 # 9. Secrets

@@ -80,11 +80,11 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
         catch
         {
             const string reason = "The destroy could not be queued.";
-            await repository.UpdateAsync(destroying.Interrupt(reason), CancellationToken.None);
+            await repository.UpdateAsync(destroying.Fail(reason), CancellationToken.None);
 
             if (run is not null)
             {
-                await runRepository.UpdateAsync(run.Interrupt(reason), CancellationToken.None);
+                await runRepository.UpdateAsync(run.Fail(reason), CancellationToken.None);
             }
 
             throw;

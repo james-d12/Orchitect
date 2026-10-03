@@ -59,7 +59,7 @@ Test projects:
 - `Orchitect.AppHost.E2E.Tests`: boots the real Aspire AppHost and checks every resource becomes healthy (needs Docker, Node.js and pnpm)
 - `Orchitect.Api.Integration.Tests`: endpoints and repositories against Postgres in Testcontainers (needs Docker)
 - `Orchitect.Domain.Unit.Tests`: domain entity behaviour (e.g. deployment status transitions)
-- `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue, Key Vault and run token minting, plus the API-to-runner contract round-trip and the Engine layering guard tests
+- `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue, run completion, Key Vault and run token minting, plus the API-to-runner contract round-trip and the Engine layering guard tests
 - `Orchitect.Engine.Execution.Unit.Tests`: orchestrator, drivers, runner secret loading and the runner API client
 - `Orchitect.Infrastructure.Inventory.Unit.Tests`, `Orchitect.Common.Unit.Tests`
 
@@ -92,8 +92,8 @@ Each capability is a namespace folder (`Core`, `Engine`, `Inventory`) inside the
 | `Orchitect.Domain` | Entities, strongly-typed IDs and repository interfaces, in `Core/`, `Engine/` and `Inventory/` |
 | `Orchitect.Persistence` | `OrchitectDbContext`, EF configurations, repositories and migrations for all contexts |
 | `Orchitect.Engine.Contracts` | What the API and the runner must agree on: runner arguments and environment keys, `RunnerOperation`, `TerraformBackendOptions`, `SecretProviderOptions`, the secrets file, the Score models, and the runner API routes, DTOs and contract version (`Runner/Api/`). No Orchitect references |
-| `Orchitect.Engine.Dispatch` | Control plane, used by the API only: `IExecutor`/`DockerExecutor`, deployment queue, runner container sweep, Key Vault token minting |
-| `Orchitect.Engine.Execution` | Data plane, used by the runner and the Playground: `EngineOrchestrator`, Score, Terraform and Helm drivers, secret providers, the runner API client (`IRunnerApiClient`) |
+| `Orchitect.Engine.Dispatch` | Control plane, used by the API only: `IExecutor`/`DockerExecutor`, deployment queue, run completion handler, runner container sweep, Key Vault token minting |
+| `Orchitect.Engine.Execution` | Data plane, used by the runner and the Playground: `EngineOrchestrator`, Score, Terraform and Helm drivers, secret providers, the runner API client (`IRunnerApiClient`) and completion reporter |
 | `Orchitect.Infrastructure.Inventory` | Discovery integrations for Azure, Azure DevOps, GitHub and GitLab, one folder per provider plus `Shared` |
 | `Orchitect.Runner` | Console app packaged as the runner image. Runs one provision or destroy for a deployment, then exits |
 | `Orchitect.Common` | Shared helpers (observability, query, extensions) |
@@ -111,7 +111,7 @@ Each capability is a namespace folder (`Core`, `Engine`, `Inventory`) inside the
 
 ### Deployments and the runner
 
-`POST /deployments` stores a `Pending` deployment with a `Queued` `DeploymentRun` and queues it in the in-memory `DeploymentQueue` (capacity 5, processed one at a time). The work item starts an `orchitect-runner-{runId}` container through `DockerExecutor`; the run ID is also its `orchitect.run-id` label and `ORCHITECT_RUN_ID`. The runner loads the deployment, parses the score file, resolves resource templates and runs Terraform. Its exit code sets the deployment to `Deployed` or `Failed` and is recorded on the run. `DELETE /deployments/{id}` destroys the latest deployment the same way, with a new `Destroy` run. `GET /deployments/{id}` returns the latest run. Only one deployment per application/environment can be active at a time (`IX_Deployments_ActiveRun`). `RunnerContainerSweepService` removes leftover containers and reconciles deployments left active by an earlier API process. See `docs/runner/` for the design and open work.
+`POST /deployments` stores a `Pending` deployment with a `Queued` `DeploymentRun` and queues it in the in-memory `DeploymentQueue` (capacity 5, processed one at a time). The work item starts an `orchitect-runner-{runId}` container through `DockerExecutor`; the run ID is also its `orchitect.run-id` label and `ORCHITECT_RUN_ID`. The runner loads the deployment, parses the score file, resolves resource templates, records the run's planned instances on the `DeploymentRun` and runs Terraform. Every run ends through one `IRunCompletionHandler` (Dispatch): the runner's `POST /internal/runs/{runId}/complete` report, the `DeploymentQueue` exit-code fallback when no report arrived, or the sweep. The handler finishes the run, moves the planned instances (`Active`/`Failed`, `Removed`/`RemovalFailed`), releases resources after a destroy, sets the deployment to `Deployed`, `Destroyed` or `Failed` and revokes the run token. Once a report has completed the run, the exit code is only recorded. `DELETE /deployments/{id}` destroys the latest deployment the same way, with a new `Destroy` run. `GET /deployments/{id}` returns the latest run. Only one deployment per application/environment can be active at a time (`IX_Deployments_ActiveRun`). `RunnerContainerSweepService` removes leftover containers and reconciles deployments left active by an earlier API process. See `docs/runner/` for the design and open work.
 
 ### Database Architecture
 

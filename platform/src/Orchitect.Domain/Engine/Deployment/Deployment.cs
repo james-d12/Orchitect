@@ -83,38 +83,27 @@ public sealed record Deployment
         return StartRun(DeploymentStatus.Destroying);
     }
 
-    public Deployment Interrupt(string reason)
-    {
-        if (!IsActive)
-        {
-            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot be interrupted while {Status}.");
-        }
-
-        return Complete(DeploymentStatus.Failed, reason);
-    }
-
-    public Deployment ProcessDeploymentStatus(long? exitCode, Exception? exception)
+    public Deployment Succeed()
     {
         if (Status is not (DeploymentStatus.Deploying or DeploymentStatus.Destroying))
         {
-            throw new InvalidOperationException(
-                $"Deployment '{Id.Value}' cannot process a run result while {Status}.");
+            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot succeed while {Status}.");
         }
 
-        if (exitCode is null && exception is null)
+        return Complete(Status == DeploymentStatus.Destroying ? DeploymentStatus.Destroyed : DeploymentStatus.Deployed,
+            null);
+    }
+
+    public Deployment Fail(string errorSummary)
+    {
+        if (!IsActive)
         {
-            throw new ArgumentException("A run result needs an exit code or an exception.");
+            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot fail while {Status}.");
         }
 
-        return exception switch
-        {
-            OperationCanceledException => this,
-            not null => Complete(DeploymentStatus.Failed, exception.Message),
-            null when exitCode == 0 => Complete(Status == DeploymentStatus.Destroying
-                ? DeploymentStatus.Destroyed
-                : DeploymentStatus.Deployed, null),
-            _ => Complete(DeploymentStatus.Failed, $"The runner exited with code {exitCode}.")
-        };
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorSummary);
+
+        return Complete(DeploymentStatus.Failed, errorSummary);
     }
 
     private Deployment StartRun(DeploymentStatus status)

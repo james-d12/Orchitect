@@ -7,6 +7,11 @@ public interface IDeploymentRunRepository : IRepository<DeploymentRun, Deploymen
     Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Saves a finished run only while the stored run is still queued or running, and returns whether it was saved.
+    /// </summary>
+    Task<bool> TryFinishAsync(DeploymentRun run, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the most recently queued run of a deployment.
     /// </summary>
     Task<DeploymentRun?> GetLatestAsync(DeploymentId deploymentId, CancellationToken cancellationToken = default);
