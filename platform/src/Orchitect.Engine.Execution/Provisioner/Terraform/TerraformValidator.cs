@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
 
@@ -9,8 +9,8 @@ namespace Orchitect.Engine.Execution.Provisioner.Terraform;
 
 public interface ITerraformValidator
 {
-    Task<Dictionary<TerraformPlanInput, TerraformValidationResult>> ValidateAsync(
-        List<TerraformPlanInput> terraformPlanInputs, CancellationToken cancellationToken = default);
+    Task<Dictionary<RunInput, TerraformValidationResult>> ValidateAsync(
+        List<RunInput> terraformPlanInputs, CancellationToken cancellationToken = default);
 }
 
 public sealed class TerraformValidator : ITerraformValidator
@@ -29,54 +29,40 @@ public sealed class TerraformValidator : ITerraformValidator
         _terraformCommandLine = terraformCommandLine;
     }
 
-    public async Task<Dictionary<TerraformPlanInput, TerraformValidationResult>> ValidateAsync(
-        List<TerraformPlanInput> terraformPlanInputs, CancellationToken cancellationToken = default)
+    public async Task<Dictionary<RunInput, TerraformValidationResult>> ValidateAsync(
+        List<RunInput> terraformPlanInputs, CancellationToken cancellationToken = default)
     {
-        var results = new Dictionary<TerraformPlanInput, TerraformValidationResult>();
-        var versions = new Dictionary<TerraformPlanInput, ResourceTemplateVersion>();
+        var results = new Dictionary<RunInput, TerraformValidationResult>();
+        var sources = new Dictionary<RunInput, RunInputSource>();
 
         foreach (var planInput in terraformPlanInputs)
         {
             _logger.LogInformation("Validating Template: {Template} using the Terraform Driver.",
-                planInput.Template.Name);
+                planInput.TemplateName);
 
-            var (version, error) = ResolveVersion(planInput.Template);
-
-            if (version is null)
+            if (planInput.Provider != RunInputProvider.Terraform)
             {
-                results[planInput] = TerraformValidationResult.TemplateInvalid(error);
+                results[planInput] = TerraformValidationResult.TemplateInvalid(
+                    $"The template: {planInput.TemplateName} is configured to use {planInput.Provider}");
                 continue;
             }
 
-            versions[planInput] = version;
+            sources[planInput] = planInput.Source;
         }
 
-        var downloads = await _moduleDownloader
-            .DownloadAsync(versions.Values.Select(v => v.Source), cancellationToken);
+        var downloads = await _moduleDownloader.DownloadAsync(sources.Values, cancellationToken);
 
         var modules = await InspectModulesAsync(downloads.Values
             .Where(download => download.IsSuccess)
             .Select(download => download.Directory!)
             .Distinct(), cancellationToken);
 
-        foreach (var (planInput, version) in versions)
+        foreach (var (planInput, source) in sources)
         {
-            results[planInput] = ValidateInputs(planInput, version, downloads[version.Source], modules);
+            results[planInput] = ValidateInputs(planInput, downloads[source], modules);
         }
 
         return terraformPlanInputs.ToDictionary(planInput => planInput, planInput => results[planInput]);
-    }
-
-    private static (ResourceTemplateVersion? Version, string Error) ResolveVersion(ResourceTemplate template)
-    {
-        if (template.Provider != ResourceTemplateProvider.Terraform)
-        {
-            return (null, $"The template: {template.Name} is configured to use {template.Provider}");
-        }
-
-        return template.GetLatestVersion() is { } version
-            ? (version, string.Empty)
-            : (null, $"No Version could be found for {template.Name} found.");
     }
 
     private async Task<IReadOnlyDictionary<string, ModuleInspection>> InspectModulesAsync(
@@ -150,17 +136,15 @@ public sealed class TerraformValidator : ITerraformValidator
         return $"{position}{diagnostic.Summary}{detail}";
     }
 
-    private static TerraformValidationResult ValidateInputs(TerraformPlanInput planInput,
-        ResourceTemplateVersion version, TerraformModuleDownloadResult download,
-        IReadOnlyDictionary<string, ModuleInspection> modules)
+    private static TerraformValidationResult ValidateInputs(RunInput planInput,
+        TerraformModuleDownloadResult download, IReadOnlyDictionary<string, ModuleInspection> modules)
     {
-        var template = planInput.Template;
-        var inputs = planInput.Inputs;
+        var inputs = planInput.Parameters;
 
         if (!download.IsSuccess)
         {
             return TerraformValidationResult.ModuleInvalid(
-                $"Could not clone template: {template.Name} from {version.Source}. {download.Error}");
+                $"Could not clone template: {planInput.TemplateName} from {planInput.Source}. {download.Error}");
         }
 
         var moduleDirectory = download.Directory!;

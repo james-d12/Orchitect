@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Helm.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
 
@@ -7,7 +7,7 @@ namespace Orchitect.Engine.Execution.Provisioner.Helm;
 
 public interface IHelmValidator
 {
-    Task<HelmValidationResult> ValidateAsync(ResourceTemplate template, Dictionary<string, string> inputs);
+    Task<HelmValidationResult> ValidateAsync(RunInput input);
 }
 
 public sealed class HelmValidator : IHelmValidator
@@ -23,45 +23,38 @@ public sealed class HelmValidator : IHelmValidator
         _parser = parser;
     }
 
-    public async Task<HelmValidationResult> ValidateAsync(ResourceTemplate template, Dictionary<string, string> inputs)
+    public async Task<HelmValidationResult> ValidateAsync(RunInput input)
     {
-        _logger.LogInformation("Validating Template: {Template} using the Helmchart Driver.", template.Name);
+        _logger.LogInformation("Validating Template: {Template} using the Helmchart Driver.", input.TemplateName);
 
-        if (template.Provider != ResourceTemplateProvider.Helm)
+        if (input.Provider != RunInputProvider.Helm)
         {
-            var message = $"The template: {template.Name} is configured to use {template.Provider}";
+            var message = $"The template: {input.TemplateName} is configured to use {input.Provider}";
             return HelmValidationResult.WrongProvider(message);
         }
 
-        ResourceTemplateVersion? latestVersion = template.GetLatestVersion();
-        if (latestVersion is null)
-        {
-            var message = $"No Version could be found for {template.Name} found.";
-            return HelmValidationResult.TemplateNotFound(message);
-        }
+        var source = input.Source;
+        var templateDir = Path.Combine(Path.GetTempPath(), "orchitect", "helm", input.TemplateName, source.Tag);
+        var cloneResult = await _gitCommandLine.CloneAsync(source.BaseUrl, templateDir);
 
-        var templateDir = Path.Combine(Path.GetTempPath(), "orchitect", "helm", template.Name, latestVersion.Version);
-        var cloneResult =
-            await _gitCommandLine.CloneAsync(latestVersion.Source.BaseUrl, templateDir);
-
-        if (!string.IsNullOrEmpty(latestVersion.Source.FolderPath))
+        if (!string.IsNullOrEmpty(source.Path))
         {
-            templateDir = Path.Combine(templateDir, latestVersion.Source.FolderPath);
+            templateDir = Path.Combine(templateDir, source.Path);
         }
 
         if (!cloneResult)
         {
-            var message = $"Could not clone template: {template.Name} from {latestVersion.Source}";
+            var message = $"Could not clone template: {input.TemplateName} from {source}";
             return HelmValidationResult.ModuleNotFound(message);
         }
 
-        _logger.LogInformation("Successfully cloned Repository: {Url} to {Output}", latestVersion.Source, templateDir);
+        _logger.LogInformation("Successfully cloned Repository: {Url} to {Output}", source, templateDir);
 
         var config = await _parser.ParseHelmConfigAsync(templateDir);
 
-        var invalidInputs = inputs
+        var invalidInputs = input.Parameters
             .Where(i =>
-                !config.Any(input => input.Key.Equals(i.Key, StringComparison.OrdinalIgnoreCase)))
+                !config.Any(helmInput => helmInput.Key.Equals(i.Key, StringComparison.OrdinalIgnoreCase)))
             .Select(i => i.Key)
             .ToList();
 

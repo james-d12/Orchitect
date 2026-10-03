@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Logging;
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Helm.Models;
 
 namespace Orchitect.Engine.Execution.Provisioner.Helm;
 
 public interface IHelmDriver
 {
-    Task PlanAsync(ResourceTemplate template, Dictionary<string, string> inputs);
+    Task PlanAsync(RunInput input);
 }
 
 public sealed class HelmDriver : IHelmDriver
@@ -20,9 +20,9 @@ public sealed class HelmDriver : IHelmDriver
         _validator = validator;
     }
 
-    public async Task PlanAsync(ResourceTemplate template, Dictionary<string, string> inputs)
+    public async Task PlanAsync(RunInput input)
     {
-        var result = await _validator.ValidateAsync(template, inputs);
+        var result = await _validator.ValidateAsync(input);
 
         switch (result.State)
         {
@@ -32,11 +32,11 @@ public sealed class HelmDriver : IHelmDriver
             case HelmValidationResultState.ModuleNotParsable:
             case HelmValidationResultState.InputNotPresent:
                 _logger.LogError("Helm Validation for {Template} Failed due to: {State} with Message: {Message}",
-                    template.Name, result.State,
+                    input.TemplateName, result.State,
                     result.Message);
                 break;
             case HelmValidationResultState.Valid:
-                _logger.LogInformation("Helm Validation for {Template} Passed.", template.Name);
+                _logger.LogInformation("Helm Validation for {Template} Passed.", input.TemplateName);
                 break;
             default:
                 throw new ArgumentOutOfRangeException();

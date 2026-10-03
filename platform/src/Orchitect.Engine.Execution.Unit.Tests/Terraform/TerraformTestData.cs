@@ -1,28 +1,22 @@
-using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Terraform;
-using Orchitect.Engine.Execution.Provisioner;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 
 namespace Orchitect.Engine.Execution.Unit.Tests.Terraform;
 
 internal static class TerraformTestData
 {
-    public static ProvisionContext NewContext() =>
-        new("orders", Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
+    public static RunContext NewContext() => new("orders", Guid.NewGuid(), Guid.NewGuid());
 
-    public static ResourceTemplate Template(ResourceTemplateProvider provider = ResourceTemplateProvider.Terraform) =>
-        ResourceTemplate.Create(new CreateResourceTemplateRequest
-        {
-            OrganisationId = new OrganisationId(),
-            Name = "Storage Account",
-            Type = "azure-storage-account",
-            Description = "A storage account.",
-            Provider = provider
-        });
+    public static RunInput Input(RunInputProvider provider = RunInputProvider.Terraform, string key = "storage",
+        IReadOnlyDictionary<string, string>? parameters = null, string templateName = "Storage Account",
+        RunInputSource? source = null) =>
+        new(key, templateName, "azure-storage-account", provider,
+            source ?? new RunInputSource(new Uri("https://example.com/storage.git"), string.Empty, null),
+            parameters ?? new Dictionary<string, string>());
 
-    public static TerraformPlanInput PlanInput() =>
-        new(Template(), new Dictionary<string, string> { ["name"] = "orders" }, "storage");
+    public static RunInput PlanInput() =>
+        Input(parameters: new Dictionary<string, string> { ["name"] = "orders" });
 
     public static TerraformValidationResult.ValidResult ValidResult() =>
         TerraformValidationResult.Valid(new TerraformConfig
@@ -33,7 +27,7 @@ internal static class TerraformTestData
             }
         }, "/modules/storage");
 
-    public static Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> ValidatedPlans() =>
+    public static Dictionary<RunInput, TerraformValidationResult.ValidResult> ValidatedPlans() =>
         new() { [PlanInput()] = ValidResult() };
 
     public static TerraformBackendOptions AzureBackend() => new()

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Microsoft.Extensions.Logging;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
 
@@ -7,7 +8,7 @@ namespace Orchitect.Engine.Execution.Provisioner.Terraform;
 
 public interface ITerraformDriver
 {
-    Task<TerraformPlanResult> PlanAsync(List<TerraformPlanInput> terraformPlanInputs, ProvisionContext context,
+    Task<TerraformPlanResult> PlanAsync(List<RunInput> terraformPlanInputs, RunContext context,
         bool destroy = false, CancellationToken cancellationToken = default);
 
     Task ApplyAsync(TerraformPlanResult planResult, CancellationToken cancellationToken = default);
@@ -30,12 +31,12 @@ public sealed class TerraformDriver : ITerraformDriver
         _projectBuilder = projectBuilder;
     }
 
-    public async Task<TerraformPlanResult> PlanAsync(List<TerraformPlanInput> terraformPlanInputs,
-        ProvisionContext context, bool destroy = false, CancellationToken cancellationToken = default)
+    public async Task<TerraformPlanResult> PlanAsync(List<RunInput> terraformPlanInputs,
+        RunContext context, bool destroy = false, CancellationToken cancellationToken = default)
     {
         var validationResults = await _validator.ValidateAsync(terraformPlanInputs, cancellationToken);
 
-        var validResults = new Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult>();
+        var validResults = new Dictionary<RunInput, TerraformValidationResult.ValidResult>();
         var validationErrors = new List<string>();
 
         foreach (var result in validationResults)
@@ -47,8 +48,8 @@ public sealed class TerraformDriver : ITerraformDriver
                     break;
                 default:
                     _logger.LogError("Validation failed for {Template}: {State} - {Message}",
-                        result.Key.Template.Name, result.Value.State, result.Value.Message);
-                    validationErrors.Add($"{result.Key.Template.Name}: {result.Value.Message}");
+                        result.Key.TemplateName, result.Value.State, result.Value.Message);
+                    validationErrors.Add($"{result.Key.TemplateName}: {result.Value.Message}");
                     break;
             }
         }

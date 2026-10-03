@@ -35,6 +35,7 @@ public sealed class OrchitectDbContext : IdentityDbContext
     public DbSet<Domain.Engine.Environment.Environment> Environments { get; init; } = null!;
     public DbSet<Deployment> Deployments { get; init; } = null!;
     public DbSet<DeploymentRun> DeploymentRuns { get; init; } = null!;
+    public DbSet<DeploymentRunPlan> DeploymentRunPlans { get; init; } = null!;
     public DbSet<Resource> Resources { get; init; } = null!;
     public DbSet<ResourceInstance> ResourceInstances { get; init; } = null!;
     public DbSet<ResourceDependencyGraph> ResourceDependencyGraphs { get; init; } = null!;

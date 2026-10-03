@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Terraform;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
@@ -14,7 +15,7 @@ public sealed class TerraformDriverTests
         var context = TerraformTestData.NewContext();
         var commandLine = new RecordingTerraformCommandLine();
         var driver = CreateDriver(commandLine);
-        List<TerraformPlanInput> inputs = [TerraformTestData.PlanInput()];
+        List<RunInput> inputs = [TerraformTestData.PlanInput()];
 
         await driver.PlanAsync(inputs, context);
         await driver.PlanAsync(inputs, context, destroy: true);
@@ -174,8 +175,8 @@ public sealed class TerraformDriverTests
 
     private sealed class FixedTerraformValidator(TerraformValidationResult result) : ITerraformValidator
     {
-        public Task<Dictionary<TerraformPlanInput, TerraformValidationResult>> ValidateAsync(
-            List<TerraformPlanInput> terraformPlanInputs, CancellationToken cancellationToken) =>
+        public Task<Dictionary<RunInput, TerraformValidationResult>> ValidateAsync(
+            List<RunInput> terraformPlanInputs, CancellationToken cancellationToken) =>
             Task.FromResult(terraformPlanInputs.ToDictionary(input => input, _ => result));
     }
 
