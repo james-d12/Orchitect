@@ -228,7 +228,7 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
   - Find the recorded resources for the score's resources and their removable instances.
   - Move those instances to `Removing`.
 - **Either:**
-  - Return the `ProvisionContext` (project name, application/environment IDs) and one `RunInput` per resource.
+  - Return the `RunContext` (project name, application/environment IDs) and one `RunInput` per resource.
   - Each `RunInput` holds the key, template type, version source URL/tag, and parameters.
 
 **DTO sketch:**
@@ -248,7 +248,7 @@ The round-trip test (#117) and the shared constants (#118) cover whatever env/ar
 - **Contracts.** `RunnerRoutes`, `RunnerContract` (header name, version and the shared JSON options), `RunDescriptor`, `ScoreSubmission`, `RunPlan`, `RunContext`, `RunInput`, `RunInputSource`, `RunCompletion` and `RunOutcome` are in `Orchitect.Engine.Contracts/Runner/Api/`. The score models (`ScoreFile` and friends) moved to `Orchitect.Engine.Contracts/Score/` so `ScoreSubmission` can carry the parsed score.
 - **Versioning.** `RunnerContractFilter` runs on every endpoint in `MapRunnerGroup` and returns `400` with the `RunnerContractMismatch` error code when the header is missing or different. Authentication runs first, so a request without a valid token still gets `401`.
 - **Descriptor.** `GET /internal/runs/{runId}` (`GetRunDescriptorEndpoint`). `DeploymentQueue` already moves the run to `Running` when it issues the token, so the endpoint only reads.
-- **Client.** `IRunnerApiClient` in `Orchitect.Engine.Execution`, registered by `AddRunnerApiClient(configuration)`. It reads `ORCHITECT_API_URL`, `ORCHITECT_RUN_ID` and `ORCHITECT_RUN_TOKEN`, sends the token and the contract header, and retries transient failures (5xx, 408, 429, network errors) with exponential backoff and jitter. It replaces the default resilience handler from `AddServiceDefaults`, so retries don't stack. The runner doesn't use it yet (#105), and nothing sets `ORCHITECT_API_URL` until #107.
+- **Client.** `IRunnerApiClient` in `Orchitect.Engine.Execution`, registered by `AddRunnerApiClient(configuration)`. It reads `ORCHITECT_API_URL`, `ORCHITECT_RUN_ID` and `ORCHITECT_RUN_TOKEN`, sends the token and the contract header, and retries transient failures (5xx, 408, 429, network errors) with exponential backoff and jitter. Each attempt times out after 10s and the whole call after 2 minutes, so a hung request is retried rather than eating the budget. Missing or malformed settings fail options validation with a message naming the variable, at host start (`ValidateOnStart`). It replaces the default resilience handler from `AddServiceDefaults`, so retries don't stack. The runner doesn't use it yet (#105), and nothing sets `ORCHITECT_API_URL` until #107.
 
 ---
 

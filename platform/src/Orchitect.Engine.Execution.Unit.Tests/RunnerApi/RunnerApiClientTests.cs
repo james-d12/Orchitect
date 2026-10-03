@@ -146,15 +146,42 @@ public sealed class RunnerApiClientTests
             handler.Requests[^1].RequestUri?.ToString());
     }
 
+    [Fact]
+    public async Task GetRunAsync_AttemptHangs_TimesOutAndRetries()
+    {
+        var descriptor = new RunDescriptor(RunId, RunnerOperation.Provision, new Uri("https://github.com/test/repo"),
+            new string('d', 40), Guid.NewGuid(), Guid.NewGuid());
+        var handler = new StubHandler(async (attempt, cancellationToken) =>
+        {
+            if (attempt == 0)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+
+            return JsonResponse(descriptor);
+        });
+
+        var result = await CreateClient(handler).GetRunAsync(CancellationToken.None);
+
+        Assert.Equal(descriptor, result);
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
     [Theory]
-    [InlineData(null, "8b6d6c0e-3f0a-4ad5-9a40-6f3b1f6f4a61", Token)]
-    [InlineData("http://orchitect-api:8080", null, Token)]
-    [InlineData("http://orchitect-api:8080", "8b6d6c0e-3f0a-4ad5-9a40-6f3b1f6f4a61", null)]
-    public void AddRunnerApiClient_MissingSetting_FailsValidation(string? baseUrl, string? runId, string? token)
+    [InlineData(null, "8b6d6c0e-3f0a-4ad5-9a40-6f3b1f6f4a61", Token, RunnerEnvironment.ApiBaseUrl)]
+    [InlineData("not-a-url", "8b6d6c0e-3f0a-4ad5-9a40-6f3b1f6f4a61", Token, RunnerEnvironment.ApiBaseUrl)]
+    [InlineData("http://orchitect-api:8080", null, Token, RunnerEnvironment.RunId)]
+    [InlineData("http://orchitect-api:8080", "not-a-guid", Token, RunnerEnvironment.RunId)]
+    [InlineData("http://orchitect-api:8080", "8b6d6c0e-3f0a-4ad5-9a40-6f3b1f6f4a61", null, RunnerEnvironment.RunToken)]
+    public void AddRunnerApiClient_InvalidSetting_FailsValidationNamingTheSetting(string? baseUrl, string? runId,
+        string? token, string expectedSetting)
     {
         using var provider = BuildProvider(new StubHandler(_ => new HttpResponseMessage()), baseUrl, runId, token);
 
-        Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IRunnerApiClient>());
+        var exception =
+            Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IRunnerApiClient>());
+
+        Assert.StartsWith(expectedSetting, Assert.Single(exception.Failures));
     }
 
     private static IRunnerApiClient CreateClient(StubHandler handler, Action<IServiceCollection>? configure = null)
@@ -182,6 +209,7 @@ public sealed class RunnerApiClientTests
         {
             options.MaxRetryAttempts = MaxRetryAttempts;
             options.RetryDelay = TimeSpan.FromMilliseconds(1);
+            options.AttemptTimeout = TimeSpan.FromMilliseconds(200);
         });
         services.AddHttpClient<IRunnerApiClient, RunnerApiClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
 
@@ -191,8 +219,14 @@ public sealed class RunnerApiClientTests
     private static HttpResponseMessage JsonResponse<T>(T value) =>
         new(HttpStatusCode.OK) { Content = JsonContent.Create(value, options: RunnerContract.JsonOptions) };
 
-    private sealed class StubHandler(Func<int, HttpResponseMessage> respond) : HttpMessageHandler
+    private sealed class StubHandler(Func<int, CancellationToken, Task<HttpResponseMessage>> respond)
+        : HttpMessageHandler
     {
+        public StubHandler(Func<int, HttpResponseMessage> respond)
+            : this((attempt, _) => Task.FromResult(respond(attempt)))
+        {
+        }
+
         public List<HttpRequestMessage> Requests { get; } = [];
         public List<string> Bodies { get; } = [];
 
@@ -206,7 +240,7 @@ public sealed class RunnerApiClientTests
                 Bodies.Add(await request.Content.ReadAsStringAsync(cancellationToken));
             }
 
-            return respond(Requests.Count - 1);
+            return await respond(Requests.Count - 1, cancellationToken);
         }
     }
 }
