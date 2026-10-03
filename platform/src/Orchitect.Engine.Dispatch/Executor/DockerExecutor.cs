@@ -47,6 +47,43 @@ public sealed class DockerExecutor : IExecutor
         }
     }
 
+    public async Task<bool> SignalStopAsync(string runId, CancellationToken cancellationToken = default)
+    {
+        var containers = await _docker.Containers.ListContainersAsync(
+            new ContainersListParameters
+            {
+                Filters = new Dictionary<string, IDictionary<string, bool>>
+                {
+                    ["label"] = new Dictionary<string, bool> { [$"{RunnerContainerLabels.RunId}={runId}"] = true }
+                }
+            },
+            cancellationToken);
+
+        var signalled = false;
+
+        foreach (var container in containers)
+        {
+            try
+            {
+                await _docker.Containers.KillContainerAsync(
+                    container.ID,
+                    new ContainerKillParameters { Signal = "SIGTERM" },
+                    cancellationToken);
+                signalled = true;
+                _logger.LogInformation("Sent SIGTERM to runner container {ContainerId} of run {RunId}.",
+                    container.ID, runId);
+            }
+            catch (DockerApiException exception) when (exception.StatusCode is HttpStatusCode.Conflict
+                                                           or HttpStatusCode.NotFound)
+            {
+                _logger.LogInformation(exception, "Runner container {ContainerId} of run {RunId} is not running.",
+                    container.ID, runId);
+            }
+        }
+
+        return signalled;
+    }
+
     private async Task<ExecutorResult> RunAsync(ExecutorContext context, CancellationToken cancellationToken)
     {
         using var activity = Tracing.StartActivity();

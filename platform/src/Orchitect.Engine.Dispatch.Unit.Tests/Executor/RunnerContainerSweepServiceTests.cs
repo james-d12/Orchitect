@@ -87,6 +87,60 @@ public sealed class RunnerContainerSweepServiceTests
         await AssertRemovedAsync("old");
     }
 
+    [Theory]
+    [InlineData(143, DeploymentStatus.Cancelled, DeploymentRunStatus.Cancelled)]
+    [InlineData(0, DeploymentStatus.Deployed, DeploymentRunStatus.Succeeded)]
+    public async Task SweepAsync_CancelRequestedWithExitedContainer_CancelsUnlessItSucceeded(long exitCode,
+        DeploymentStatus expected, DeploymentRunStatus expectedRun)
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        RequestCancel(deployment);
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), RunIdOf(deployment)));
+        _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
+            .Returns(new ContainerInspectResponse { State = new State { ExitCode = exitCode } });
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, expected);
+        await _runs.Received(1).UpdateAsync(
+            Arg.Is<DeploymentRun>(r => r.Status == expectedRun && r.ExitCode == exitCode && r.RunnerId == "old" &&
+                                       r.CancelRequestedAt != null),
+            Arg.Any<CancellationToken>());
+        await AssertRemovedAsync("old");
+    }
+
+    [Fact]
+    public async Task SweepAsync_CancelRequestedWithoutContainer_IsCancelled()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        RequestCancel(deployment);
+        SetContainers();
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Cancelled);
+        await AssertRunUpdatedAsync(deployment, DeploymentRunStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task SweepAsync_RunChangedWhileReconciling_LeavesDeploymentAndContainerForNextSweep()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), RunIdOf(deployment)));
+        _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
+            .Returns(new ContainerInspectResponse { State = new State { ExitCode = 1 } });
+        _runs.UpdateAsync(Arg.Any<DeploymentRun>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new DeploymentRunConflictException(RunIdOf(deployment)));
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await _deployments.DidNotReceive().UpdateAsync(Arg.Any<Deployment>(), Arg.Any<CancellationToken>());
+        await AssertNotRemovedAsync();
+    }
+
     [Fact]
     public async Task SweepAsync_RunWithExitedContainer_RevokesToken()
     {
@@ -341,6 +395,12 @@ public sealed class RunnerContainerSweepServiceTests
     }
 
     private DeploymentRunId RunIdOf(Deployment deployment) => _latestRuns[deployment.Id].Id;
+
+    private void RequestCancel(Deployment deployment)
+    {
+        _latestRuns[deployment.Id] = _latestRuns[deployment.Id].RequestCancel(DateTime.UtcNow);
+        _runs.GetLatestAsync(deployment.Id, Arg.Any<CancellationToken>()).Returns(_latestRuns[deployment.Id]);
+    }
 
     private Task<DeploymentRun?> AssertRunUpdatedAsync(Deployment deployment, DeploymentRunStatus status) =>
         _runs.Received(1).UpdateAsync(

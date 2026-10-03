@@ -81,24 +81,28 @@ public sealed class DeploymentQueue : IDeploymentQueue
             return;
         }
 
-        if (run.Operation == DeploymentRunOperation.Destroy)
+        if (run.Operation == DeploymentRunOperation.Destroy && deployment.Status != DeploymentStatus.Destroying)
         {
-            if (deployment.Status != DeploymentStatus.Destroying)
-            {
-                throw new InvalidOperationException(
-                    $"Deployment '{deployment.Id.Value}' must be Destroying to run a destroy, but is {deployment.Status}.");
-            }
+            throw new InvalidOperationException(
+                $"Deployment '{deployment.Id.Value}' must be Destroying to run a destroy, but is {deployment.Status}.");
         }
-        else
+
+        var token = RunnerToken.Generate();
+        var claimed = await ClaimAsync(runs, run.Start().IssueToken(token.Hash,
+            DateTime.UtcNow + _executorOptions.Timeout + _executorOptions.StopGracePeriod), ct);
+
+        if (claimed is null)
+        {
+            return;
+        }
+
+        run = claimed;
+
+        if (run.Operation == DeploymentRunOperation.Provision)
         {
             deployment = deployment.Start();
             await deployments.UpdateAsync(deployment, ct);
         }
-
-        var token = RunnerToken.Generate();
-        run = run.Start().IssueToken(token.Hash,
-            DateTime.UtcNow + _executorOptions.Timeout + _executorOptions.StopGracePeriod);
-        await runs.UpdateAsync(run, ct);
 
         var result = await ExecuteAsync(request, run, token, stopRequested, ct);
 
@@ -120,11 +124,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
             await deployments.UpdateAsync(processed, CancellationToken.None);
         }
 
-        var completed = run.Complete(result.ExitCode, exception, result.RunnerId);
-        if (completed != run)
-        {
-            await runs.UpdateAsync(completed, CancellationToken.None);
-        }
+        var completed = await UpdateRunAsync(runs, run, r => r.Complete(result.ExitCode, exception, result.RunnerId));
 
         _logger.LogInformation("Deployment {DeploymentId} is {Status} after run {RunId} {RunStatus}.",
             processed.Id.Value, processed.Status, completed.Id.Value, completed.Status);
@@ -136,11 +136,55 @@ public sealed class DeploymentQueue : IDeploymentQueue
         var cancelled = deployment.Cancel();
         await deployments.UpdateAsync(cancelled, CancellationToken.None);
 
-        var cancelledRun = run.Cancel(result.ExitCode, result.RunnerId);
-        await runs.UpdateAsync(cancelledRun, CancellationToken.None);
+        var cancelledRun = await UpdateRunAsync(runs, run, r => r.Cancel(result.ExitCode, result.RunnerId));
 
         _logger.LogInformation("Deployment {DeploymentId} is {Status} after run {RunId} was cancelled.",
             cancelled.Id.Value, cancelled.Status, cancelledRun.Id.Value);
+    }
+
+    private async Task<DeploymentRun?> ClaimAsync(IDeploymentRunRepository runs, DeploymentRun started,
+        CancellationToken ct)
+    {
+        try
+        {
+            return await runs.UpdateAsync(started, ct) ?? started;
+        }
+        catch (DeploymentRunConflictException exception)
+        {
+            var current = await runs.GetByIdAsync(started.Id, ct);
+
+            if (current is { IsActive: true })
+            {
+                throw new InvalidOperationException(
+                    $"Run '{started.Id.Value}' was changed while it was being started.", exception);
+            }
+
+            _logger.LogInformation("Run {RunId} became {RunStatus} before it started.",
+                started.Id.Value, current?.Status);
+            return null;
+        }
+    }
+
+    private static async Task<DeploymentRun> UpdateRunAsync(IDeploymentRunRepository runs, DeploymentRun run,
+        Func<DeploymentRun, DeploymentRun> transition)
+    {
+        try
+        {
+            return await SaveTransitionAsync(runs, run, transition);
+        }
+        catch (DeploymentRunConflictException)
+        {
+            var current = await runs.GetByIdAsync(run.Id, CancellationToken.None)
+                          ?? throw new InvalidOperationException($"Run '{run.Id.Value}' was not found.");
+            return await SaveTransitionAsync(runs, current, transition);
+        }
+    }
+
+    private static async Task<DeploymentRun> SaveTransitionAsync(IDeploymentRunRepository runs, DeploymentRun run,
+        Func<DeploymentRun, DeploymentRun> transition)
+    {
+        var next = transition(run);
+        return next == run ? run : await runs.UpdateAsync(next, CancellationToken.None) ?? next;
     }
 
     private async Task FailOwnedRunAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
@@ -168,10 +212,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
                     deployment.Id.Value, deployment.Status);
             }
 
-            if (run.IsActive)
-            {
-                await runs.UpdateAsync(run.Interrupt(failure.Message), CancellationToken.None);
-            }
+            await UpdateRunAsync(runs, run, r => r.IsActive ? r.Interrupt(failure.Message) : r);
         }
         catch (Exception exception)
         {

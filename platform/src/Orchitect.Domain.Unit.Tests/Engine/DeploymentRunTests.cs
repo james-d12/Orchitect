@@ -144,6 +144,45 @@ public sealed class DeploymentRunTests
     }
 
     [Fact]
+    public void RequestCancel_Active_RecordsWhenAndKeepsStatus()
+    {
+        var now = DateTime.UtcNow;
+
+        var queued = Queued().RequestCancel(now);
+        var running = Running().RequestCancel(now);
+
+        Assert.Equal(now, queued.CancelRequestedAt);
+        Assert.Equal(DeploymentRunStatus.Queued, queued.Status);
+        Assert.Equal(now, running.CancelRequestedAt);
+        Assert.Equal(DeploymentRunStatus.Running, running.Status);
+    }
+
+    [Fact]
+    public void RequestCancel_AlreadyRequested_KeepsFirstRequest()
+    {
+        var first = DateTime.UtcNow;
+        var requested = Running().RequestCancel(first);
+
+        Assert.Same(requested, requested.RequestCancel(first.AddMinutes(1)));
+    }
+
+    [Fact]
+    public void RequestCancel_Finished_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => Running().Complete(0, null).RequestCancel(DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void CompleteOrCancel_KeepsCancelRequestedAt()
+    {
+        var now = DateTime.UtcNow;
+        var requested = Running().RequestCancel(now);
+
+        Assert.Equal(now, requested.Complete(0, null).CancelRequestedAt);
+        Assert.Equal(now, requested.Cancel(143).CancelRequestedAt);
+    }
+
+    [Fact]
     public void Cancel_Finished_Throws()
     {
         Assert.Throws<InvalidOperationException>(() => Running().Complete(0, null).Cancel());

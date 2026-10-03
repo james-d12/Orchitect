@@ -157,7 +157,7 @@ public sealed class DeploymentQueueTests
 
         Assert.False(executor.Executed);
         Assert.Equal([DeploymentStatus.Failed], repository.Statuses);
-        Assert.Equal([DeploymentRunStatus.Failed], _runs.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Failed], _runs.Statuses);
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public sealed class DeploymentQueueTests
             await workItem(services, cancellation.Token));
 
         Assert.Empty(repository.Statuses);
-        Assert.Empty(_runs.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running], _runs.Statuses);
     }
 
     [Fact]
@@ -290,6 +290,58 @@ public sealed class DeploymentQueueTests
         Assert.False(executor.Executed);
         Assert.Empty(repository.Statuses);
         Assert.Empty(_runs.Statuses);
+    }
+
+    [Fact]
+    public async Task WorkItem_RunCancelledWhileClaiming_DoesNotExecuteOrStartDeployment()
+    {
+        var (deployment, repository, services) = Setup();
+        var executor = new FakeExecutor();
+        var workItem = await QueueAsync(deployment, executor);
+        _runs.Conflicts = 1;
+        _runs.ConcurrentChange = run => run.Cancel();
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.False(executor.Executed);
+        Assert.Empty(repository.Statuses);
+        Assert.Equal(DeploymentRunStatus.Cancelled, _runs.Run!.Status);
+    }
+
+    [Fact]
+    public async Task WorkItem_RunChangedWhileClaimingButStillQueued_FailsRun()
+    {
+        var (deployment, _, services) = Setup();
+        var executor = new FakeExecutor();
+        var workItem = await QueueAsync(deployment, executor);
+        _runs.Conflicts = 1;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await workItem(services, CancellationToken.None));
+
+        Assert.False(executor.Executed);
+        Assert.Equal(DeploymentRunStatus.Failed, _runs.Run!.Status);
+    }
+
+    [Fact]
+    public async Task WorkItem_CancelRequestedButRunnerSucceeded_CompletesFreshRunAsSucceeded()
+    {
+        var (deployment, repository, services) = Setup();
+        var requestedAt = DateTime.UtcNow;
+        var workItem = await QueueAsync(deployment, new FakeExecutor
+        {
+            OnExecute = () =>
+            {
+                _runs.Conflicts = 1;
+                _runs.ConcurrentChange = run => run.RequestCancel(requestedAt);
+            }
+        });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, DeploymentStatus.Deployed], repository.Statuses);
+        Assert.Equal(DeploymentRunStatus.Succeeded, _runs.Run!.Status);
+        Assert.Equal(requestedAt, _runs.Run.CancelRequestedAt);
     }
 
     [Fact]
@@ -485,6 +537,9 @@ public sealed class DeploymentQueueTests
 
             return Task.FromResult(Exception is null ? new ExecutorResult(ExitCode, RunnerId: RunnerId) : new ExecutorResult(null, Exception));
         }
+
+        public Task<bool> SignalStopAsync(string runId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class StaticTokenProvider(IReadOnlyDictionary<string, string> environment)
@@ -533,12 +588,21 @@ public sealed class DeploymentQueueTests
         public DeploymentRun? Run { get; set; }
         public List<DeploymentRunStatus> Statuses { get; } = [];
         public List<DeploymentRun> Updates { get; } = [];
+        public int Conflicts { get; set; }
+        public Func<DeploymentRun, DeploymentRun> ConcurrentChange { get; set; } = run => run;
 
         public Task<DeploymentRun?> GetByIdAsync(DeploymentRunId id, CancellationToken cancellationToken = default) =>
             Task.FromResult(Run?.Id == id ? Run : null);
 
         public Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default)
         {
+            if (Conflicts > 0)
+            {
+                Conflicts--;
+                Run = ConcurrentChange(Run!);
+                throw new DeploymentRunConflictException(run.Id);
+            }
+
             Statuses.Add(run.Status);
             Updates.Add(run);
             Run = run;

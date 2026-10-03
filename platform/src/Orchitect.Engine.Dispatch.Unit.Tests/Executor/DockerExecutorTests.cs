@@ -347,6 +347,47 @@ public sealed class DockerExecutorTests : IDisposable
         await AssertRemovedAsync();
     }
 
+    [Fact]
+    public async Task SignalStopAsync_RunningContainerForRun_SendsSigterm()
+    {
+        ContainersListParameters? listed = null;
+        _containers.ListContainersAsync(Arg.Do<ContainersListParameters>(p => listed = p),
+                Arg.Any<CancellationToken>())
+            .Returns([new ContainerListResponse { ID = ContainerId }]);
+
+        var signalled = await _executor.SignalStopAsync("run-1");
+
+        Assert.True(signalled);
+        Assert.NotNull(listed?.Filters);
+        Assert.True(listed!.Filters!["label"][$"{RunnerContainerLabels.RunId}=run-1"]);
+        Assert.NotEqual(true, listed!.All);
+        await _containers.Received(1).KillContainerAsync(ContainerId,
+            Arg.Is<ContainerKillParameters>(p => p.Signal == "SIGTERM"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SignalStopAsync_NoRunningContainer_ReturnsFalse()
+    {
+        _containers.ListContainersAsync(Arg.Any<ContainersListParameters>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        Assert.False(await _executor.SignalStopAsync("run-1"));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Conflict)]
+    [InlineData(HttpStatusCode.NotFound)]
+    public async Task SignalStopAsync_ContainerStoppedMeanwhile_ReturnsFalse(HttpStatusCode statusCode)
+    {
+        _containers.ListContainersAsync(Arg.Any<ContainersListParameters>(), Arg.Any<CancellationToken>())
+            .Returns([new ContainerListResponse { ID = ContainerId }]);
+        _containers.KillContainerAsync(Arg.Any<string>(), Arg.Any<ContainerKillParameters>(),
+                Arg.Any<CancellationToken>())
+            .ThrowsAsync(new DockerApiException(statusCode, "not running"));
+
+        Assert.False(await _executor.SignalStopAsync("run-1"));
+    }
+
     private Task<ExecutorResult> ExecuteAsync(TimeSpan? timeout = null, TimeSpan? stopGracePeriod = null) =>
         _executor.ExecuteAsync(new ExecutorContext
         {
