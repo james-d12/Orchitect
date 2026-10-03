@@ -48,6 +48,12 @@ public sealed class DeploymentRunRepository : IDeploymentRunRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public Task<DeploymentRun?> GetByTokenHashAsync(string tokenHash, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.DeploymentRuns.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.TokenHash == tokenHash, cancellationToken);
+    }
+
     public async Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default)
     {
         var entry = _dbContext.DeploymentRuns.Update(run);

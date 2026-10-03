@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using AutoFixture;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -11,6 +12,7 @@ using Orchitect.Api.Integration.Tests.Helpers;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
+using Orchitect.Engine.Dispatch.Auth;
 using Orchitect.Engine.Dispatch.Queue;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
@@ -344,6 +346,53 @@ public sealed class DeploymentIntegrationTests
         Assert.Equal("The runner exited with code 1.", stored.ErrorSummary);
         Assert.NotNull(stored.StartedAt);
         Assert.NotNull(stored.FinishedAt);
+    }
+
+    [Fact]
+    public async Task DeploymentRunRepository_WhenGettingByTokenHash_ShouldReturnRunUntilRevoked()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deploying);
+        var token = RunnerToken.Generate();
+        var run = DeploymentRun.Queue(deployment.Id, DeploymentRunOperation.Provision).Start()
+            .IssueToken(token.Hash, DateTime.UtcNow.AddHours(1));
+        using var scope = _factory.Services.CreateScope();
+        var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
+        await runs.CreateAsync(run);
+
+        // Act
+        var issued = await runs.GetByTokenHashAsync(token.Hash);
+        await runs.UpdateAsync(run.Complete(0, null));
+        var revoked = await runs.GetByTokenHashAsync(token.Hash);
+
+        // Assert
+        Assert.Equal(run.Id, issued?.Id);
+        Assert.Null(revoked);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenUsingRunnerToken_ShouldReturn401Unauthorized()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deploying);
+        var token = RunnerToken.Generate();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>().CreateAsync(
+                DeploymentRun.Queue(deployment.Id, DeploymentRunOperation.Provision).Start()
+                    .IssueToken(token.Hash, DateTime.UtcNow.AddHours(1)));
+        }
+
+        var runnerClient = _factory.CreateClient();
+        runnerClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
+
+        // Act
+        var response = await runnerClient.GetAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Dispatch.Auth;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Secret;
 
@@ -83,10 +84,12 @@ public sealed class DeploymentQueue : IDeploymentQueue
             await deployments.UpdateAsync(deployment, ct);
         }
 
-        run = run.Start();
+        var token = RunnerToken.Generate();
+        run = run.Start().IssueToken(token.Hash,
+            DateTime.UtcNow + _executorOptions.Timeout + _executorOptions.StopGracePeriod);
         await runs.UpdateAsync(run, ct);
 
-        var result = await ExecuteAsync(request, run, ct);
+        var result = await ExecuteAsync(request, run, token, ct);
         var exception = result.Exception is OperationCanceledException && !ct.IsCancellationRequested
             ? new TimeoutException(
                 $"Deployment '{deployment.Id.Value}' was cancelled without the API shutting down.",
@@ -148,7 +151,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
     }
 
     private async Task<ExecutorResult> ExecuteAsync(DeploymentQueueRequest request, DeploymentRun run,
-        CancellationToken ct)
+        RunnerToken token, CancellationToken ct)
     {
         try
         {
@@ -165,7 +168,10 @@ public sealed class DeploymentQueue : IDeploymentQueue
                     RunnerArguments.Operation, ToRunnerOperation(run.Operation).ToString()
                 ],
                 Configuration = _executorOptions.ToEnvironment(),
-                Secrets = _executorOptions.Configuration.Concat(tokenEnvironment).ToDictionary(),
+                Secrets = new Dictionary<string, string>(_executorOptions.Configuration.Concat(tokenEnvironment))
+                {
+                    [RunnerEnvironment.RunToken] = token.Value
+                },
                 Network = _executorOptions.Network,
                 DatabaseHost = _executorOptions.DatabaseHost,
                 DatabasePort = _executorOptions.DatabasePort,

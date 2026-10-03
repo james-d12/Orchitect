@@ -19,7 +19,7 @@ Items left over after the Runner review (`../archive/REVIEW_CODE.md`) and the fi
   1. loads the Application and Deployment from the DB by ID
   2. loads the mapped secrets into its environment (`ISecretEnvironmentLoader`)
   3. calls `IEngineOrchestrator.StartAsync` or `DestroyAsync`, depending on `--operation`
-- Only these cross the boundary: the IDs (and `--operation provision|destroy`) as container args, non-secret env vars built by `ExecutorOptions.ToEnvironment()`, and a `/run/orchitect/secrets.json` copied into the container before it starts (connection string, Key Vault token, `Configuration`). The runner loads that file into its environment and deletes it at startup. The Runner resolves every concrete implementation through its own DI root. It registers only `AddEngineProvisioningServices()` and `AddRunnerServices()`; the queue, the Docker client and `ExecutorOptions` come from `AddEngineExecutionServices()`, which only the API calls.
+- Only these cross the boundary: the IDs (and `--operation provision|destroy`) as container args, non-secret env vars built by `ExecutorOptions.ToEnvironment()`, and a `/run/orchitect/secrets.json` copied into the container before it starts (connection string, run token, Key Vault token, `Configuration`). The runner loads that file into its environment and deletes it at startup. The Runner resolves every concrete implementation through its own DI root. It registers only `AddEngineProvisioningServices()` and `AddRunnerServices()`; the queue, the Docker client and `ExecutorOptions` come from `AddEngineExecutionServices()`, which only the API calls.
 - `DELETE /deployments/{id}` queues a run with `--operation Destroy`. Terraform state is per application/environment, so destroy tears down everything in it; only the latest deployment of an application to an environment can be destroyed, and only while it is `Deployed` or `Failed` (409 otherwise). The deployment moves to `Destroying`, then `Destroyed` or `Failed` (a failed destroy can be retried). The row is kept. `GET /deployments/{id}` returns the status.
 
 ## Build
@@ -38,7 +38,7 @@ The image pins Terraform, Helm, `terraform-config-inspect` and its base images. 
 
 All of it lives under `ExecutorOptions` in the API. Keep real values in user-secrets or env vars, never in `appsettings.json`. `appsettings.json` only sets safe defaults: `TerraformBackend:Mode = Local` and `SecretProvider:Type = Environment`.
 
-The API flattens the typed sections into container env (`TerraformBackend__*`, `SecretProvider__*`). `Configuration`, the Key Vault token and the runner's connection string go in the secrets file instead, so `docker inspect` doesn't show them.
+The API flattens the typed sections into container env (`TerraformBackend__*`, `SecretProvider__*`). `Configuration`, the Key Vault token, the run token and the runner's connection string go in the secrets file instead, so `docker inspect` doesn't show them.
 
 The API validates `TerraformBackend` and `SecretProvider` at startup (`ValidateOnStart`), so invalid config stops the API from booting instead of failing inside a container. `Configuration` is opaque and not validated, so a typo in a key (e.g. `AZURE_CLIENTID`) only shows up when the Runner runs.
 

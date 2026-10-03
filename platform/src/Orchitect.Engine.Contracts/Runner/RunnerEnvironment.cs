@@ -8,6 +8,7 @@ public static class RunnerEnvironment
     private const string KeyVaultPrefix = $"{SecretProviderOptions.SectionName}__AzureKeyVault__";
 
     public const string RunId = "ORCHITECT_RUN_ID";
+    public const string RunToken = "ORCHITECT_RUN_TOKEN";
     public const string ConnectionString = "ConnectionStrings__orchitect";
     public const string KeyVaultAccessToken = $"{KeyVaultPrefix}{nameof(AzureKeyVaultOptions.AccessToken)}";
     public const string KeyVaultAccessTokenExpiresOn =

@@ -56,6 +56,24 @@ public sealed record DeploymentRun
         };
     }
 
+    public bool HasValidToken(DateTime now) => IsActive && TokenHash is not null && TokenExpiresAt > now;
+
+    public DeploymentRun IssueToken(string tokenHash, DateTime expiresAt)
+    {
+        if (!IsActive)
+        {
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot be issued a token while {Status}.");
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
+
+        return this with
+        {
+            TokenHash = tokenHash,
+            TokenExpiresAt = expiresAt
+        };
+    }
+
     public DeploymentRun Interrupt(string reason)
     {
         if (!IsActive)
@@ -96,6 +114,8 @@ public sealed record DeploymentRun
             Status = status,
             FinishedAt = DateTime.UtcNow,
             ExitCode = exitCode,
+            TokenHash = null,
+            TokenExpiresAt = null,
             ErrorSummary = errorSummary is { Length: > ErrorSummaryMaxLength }
                 ? errorSummary[..ErrorSummaryMaxLength]
                 : errorSummary

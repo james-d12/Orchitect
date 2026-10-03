@@ -59,7 +59,7 @@ Test projects:
 - `Orchitect.AppHost.E2E.Tests`: boots the real Aspire AppHost and checks every resource becomes healthy (needs Docker, Node.js and pnpm)
 - `Orchitect.Api.Integration.Tests`: endpoints and repositories against Postgres in Testcontainers (needs Docker)
 - `Orchitect.Domain.Unit.Tests`: domain entity behaviour (e.g. deployment status transitions)
-- `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue and token minting, plus the API-to-runner contract round-trip and the Engine layering guard tests
+- `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue, Key Vault and run token minting, plus the API-to-runner contract round-trip and the Engine layering guard tests
 - `Orchitect.Engine.Execution.Unit.Tests`: orchestrator, drivers and runner secret loading
 - `Orchitect.Infrastructure.Inventory.Unit.Tests`, `Orchitect.Common.Unit.Tests`
 
@@ -171,5 +171,5 @@ Design docs live in `docs/`, grouped by workstream (`runner/`, `resource/`, `arc
 ## Project Configuration
 
 - **Directory.Build.props**: TreatWarningsAsErrors, nullable enabled, Roslyn analyzers enforced, NuGet audit on all transitive dependencies
-- **Authentication**: JWT Bearer tokens (JwtOptions from appsettings.json). Only `/users/register` and `/users/login` are public; all other endpoints require auth
+- **Authentication**: JWT Bearer tokens (JwtOptions from appsettings.json) for users, registered by `AddOrchitectAuthentication()`. Only `/users/register` and `/users/login` are public; all other endpoints require auth. The runner API under `/internal/runs/{runId}` (`MapRunnerGroup()`) accepts only the `Runner` scheme: a per-run opaque token whose SHA-256 hash is on `DeploymentRun.TokenHash`, valid while the run is Queued/Running and unexpired, and only for the run in the route
 - **API docs**: OpenAPI/Swagger on all environments with JWT Bearer security definition
