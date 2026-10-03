@@ -120,6 +120,36 @@ public sealed class DeploymentRunTests
     }
 
     [Fact]
+    public void Cancel_Queued_BecomesCancelled()
+    {
+        var cancelled = Queued().Cancel();
+
+        Assert.Equal(DeploymentRunStatus.Cancelled, cancelled.Status);
+        Assert.False(cancelled.IsActive);
+        Assert.NotNull(cancelled.FinishedAt);
+        Assert.Null(cancelled.ExitCode);
+        Assert.Null(cancelled.ErrorSummary);
+    }
+
+    [Fact]
+    public void Cancel_Running_RecordsExitCodeAndRunnerAndRevokesToken()
+    {
+        var cancelled = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1)).Cancel(143, "container-1");
+
+        Assert.Equal(DeploymentRunStatus.Cancelled, cancelled.Status);
+        Assert.Equal(143, cancelled.ExitCode);
+        Assert.Equal("container-1", cancelled.RunnerId);
+        Assert.Null(cancelled.TokenHash);
+        Assert.Null(cancelled.TokenExpiresAt);
+    }
+
+    [Fact]
+    public void Cancel_Finished_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => Running().Complete(0, null).Cancel());
+    }
+
+    [Fact]
     public void Interrupt_Finished_Throws()
     {
         Assert.Throws<InvalidOperationException>(() => Running().Complete(0, null).Interrupt("late"));

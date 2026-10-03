@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using Microsoft.Extensions.Configuration;
@@ -18,6 +19,7 @@ public sealed class DockerExecutorTests : IDisposable
     private readonly IDockerClient _docker = Substitute.For<IDockerClient>();
     private readonly IContainerOperations _containers = Substitute.For<IContainerOperations>();
     private readonly CancellationTokenSource _cancellation = new();
+    private readonly CancellationTokenSource _stop = new();
     private readonly DockerExecutor _executor;
 
     public DockerExecutorTests()
@@ -41,7 +43,11 @@ public sealed class DockerExecutorTests : IDisposable
         _executor = CreateExecutor();
     }
 
-    public void Dispose() => _cancellation.Dispose();
+    public void Dispose()
+    {
+        _cancellation.Dispose();
+        _stop.Dispose();
+    }
 
     [Theory]
     [InlineData(0)]
@@ -258,6 +264,89 @@ public sealed class DockerExecutorTests : IDisposable
         await AssertNotRemovedAsync();
     }
 
+    [Fact]
+    public async Task ExecuteAsync_StopRequestedBeforeStart_ReturnsStoppedWithoutStartingAndRemovesContainer()
+    {
+        await _stop.CancelAsync();
+
+        var result = await ExecuteAsync();
+
+        Assert.True(result.Stopped);
+        Assert.Null(result.ExitCode);
+        Assert.Null(result.Exception);
+        Assert.Equal(ContainerId, result.RunnerId);
+        await _containers.DidNotReceive().StartContainerAsync(Arg.Any<string>(),
+            Arg.Any<ContainerStartParameters>(), Arg.Any<CancellationToken>());
+        await AssertRemovedAsync();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StopRequestedWhileRunning_SendsSigtermAndReturnsStoppedExitCode()
+    {
+        var waits = 0;
+        SetWait(call =>
+        {
+            if (Interlocked.Increment(ref waits) > 1)
+            {
+                return Task.FromResult(new ContainerWaitResponse { StatusCode = 143 });
+            }
+
+            _stop.Cancel();
+            return WaitUntilCancelledAsync(call.ArgAt<CancellationToken>(1));
+        });
+
+        var result = await ExecuteAsync(stopGracePeriod: TimeSpan.FromSeconds(5));
+
+        Assert.True(result.Stopped);
+        Assert.Equal(143, result.ExitCode);
+        Assert.Null(result.Exception);
+        Assert.Equal(ContainerId, result.RunnerId);
+        await _containers.Received(1).KillContainerAsync(ContainerId,
+            Arg.Is<ContainerKillParameters>(p => p.Signal == "SIGTERM"), Arg.Any<CancellationToken>());
+        await AssertRemovedAsync();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StopRequestedAndIgnoresSigterm_RemovesContainerAfterGracePeriod()
+    {
+        SetWait(call =>
+        {
+            _stop.Cancel();
+            return WaitUntilCancelledAsync(call.ArgAt<CancellationToken>(1));
+        });
+
+        var result = await ExecuteAsync(stopGracePeriod: TimeSpan.FromMilliseconds(50));
+
+        Assert.True(result.Stopped);
+        Assert.Null(result.ExitCode);
+        await AssertRemovedAsync();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StopRequestedAfterContainerExited_ReturnsItsExitCode()
+    {
+        var waits = 0;
+        SetWait(call =>
+        {
+            if (Interlocked.Increment(ref waits) > 1)
+            {
+                return Task.FromResult(new ContainerWaitResponse { StatusCode = 1 });
+            }
+
+            _stop.Cancel();
+            return WaitUntilCancelledAsync(call.ArgAt<CancellationToken>(1));
+        });
+        _containers.KillContainerAsync(Arg.Any<string>(), Arg.Any<ContainerKillParameters>(),
+                Arg.Any<CancellationToken>())
+            .ThrowsAsync(new DockerApiException(HttpStatusCode.Conflict, "container is not running"));
+
+        var result = await ExecuteAsync(stopGracePeriod: TimeSpan.FromSeconds(5));
+
+        Assert.True(result.Stopped);
+        Assert.Equal(1, result.ExitCode);
+        await AssertRemovedAsync();
+    }
+
     private Task<ExecutorResult> ExecuteAsync(TimeSpan? timeout = null, TimeSpan? stopGracePeriod = null) =>
         _executor.ExecuteAsync(new ExecutorContext
         {
@@ -266,7 +355,8 @@ public sealed class DockerExecutorTests : IDisposable
             Arguments = [],
             Configuration = new Dictionary<string, string>(),
             Timeout = timeout,
-            StopGracePeriod = stopGracePeriod
+            StopGracePeriod = stopGracePeriod,
+            StopRequested = _stop.Token
         }, _cancellation.Token);
 
     private DockerExecutor CreateExecutor(Dictionary<string, string?>? settings = null)

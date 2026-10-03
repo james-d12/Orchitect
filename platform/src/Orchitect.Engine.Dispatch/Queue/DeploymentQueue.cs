@@ -17,6 +17,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
     private readonly IExecutor _executor;
     private readonly ExecutorOptions _executorOptions;
     private readonly IRunnerSecretTokenProvider _tokenProvider;
+    private readonly IDeploymentRunCancellation _cancellation;
     private readonly ILogger<DeploymentQueue> _logger;
 
     public DeploymentQueue(
@@ -24,11 +25,13 @@ public sealed class DeploymentQueue : IDeploymentQueue
         IExecutor executor,
         IOptions<ExecutorOptions> executorOptions,
         IRunnerSecretTokenProvider tokenProvider,
+        IDeploymentRunCancellation cancellation,
         ILogger<DeploymentQueue> logger)
     {
         _backgroundTaskQueueProcessor = backgroundTaskQueueProcessor;
         _executor = executor;
         _tokenProvider = tokenProvider;
+        _cancellation = cancellation;
         _logger = logger;
         _executorOptions = executorOptions.Value;
     }
@@ -45,10 +48,11 @@ public sealed class DeploymentQueue : IDeploymentQueue
 
             var deployments = sp.GetRequiredService<IDeploymentRepository>();
             var runs = sp.GetRequiredService<IDeploymentRunRepository>();
+            using var stop = _cancellation.Track(request.RunId);
 
             try
             {
-                await RunAsync(deployments, runs, request, activity, ct);
+                await RunAsync(deployments, runs, request, activity, stop.StopRequested, ct);
             }
             catch (Exception exception) when (!ct.IsCancellationRequested)
             {
@@ -60,7 +64,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
     }
 
     private async Task RunAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
-        DeploymentQueueRequest request, Activity? activity, CancellationToken ct)
+        DeploymentQueueRequest request, Activity? activity, CancellationToken stopRequested, CancellationToken ct)
     {
         var deployment = await deployments.GetByIdAsync(request.DeploymentId, ct)
                          ?? throw new InvalidOperationException(
@@ -69,6 +73,13 @@ public sealed class DeploymentQueue : IDeploymentQueue
                   ?? throw new InvalidOperationException($"Run '{request.RunId.Value}' was not found.");
 
         activity?.SetTag("orchitect.run.operation", run.Operation.ToString());
+
+        if (!run.IsActive)
+        {
+            _logger.LogInformation("Run {RunId} of deployment {DeploymentId} is {RunStatus} and will not be started.",
+                run.Id.Value, deployment.Id.Value, run.Status);
+            return;
+        }
 
         if (run.Operation == DeploymentRunOperation.Destroy)
         {
@@ -89,7 +100,14 @@ public sealed class DeploymentQueue : IDeploymentQueue
             DateTime.UtcNow + _executorOptions.Timeout + _executorOptions.StopGracePeriod);
         await runs.UpdateAsync(run, ct);
 
-        var result = await ExecuteAsync(request, run, token, ct);
+        var result = await ExecuteAsync(request, run, token, stopRequested, ct);
+
+        if (result.Stopped && result.ExitCode != 0)
+        {
+            await CancelAsync(deployments, runs, deployment, run, result);
+            return;
+        }
+
         var exception = result.Exception is OperationCanceledException && !ct.IsCancellationRequested
             ? new TimeoutException(
                 $"Deployment '{deployment.Id.Value}' was cancelled without the API shutting down.",
@@ -110,6 +128,19 @@ public sealed class DeploymentQueue : IDeploymentQueue
 
         _logger.LogInformation("Deployment {DeploymentId} is {Status} after run {RunId} {RunStatus}.",
             processed.Id.Value, processed.Status, completed.Id.Value, completed.Status);
+    }
+
+    private async Task CancelAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
+        Deployment deployment, DeploymentRun run, ExecutorResult result)
+    {
+        var cancelled = deployment.Cancel();
+        await deployments.UpdateAsync(cancelled, CancellationToken.None);
+
+        var cancelledRun = run.Cancel(result.ExitCode, result.RunnerId);
+        await runs.UpdateAsync(cancelledRun, CancellationToken.None);
+
+        _logger.LogInformation("Deployment {DeploymentId} is {Status} after run {RunId} was cancelled.",
+            cancelled.Id.Value, cancelled.Status, cancelledRun.Id.Value);
     }
 
     private async Task FailOwnedRunAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
@@ -151,7 +182,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
     }
 
     private async Task<ExecutorResult> ExecuteAsync(DeploymentQueueRequest request, DeploymentRun run,
-        RunnerToken token, CancellationToken ct)
+        RunnerToken token, CancellationToken stopRequested, CancellationToken ct)
     {
         try
         {
@@ -179,7 +210,8 @@ public sealed class DeploymentQueue : IDeploymentQueue
                 NanoCpus = _executorOptions.NanoCpus,
                 PidsLimit = _executorOptions.PidsLimit,
                 StopGracePeriod = _executorOptions.StopGracePeriod,
-                Timeout = _executorOptions.Timeout
+                Timeout = _executorOptions.Timeout,
+                StopRequested = stopRequested
             }, ct);
         }
         catch (Exception exception)

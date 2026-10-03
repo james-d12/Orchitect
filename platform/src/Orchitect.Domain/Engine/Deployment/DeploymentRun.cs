@@ -84,6 +84,18 @@ public sealed record DeploymentRun
         return Finish(DeploymentRunStatus.Failed, null, reason);
     }
 
+    public DeploymentRun Cancel(long? exitCode = null, string? runnerId = null)
+    {
+        if (!IsActive)
+        {
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot be cancelled while {Status}.");
+        }
+
+        var run = runnerId is null ? this : this with { RunnerId = runnerId };
+
+        return run.Finish(DeploymentRunStatus.Cancelled, exitCode, null);
+    }
+
     public DeploymentRun Complete(long? exitCode, Exception? exception, string? runnerId = null)
     {
         if (Status != DeploymentRunStatus.Running)

@@ -322,6 +322,147 @@ public sealed class DeploymentIntegrationTests
     }
 
     [Fact]
+    public async Task DeploymentApi_WhenCancellingQueuedDeployment_ShouldCancelDeploymentAndRun()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
+        await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(applicationId, environmentId, NewCommitId()));
+        var request = Assert.Single(_queue.Requests);
+
+        // Act
+        var response = await client.PostAsync($"{DeploymentsUrl}/{request.DeploymentId.Value}/cancel", null);
+        var body = await response.ReadFromJsonAsync<CancelDeploymentEndpoint.CancelDeploymentResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(request.DeploymentId.Value, body.Id);
+        Assert.Equal(nameof(DeploymentStatus.Cancelled), body.Status);
+        Assert.Equal(request.RunId.Value, body.RunId);
+        Assert.Equal(nameof(DeploymentRunStatus.Cancelled), body.RunStatus);
+        Assert.EndsWith($"{DeploymentsUrl}/{request.DeploymentId.Value}", response.Headers.Location?.ToString());
+        var deployment = await GetDeploymentAsync(request.DeploymentId);
+        Assert.Equal(DeploymentStatus.Cancelled, deployment.Status);
+        Assert.NotNull(deployment.CompletedAt);
+        var run = await GetLatestRunAsync(request.DeploymentId);
+        Assert.Equal(DeploymentRunStatus.Cancelled, run.Status);
+        Assert.NotNull(run.FinishedAt);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenCreatingDeploymentAfterCancel_ShouldReturn202Accepted()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var active = await SeedDeploymentWithRunAsync(client, DeploymentStatus.Pending, DeploymentRunStatus.Queued);
+        await client.PostAsync($"{DeploymentsUrl}/{active.Id.Value}/cancel", null);
+
+        // Act
+        var response = await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(active.ApplicationId, active.EnvironmentId, NewCommitId()));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenCancellingQueuedDestroy_ShouldCancelAndAllowDestroyAgain()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deployed);
+        await client.DeleteAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+
+        // Act
+        var response = await client.PostAsync($"{DeploymentsUrl}/{deployment.Id.Value}/cancel", null);
+        var destroyAgain = await client.DeleteAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, destroyAgain.StatusCode);
+        Assert.Equal(2, _queue.Requests.Count);
+        using var scope = _factory.Services.CreateScope();
+        var cancelledRun = await scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>()
+            .GetByIdAsync(_queue.Requests[0].RunId);
+        Assert.Equal(DeploymentRunOperation.Destroy, cancelledRun?.Operation);
+        Assert.Equal(DeploymentRunStatus.Cancelled, cancelledRun?.Status);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenCancellingRunningRun_ShouldReturn202AcceptedAndStopRunner()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment =
+            await SeedDeploymentWithRunAsync(client, DeploymentStatus.Deploying, DeploymentRunStatus.Running);
+        var run = await GetLatestRunAsync(deployment.Id);
+        using var tracked = _factory.Services.GetRequiredService<IDeploymentRunCancellation>().Track(run.Id);
+
+        // Act
+        var response = await client.PostAsync($"{DeploymentsUrl}/{deployment.Id.Value}/cancel", null);
+        var body = await response.ReadFromJsonAsync<CancelDeploymentEndpoint.CancelDeploymentResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(nameof(DeploymentStatus.Deploying), body.Status);
+        Assert.Equal(run.Id.Value, body.RunId);
+        Assert.Equal(nameof(DeploymentRunStatus.Running), body.RunStatus);
+        Assert.True(tracked.StopRequested.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenCancellingRunningRunNotInThisProcess_ShouldReturn409Conflict()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment =
+            await SeedDeploymentWithRunAsync(client, DeploymentStatus.Deploying, DeploymentRunStatus.Running);
+
+        // Act
+        var response = await client.PostAsync($"{DeploymentsUrl}/{deployment.Id.Value}/cancel", null);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(DeploymentStatus.Deploying, (await GetDeploymentAsync(deployment.Id)).Status);
+        Assert.Equal(DeploymentRunStatus.Running, (await GetLatestRunAsync(deployment.Id)).Status);
+    }
+
+    [Theory]
+    [InlineData(DeploymentStatus.Deployed, DeploymentRunStatus.Succeeded)]
+    [InlineData(DeploymentStatus.Failed, DeploymentRunStatus.Failed)]
+    [InlineData(DeploymentStatus.Deployed, null)]
+    public async Task DeploymentApi_WhenCancellingDeploymentWithoutActiveRun_ShouldReturn409Conflict(
+        DeploymentStatus status, DeploymentRunStatus? runStatus)
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentWithRunAsync(client, status, runStatus);
+
+        // Act
+        var response = await client.PostAsync($"{DeploymentsUrl}/{deployment.Id.Value}/cancel", null);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(status, (await GetDeploymentAsync(deployment.Id)).Status);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenCancellingNonExistentDeployment_ShouldReturn404NotFound()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+
+        // Act
+        var response = await client.PostAsync($"{DeploymentsUrl}/{Guid.NewGuid()}/cancel", null);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task DeploymentRunRepository_WhenUpdatingRun_ShouldPersistResult()
     {
         // Arrange
@@ -586,6 +727,32 @@ public sealed class DeploymentIntegrationTests
         var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
 
         return await CreateDeploymentAsync(applicationId, environmentId, status);
+    }
+
+    private async Task<Deployment> SeedDeploymentWithRunAsync(HttpClient client, DeploymentStatus status,
+        DeploymentRunStatus? runStatus)
+    {
+        var deployment = await SeedDeploymentAsync(client, status);
+
+        if (runStatus is null)
+        {
+            return deployment;
+        }
+
+        var queued = DeploymentRun.Queue(deployment.Id, DeploymentRunOperation.Provision);
+        var run = runStatus switch
+        {
+            DeploymentRunStatus.Queued => queued,
+            DeploymentRunStatus.Running => queued.Start(),
+            DeploymentRunStatus.Succeeded => queued.Start().Complete(0, null),
+            DeploymentRunStatus.Failed => queued.Start().Complete(1, null),
+            _ => throw new ArgumentOutOfRangeException(nameof(runStatus), runStatus, null)
+        };
+
+        using var scope = _factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>().CreateAsync(run);
+
+        return deployment;
     }
 
     private static CommitId NewCommitId() => new(Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(20)));

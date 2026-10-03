@@ -18,6 +18,7 @@ namespace Orchitect.Engine.Dispatch.Unit.Tests.Queue;
 public sealed class DeploymentQueueTests
 {
     private readonly RecordingDeploymentRunRepository _runs = new();
+    private readonly DeploymentRunCancellation _cancellation = new();
 
     [Fact]
     public async Task WorkItem_ExecutorSucceeds_SetsDeployingThenDeployed()
@@ -277,6 +278,82 @@ public sealed class DeploymentQueueTests
     }
 
     [Fact]
+    public async Task WorkItem_RunCancelledWhileQueued_DoesNotExecute()
+    {
+        var (deployment, repository, services) = Setup();
+        var executor = new FakeExecutor();
+        var workItem = await QueueAsync(deployment, executor);
+        _runs.Run = _runs.Run!.Cancel();
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.False(executor.Executed);
+        Assert.Empty(repository.Statuses);
+        Assert.Empty(_runs.Statuses);
+    }
+
+    [Fact]
+    public async Task WorkItem_StopRequestedWhileRunning_CancelsDeploymentAndRun()
+    {
+        var (deployment, repository, services) = Setup();
+        var executor = new FakeExecutor
+        {
+            RunnerId = "container-1",
+            OnExecute = () => Assert.True(_cancellation.RequestStop(_runs.Run!.Id))
+        };
+        var workItem = await QueueAsync(deployment, executor);
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, DeploymentStatus.Cancelled], repository.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Cancelled], _runs.Statuses);
+        Assert.Equal(143, _runs.Run!.ExitCode);
+        Assert.Equal("container-1", _runs.Run.RunnerId);
+        Assert.NotNull(_runs.Run.FinishedAt);
+        Assert.Null(_runs.Run.TokenHash);
+    }
+
+    [Fact]
+    public async Task WorkItem_DestroyStopRequested_CancelsDeploymentAndRun()
+    {
+        var (deployment, repository, services) = Setup(Deployed().StartDestroy(), DeploymentRunOperation.Destroy);
+        var workItem = await QueueAsync(deployment,
+            new FakeExecutor { OnExecute = () => _cancellation.RequestStop(_runs.Run!.Id) });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Cancelled], repository.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Cancelled], _runs.Statuses);
+    }
+
+    [Fact]
+    public async Task WorkItem_StopRequestedAfterRunnerSucceeded_KeepsDeployed()
+    {
+        var (deployment, repository, services) = Setup();
+        var workItem = await QueueAsync(deployment, new FakeExecutor
+        {
+            StoppedExitCode = 0,
+            OnExecute = () => _cancellation.RequestStop(_runs.Run!.Id)
+        });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, DeploymentStatus.Deployed], repository.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Succeeded], _runs.Statuses);
+    }
+
+    [Fact]
+    public async Task WorkItem_Finished_StopsTrackingRun()
+    {
+        var (deployment, _, services) = Setup();
+        var workItem = await QueueAsync(deployment, new FakeExecutor());
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.False(_cancellation.RequestStop(_runs.Run!.Id));
+    }
+
+    [Fact]
     public async Task WorkItem_DeploymentMissing_ThrowsWithoutExecuting()
     {
         var (deployment, repository, services) = Setup();
@@ -355,6 +432,7 @@ public sealed class DeploymentQueueTests
         var queue = new DeploymentQueue(processor, executor,
             Options.Create(options ?? new ExecutorOptions { Image = "runner:test" }),
             tokenProvider ?? new StaticTokenProvider(new Dictionary<string, string>()),
+            _cancellation,
             NullLogger<DeploymentQueue>.Instance);
 
         await queue.QueueDeploymentTaskAsync(
@@ -380,6 +458,7 @@ public sealed class DeploymentQueueTests
     private sealed class FakeExecutor : IExecutor
     {
         public long ExitCode { get; init; }
+        public long? StoppedExitCode { get; init; } = 143;
         public string? RunnerId { get; init; }
         public Exception? Exception { get; init; }
         public Action? OnExecute { get; init; }
@@ -397,6 +476,11 @@ public sealed class DeploymentQueueTests
             if (cancellationToken.IsCancellationRequested)
             {
                 return Task.FromResult(new ExecutorResult(null, new OperationCanceledException(cancellationToken)));
+            }
+
+            if (context.StopRequested.IsCancellationRequested)
+            {
+                return Task.FromResult(new ExecutorResult(StoppedExitCode, RunnerId: RunnerId, Stopped: true));
             }
 
             return Task.FromResult(Exception is null ? new ExecutorResult(ExitCode, RunnerId: RunnerId) : new ExecutorResult(null, Exception));
