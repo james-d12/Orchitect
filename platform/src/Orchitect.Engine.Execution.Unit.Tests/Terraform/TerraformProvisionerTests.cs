@@ -1,5 +1,5 @@
 using NSubstitute;
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner;
 using Orchitect.Engine.Execution.Provisioner.Terraform;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
@@ -13,27 +13,27 @@ public sealed class TerraformProvisionerTests
 
     public TerraformProvisionerTests()
     {
-        _driver.PlanAsync(Arg.Any<List<TerraformPlanInput>>(), Arg.Any<ProvisionContext>(), Arg.Any<bool>(),
+        _driver.PlanAsync(Arg.Any<List<RunInput>>(), Arg.Any<RunContext>(), Arg.Any<bool>(),
             Arg.Any<CancellationToken>()).Returns(_planResult);
     }
 
     [Fact]
     public void Provider_IsTerraform()
     {
-        Assert.Equal(ResourceTemplateProvider.Terraform, new TerraformProvisioner(_driver).Provider);
+        Assert.Equal(RunInputProvider.Terraform, new TerraformProvisioner(_driver).Provider);
     }
 
     [Fact]
     public async Task ProvisionAsync_TerraformInputs_PlansThenApplies()
     {
         var context = TerraformTestData.NewContext();
-        var terraformInput = Input(ResourceTemplateProvider.Terraform, "storage");
+        var terraformInput = Input(RunInputProvider.Terraform, "storage");
 
         await new TerraformProvisioner(_driver).ProvisionAsync(
-            [terraformInput, Input(ResourceTemplateProvider.Helm, "chart")], context);
+            [terraformInput, Input(RunInputProvider.Helm, "chart")], context);
 
         await _driver.Received(1).PlanAsync(
-            Arg.Is<List<TerraformPlanInput>>(inputs => IsOnly(inputs, terraformInput)), context, false,
+            Arg.Is<List<RunInput>>(inputs => IsOnly(inputs, terraformInput)), context, false,
             Arg.Any<CancellationToken>());
         await _driver.Received(1).ApplyAsync(_planResult, Arg.Any<CancellationToken>());
         await _driver.DidNotReceiveWithAnyArgs().DestroyAsync(default!);
@@ -43,7 +43,7 @@ public sealed class TerraformProvisionerTests
     public async Task ProvisionAsync_NoTerraformInputs_DoesNothing()
     {
         await new TerraformProvisioner(_driver).ProvisionAsync(
-            [Input(ResourceTemplateProvider.Helm, "chart")], TerraformTestData.NewContext());
+            [Input(RunInputProvider.Helm, "chart")], TerraformTestData.NewContext());
 
         Assert.Empty(_driver.ReceivedCalls());
     }
@@ -52,13 +52,13 @@ public sealed class TerraformProvisionerTests
     public async Task DeleteAsync_TerraformInputs_PlansDestroyThenDestroys()
     {
         var context = TerraformTestData.NewContext();
-        var terraformInput = Input(ResourceTemplateProvider.Terraform, "storage");
+        var terraformInput = Input(RunInputProvider.Terraform, "storage");
 
         await new TerraformProvisioner(_driver).DeleteAsync(
-            [terraformInput, Input(ResourceTemplateProvider.Helm, "chart")], context);
+            [terraformInput, Input(RunInputProvider.Helm, "chart")], context);
 
         await _driver.Received(1).PlanAsync(
-            Arg.Is<List<TerraformPlanInput>>(inputs => IsOnly(inputs, terraformInput)), context, true,
+            Arg.Is<List<RunInput>>(inputs => IsOnly(inputs, terraformInput)), context, true,
             Arg.Any<CancellationToken>());
         await _driver.Received(1).DestroyAsync(_planResult, Arg.Any<CancellationToken>());
         await _driver.DidNotReceiveWithAnyArgs().ApplyAsync(default!);
@@ -68,17 +68,14 @@ public sealed class TerraformProvisionerTests
     public async Task DeleteAsync_NoTerraformInputs_DoesNothing()
     {
         await new TerraformProvisioner(_driver).DeleteAsync(
-            [Input(ResourceTemplateProvider.Helm, "chart")], TerraformTestData.NewContext());
+            [Input(RunInputProvider.Helm, "chart")], TerraformTestData.NewContext());
 
         Assert.Empty(_driver.ReceivedCalls());
     }
 
-    private static ProvisionInput Input(ResourceTemplateProvider provider, string key) =>
-        new(TerraformTestData.Template(provider), new Dictionary<string, string> { ["name"] = key }, key);
+    private static RunInput Input(RunInputProvider provider, string key) =>
+        TerraformTestData.Input(provider, key, new Dictionary<string, string> { ["name"] = key });
 
-    private static bool IsOnly(List<TerraformPlanInput> inputs, ProvisionInput expected) =>
-        inputs.Count == 1 &&
-        inputs[0].Template == expected.Template &&
-        inputs[0].Inputs == expected.Inputs &&
-        inputs[0].Key == expected.Key;
+    private static bool IsOnly(List<RunInput> inputs, RunInput expected) =>
+        inputs.Count == 1 && inputs[0] == expected;
 }

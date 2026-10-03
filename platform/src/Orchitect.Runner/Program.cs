@@ -9,9 +9,13 @@ using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Contracts.Terraform;
+using Orchitect.Engine.Dispatch;
+using Orchitect.Engine.Dispatch.Plan;
 using Orchitect.Engine.Execution;
+using Orchitect.Engine.Execution.RunnerApi;
 using Orchitect.Engine.Execution.Secret;
 using Orchitect.Persistence;
+using Orchitect.Runner;
 using Orchitect.ServiceDefaults;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
@@ -27,6 +31,12 @@ builder.Services.Configure<ConsoleLifetimeOptions>(options => options.SuppressSt
 builder.Services.AddEngineProvisioningServices();
 builder.Services.AddPersistenceServices();
 builder.Services.AddRunnerServices(builder.Configuration);
+builder.Services.AddRunPlanServices();
+builder.Services.AddScoped<IRunnerApiClient>(sp => new InProcessRunnerApiClient(
+    sp.GetRequiredService<IRunPlanner>(),
+    Guid.TryParse(builder.Configuration[RunnerEnvironment.RunId], out var runId)
+        ? new DeploymentRunId(runId)
+        : throw new InvalidOperationException($"{RunnerEnvironment.RunId} must be set to the run's id.")));
 
 using var host = builder.Build();
 

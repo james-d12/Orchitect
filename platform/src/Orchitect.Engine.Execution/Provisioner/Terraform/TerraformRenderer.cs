@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 
 namespace Orchitect.Engine.Execution.Provisioner.Terraform;
@@ -13,7 +14,7 @@ public interface ITerraformRenderer
     /// Input values only appear in the tfvars file, so Terraform never evaluates them as expressions.
     /// </summary>
     TerraformRenderedModules RenderModules(
-        Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> terraformValidationResults);
+        Dictionary<RunInput, TerraformValidationResult.ValidResult> terraformValidationResults);
 
     /// <summary>
     /// Renders the required_providers and provider blocks as providers.tf.json.
@@ -37,7 +38,7 @@ public sealed partial class TerraformRenderer : ITerraformRenderer
     private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
     public TerraformRenderedModules RenderModules(
-        Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> terraformValidationResults)
+        Dictionary<RunInput, TerraformValidationResult.ValidResult> terraformValidationResults)
     {
         var variables = new JsonObject();
         var modules = new JsonObject();
@@ -45,7 +46,7 @@ public sealed partial class TerraformRenderer : ITerraformRenderer
 
         foreach (var (planInput, validationResult) in terraformValidationResults)
         {
-            var moduleName = ToIdentifier($"{planInput.Template.Name}_{planInput.Key}");
+            var moduleName = ToIdentifier($"{planInput.TemplateName}_{planInput.Key}");
 
             if (modules.ContainsKey(moduleName))
             {
@@ -55,7 +56,7 @@ public sealed partial class TerraformRenderer : ITerraformRenderer
 
             var module = new JsonObject { ["source"] = validationResult.ModuleDirectory };
 
-            foreach (var (inputName, rawValue) in planInput.Inputs)
+            foreach (var (inputName, rawValue) in planInput.Parameters)
             {
                 var variableName = $"{moduleName}__{inputName}";
                 var variableType = validationResult.Config.Variables.GetValueOrDefault(inputName)?.Type;

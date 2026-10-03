@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
 
@@ -12,8 +12,8 @@ public interface ITerraformModuleDownloader
     /// <summary>
     /// Downloads each unique repository and ref once and returns the local module directory for every source.
     /// </summary>
-    Task<IReadOnlyDictionary<ResourceTemplateVersionSource, TerraformModuleDownloadResult>> DownloadAsync(
-        IEnumerable<ResourceTemplateVersionSource> sources, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<RunInputSource, TerraformModuleDownloadResult>> DownloadAsync(
+        IEnumerable<RunInputSource> sources, CancellationToken cancellationToken = default);
 }
 
 public sealed class TerraformModuleDownloader : ITerraformModuleDownloader
@@ -32,8 +32,8 @@ public sealed class TerraformModuleDownloader : ITerraformModuleDownloader
         _cacheRoot = cacheRoot ?? Path.Combine(Path.GetTempPath(), "orchitect", "terraform", "modules");
     }
 
-    public async Task<IReadOnlyDictionary<ResourceTemplateVersionSource, TerraformModuleDownloadResult>> DownloadAsync(
-        IEnumerable<ResourceTemplateVersionSource> sources, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyDictionary<RunInputSource, TerraformModuleDownloadResult>> DownloadAsync(
+        IEnumerable<RunInputSource> sources, CancellationToken cancellationToken = default)
     {
         var distinctSources = sources.Distinct().ToList();
         var repositories = distinctSources
@@ -115,7 +115,7 @@ public sealed class TerraformModuleDownloader : ITerraformModuleDownloader
         }
     }
 
-    private static TerraformModuleDownloadResult ResolveModuleDirectory(ResourceTemplateVersionSource source,
+    private static TerraformModuleDownloadResult ResolveModuleDirectory(RunInputSource source,
         string? repositoryDirectory)
     {
         if (repositoryDirectory is null)
@@ -123,17 +123,17 @@ public sealed class TerraformModuleDownloader : ITerraformModuleDownloader
             return TerraformModuleDownloadResult.Failure($"Could not download {source.BaseUrl}@{source.Tag}.");
         }
 
-        if (string.IsNullOrEmpty(source.FolderPath))
+        if (string.IsNullOrEmpty(source.Path))
         {
             return TerraformModuleDownloadResult.Success(repositoryDirectory);
         }
 
-        var moduleDirectory = Path.Combine(repositoryDirectory, source.FolderPath);
+        var moduleDirectory = Path.Combine(repositoryDirectory, source.Path);
 
         return Directory.Exists(moduleDirectory)
             ? TerraformModuleDownloadResult.Success(moduleDirectory)
             : TerraformModuleDownloadResult.Failure(
-                $"Folder '{source.FolderPath}' does not exist in {source.BaseUrl}@{source.Tag}.");
+                $"Folder '{source.Path}' does not exist in {source.BaseUrl}@{source.Tag}.");
     }
 
     private sealed record Repository(Uri BaseUrl, string Tag)

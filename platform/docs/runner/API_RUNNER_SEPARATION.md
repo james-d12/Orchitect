@@ -229,7 +229,7 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
   - Move those instances to `Removing`.
 - **Either:**
   - Return the `RunContext` (project name, application/environment IDs) and one `RunInput` per resource.
-  - Each `RunInput` holds the key, template type, version source URL/tag, and parameters.
+  - Each `RunInput` holds the key, template name and type, provider, version source URL/tag/path, and parameters.
 
 **DTO sketch:**
 
@@ -237,11 +237,19 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
 RunDescriptor   { RunId, Operation, RepositoryUrl, CommitId, ApplicationId, EnvironmentId }
 ScoreSubmission { ScoreFile }                       // parsed score, contract shape
 RunPlan         { Context: { ProjectName, ApplicationId, EnvironmentId }, Inputs: RunInput[] }
-RunInput        { Key, TemplateType, Source: { BaseUrl, Tag, Path? }, Parameters }
+RunInput        { Key, TemplateName, TemplateType, Provider, Source: { BaseUrl, Tag, Path? }, Parameters }
 RunCompletion   { Outcome: Succeeded | Failed, ErrorSummary? }
 ```
 
 The round-trip test (#117) and the shared constants (#118) cover whatever env/arg contract is left (backend config, OTel).
+
+**Status (#204).** Implemented:
+
+- **Planner.** `IRunPlanner` (`Orchitect.Engine.Dispatch/Plan/`) holds the logic that was in `EngineOrchestrator`. `PlanAsync` resolves templates and records or finds the instances as above. `FinishAsync` moves the planned instances to `Active` (with output) / `Failed` or `Removed` / `RemovalFailed`, and releases the resources after a successful destroy. It skips instances that have already finished, so #106's callers can share it.
+- **Stored plan.** The plan is stored in `DeploymentRunPlans`, keyed by run ID, together with the planned instance IDs and their outputs. A repeat `/plan` returns it without recording again, and the key stops a run from being planned twice.
+- **Endpoint.** `POST /internal/runs/{runId}/plan` (`PlanRunEndpoint`) returns `409` for a run that isn't `Running`. It returns `400` (`RunPlanInvalid`) for a score with no resources, an unknown resource type, a template with no active version, or a resource already recorded with a different template.
+- **Contract.** `RunInput` also carries `TemplateName`, which keeps the Terraform module names (and so the state addresses) unchanged, and `Provider` (`RunInputProvider`), which picks the provisioner.
+- **Runner.** Provisioners, drivers and validators take `RunInput`/`RunContext`, and Execution no longer references any resource repository. `EngineOrchestrator` parses the score, calls `IRunnerApiClient.SubmitScoreAsync`, executes the plan and reports through `CompleteAsync`. Until #105, the runner registers `InProcessRunnerApiClient`, which calls `IRunPlanner` directly over its database connection. That is why `Orchitect.Runner` references `Orchitect.Engine.Dispatch` for now.
 
 **Status (#203).** Implemented:
 

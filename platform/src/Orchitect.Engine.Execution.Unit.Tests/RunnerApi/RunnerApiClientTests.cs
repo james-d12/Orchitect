@@ -110,7 +110,7 @@ public sealed class RunnerApiClientTests
     {
         var plan = new RunPlan(new RunContext("project", Guid.NewGuid(), Guid.NewGuid()),
         [
-            new RunInput("db", "postgres", new RunInputSource(new Uri("https://github.com/test/modules"), "v1", null),
+            new RunInput("db", "Postgres", "postgres", RunInputProvider.Terraform, new RunInputSource(new Uri("https://github.com/test/modules"), "v1", null),
                 new Dictionary<string, string> { ["size"] = "small" })
         ]);
         var handler = new StubHandler(_ => JsonResponse(plan));

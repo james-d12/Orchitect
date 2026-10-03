@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orchitect.Engine.Dispatch.Executor;
+using Orchitect.Engine.Dispatch.Plan;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
 using Orchitect.Engine.Dispatch.Secret.Azure;
@@ -17,6 +18,13 @@ public static class DispatchExtensions
     {
         services.AddExecutorServices(configuration);
         services.AddQueueServices();
+        services.AddRunPlanServices();
+        return services;
+    }
+
+    public static IServiceCollection AddRunPlanServices(this IServiceCollection services)
+    {
+        services.TryAddScoped<IRunPlanner, RunPlanner>();
         return services;
     }
 

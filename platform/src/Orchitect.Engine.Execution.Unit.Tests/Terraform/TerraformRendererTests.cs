@@ -1,3 +1,4 @@
+using Orchitect.Engine.Contracts.Runner.Api;
 using System.Text.Json.Nodes;
 using Orchitect.Engine.Execution.Provisioner.Terraform;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
@@ -79,7 +80,7 @@ public sealed class TerraformRendererTests
     public void RenderModules_ModuleName_IsSanitisedToAnIdentifier()
     {
         var input = TerraformTestData.PlanInput() with { Key = "9 bad\"key}" };
-        var plans = new Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult>
+        var plans = new Dictionary<RunInput, TerraformValidationResult.ValidResult>
         {
             [input] = TerraformTestData.ValidResult()
         };
@@ -127,7 +128,7 @@ public sealed class TerraformRendererTests
             new TerraformRenderer().RenderBackendConfig(new Dictionary<string, string> { [key] = "value" }));
     }
 
-    private static Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> Plans(
+    private static Dictionary<RunInput, TerraformValidationResult.ValidResult> Plans(
         Dictionary<string, string> inputs, params (string Name, string? Type)[] variables)
     {
         var config = new TerraformConfig
@@ -136,9 +137,9 @@ public sealed class TerraformRendererTests
                 v => new TerraformConfig.Variable { Name = v.Name, Type = v.Type })
         };
 
-        return new Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult>
+        return new Dictionary<RunInput, TerraformValidationResult.ValidResult>
         {
-            [TerraformTestData.PlanInput() with { Inputs = inputs }] =
+            [TerraformTestData.PlanInput() with { Parameters = inputs }] =
                 TerraformValidationResult.Valid(config, "/modules/storage")
         };
     }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Terraform;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 
@@ -12,8 +13,8 @@ public interface ITerraformProjectBuilder
     /// backend.tf.json plus an owner-only backend.tfbackend holding the backend settings) for the given context.
     /// </summary>
     Task<TerraformProjectBuilderResult> BuildProjectAsync(
-        Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> validatedPlans,
-        ProvisionContext context,
+        Dictionary<RunInput, TerraformValidationResult.ValidResult> validatedPlans,
+        RunContext context,
         CancellationToken cancellationToken = default);
 }
 
@@ -34,8 +35,8 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
     }
 
     public async Task<TerraformProjectBuilderResult> BuildProjectAsync(
-        Dictionary<TerraformPlanInput, TerraformValidationResult.ValidResult> validatedPlans,
-        ProvisionContext context,
+        Dictionary<RunInput, TerraformValidationResult.ValidResult> validatedPlans,
+        RunContext context,
         CancellationToken cancellationToken = default)
     {
         if (_backendOptions.GetValidationError() is { } backendError)
@@ -44,7 +45,7 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
         }
 
         var workingDirectory = Path.Combine(Path.GetTempPath(), "orchitect", "terraform",
-            context.ApplicationId, context.EnvironmentId);
+            context.ApplicationId.ToString(), context.EnvironmentId.ToString());
         var plansDirectory = Path.Combine(workingDirectory, "plans");
 
         if (_backendOptions.IsRemote && Directory.Exists(workingDirectory))
@@ -129,8 +130,8 @@ public sealed class TerraformProjectBuilder : ITerraformProjectBuilder
         _logger.LogInformation("Created {FileName} at: {FilePath}", Path.GetFileName(path), path);
     }
 
-    private static string ResolvePlaceholders(string value, ProvisionContext context) => value
-        .Replace("{applicationId}", context.ApplicationId, StringComparison.Ordinal)
-        .Replace("{environmentId}", context.EnvironmentId, StringComparison.Ordinal)
+    private static string ResolvePlaceholders(string value, RunContext context) => value
+        .Replace("{applicationId}", context.ApplicationId.ToString(), StringComparison.Ordinal)
+        .Replace("{environmentId}", context.EnvironmentId.ToString(), StringComparison.Ordinal)
         .Replace("{projectName}", context.ProjectName, StringComparison.Ordinal);
 }
