@@ -48,7 +48,7 @@ public sealed class EngineOrchestratorIntegrationTests(EngineOrchestratorFixture
         Assert.All(resources, r => Assert.True(graph.ContainsResource(r.Id)));
         Assert.True(graph.HasDependencyPath(storage.Id, vault.Id));
         Assert.True(graph.HasDependencyPath(database.Id, storage.Id));
-        Assert.Equal(vault.Id, graph.ResolveOrder().Last());
+        Assert.Equal([vault.Id, storage.Id, database.Id], graph.ResolveOrder());
         Assert.All(resources, r => Assert.Equal([_application.Id], r.Consumers));
     }
 

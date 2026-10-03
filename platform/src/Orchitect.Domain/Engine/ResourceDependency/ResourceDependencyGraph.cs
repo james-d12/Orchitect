@@ -159,32 +159,32 @@ public sealed class ResourceDependencyGraph : IResourceDependencyGraph
 
     public IList<ResourceId> ResolveOrder()
     {
-        var inDegreeMap = new Dictionary<ResourceId, int>();
-        var zeroInDegreeQueue = new Queue<ResourceId>();
+        var remainingDependencies = new Dictionary<ResourceId, int>();
+        var readyQueue = new Queue<ResourceId>();
 
         foreach ((ResourceId resourceId, ResourceDependencyNode node) in _nodes)
         {
-            inDegreeMap[resourceId] = node.In.Count;
-            if (node.In.Count == 0)
+            remainingDependencies[resourceId] = node.Out.Count;
+            if (node.Out.Count == 0)
             {
-                zeroInDegreeQueue.Enqueue(resourceId);
+                readyQueue.Enqueue(resourceId);
             }
         }
 
         var sortedResources = new List<ResourceId>(_nodes.Count);
 
-        while (zeroInDegreeQueue.Count > 0)
+        while (readyQueue.Count > 0)
         {
-            ResourceId currentId = zeroInDegreeQueue.Dequeue();
+            ResourceId currentId = readyQueue.Dequeue();
             ResourceDependencyNode resourceDependencyNode = _nodes[currentId];
             sortedResources.Add(currentId);
 
-            foreach (ResourceId dependentId in resourceDependencyNode.Out)
+            foreach (ResourceId dependentId in resourceDependencyNode.In)
             {
-                inDegreeMap[dependentId]--;
-                if (inDegreeMap[dependentId] == 0)
+                remainingDependencies[dependentId]--;
+                if (remainingDependencies[dependentId] == 0)
                 {
-                    zeroInDegreeQueue.Enqueue(dependentId);
+                    readyQueue.Enqueue(dependentId);
                 }
             }
         }

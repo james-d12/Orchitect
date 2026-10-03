@@ -1,7 +1,9 @@
 using System.Net;
 using AutoFixture;
+using Microsoft.Extensions.DependencyInjection;
 using Orchitect.Api.Endpoints.Engine.Application;
 using Orchitect.Api.Integration.Tests.Helpers;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
 
 namespace Orchitect.Api.Integration.Tests;
@@ -233,5 +235,51 @@ public sealed class ApplicationIntegrationTests(WebApplicationFactoryWithPostgre
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ApplicationRepository_WhenGettingByOrganisation_ShouldReturnOnlyThatOrganisationsApplications()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var otherOrganisation = await client.CreateOrganisationAsync();
+        var first = await client.CreateApplicationAsync(organisation.Id);
+        var second = await client.CreateApplicationAsync(organisation.Id);
+        var other = await client.CreateApplicationAsync(otherOrganisation.Id);
+
+        // Act
+        IReadOnlyList<Application> applications;
+        using (var scope = factory.Services.CreateScope())
+        {
+            applications = await scope.ServiceProvider.GetRequiredService<IApplicationRepository>()
+                .GetByOrganisationAsync(new OrganisationId(organisation.Id));
+        }
+
+        // Assert
+        var ids = applications.Select(a => a.Id.Value).ToHashSet();
+        Assert.Equal(2, ids.Count);
+        Assert.Contains(first.Id, ids);
+        Assert.Contains(second.Id, ids);
+        Assert.DoesNotContain(other.Id, ids);
+    }
+
+    [Fact]
+    public async Task ApplicationRepository_WhenGettingByOrganisationWithNoApplications_ShouldReturnEmpty()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+
+        // Act
+        IReadOnlyList<Application> applications;
+        using (var scope = factory.Services.CreateScope())
+        {
+            applications = await scope.ServiceProvider.GetRequiredService<IApplicationRepository>()
+                .GetByOrganisationAsync(new OrganisationId(organisation.Id));
+        }
+
+        // Assert
+        Assert.Empty(applications);
     }
 }
