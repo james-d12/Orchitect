@@ -506,6 +506,29 @@ namespace Orchitect.Persistence.Migrations
                     b.ToTable("DeploymentRuns", (string)null);
                 });
 
+            modelBuilder.Entity("Orchitect.Domain.Engine.Deployment.DeploymentRunPlan", b =>
+                {
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Contents")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("timezone('utc', now())");
+
+                    b.Property<string>("Instances")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("RunId");
+
+                    b.ToTable("DeploymentRunPlans", (string)null);
+                });
+
             modelBuilder.Entity("Orchitect.Domain.Engine.Environment.Environment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1347,6 +1370,15 @@ namespace Orchitect.Persistence.Migrations
                     b.HasOne("Orchitect.Domain.Engine.Deployment.Deployment", null)
                         .WithMany()
                         .HasForeignKey("DeploymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Engine.Deployment.DeploymentRunPlan", b =>
+                {
+                    b.HasOne("Orchitect.Domain.Engine.Deployment.DeploymentRun", null)
+                        .WithOne()
+                        .HasForeignKey("Orchitect.Domain.Engine.Deployment.DeploymentRunPlan", "RunId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

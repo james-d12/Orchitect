@@ -619,5 +619,8 @@ public sealed class DeploymentQueueTests
 
         public Task<DeploymentRun?> GetByTokenHashAsync(string tokenHash,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task LockAsync(DeploymentRunId id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

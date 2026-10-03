@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
-using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceDependency;
 using Orchitect.Domain.Engine.ResourceInstance;
@@ -220,9 +219,6 @@ var orderService = Application.Create("order-service", new Repository { Name = "
 var paymentService = Application.Create("payment-service", new Repository { Name = "payment-service", Url = new Uri("https://github.com/acme/payment-service.git"), Provider = RepositoryProvider.GitHub }, organisation.Id);
 var notifService = Application.Create("notification-service", new Repository { Name = "notification-service", Url = new Uri("https://github.com/acme/notification-service.git"), Provider = RepositoryProvider.GitHub }, organisation.Id);
 var catalogService = Application.Create("product-catalog", new Repository { Name = "product-catalog", Url = new Uri("https://github.com/acme/product-catalog.git"), Provider = RepositoryProvider.GitHub }, organisation.Id);
-
-var commitId = new CommitId("7b926d5c23d0e806c62d4c86e25fc73564efb8a1");
-var deployment = Deployment.Create(orderService.Id, production.Id, commitId, "system");
 
 // =============================================================================
 // Step 3 — Declare Resources (desired state)
@@ -548,7 +544,3 @@ else
 // you cannot update the VNet without also re-creating all subnets downstream.
 bool aksBlockedByVnet = graph.HasDependencyPath(aksResource.Id, vnetResource.Id);
 Console.WriteLine($"AKS transitively blocked by VNet change: {aksBlockedByVnet}");
-
-// Demonstrate the ResourceProvisioner flow via a score.yaml-driven deployment.
-var engineOrchestrator = host.Services.GetRequiredService<IEngineOrchestrator>();
-await engineOrchestrator.StartAsync(orderService, deployment, CancellationToken.None);

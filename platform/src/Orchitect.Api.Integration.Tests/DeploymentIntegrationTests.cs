@@ -912,6 +912,8 @@ public sealed class DeploymentIntegrationTests
 
         public Task<DeploymentRun?> GetByIdAsync(DeploymentRunId id, CancellationToken cancellationToken = default) =>
             inner.GetByIdAsync(id, cancellationToken);
+        public Task LockAsync(DeploymentRunId id, CancellationToken cancellationToken = default) =>
+            inner.LockAsync(id, cancellationToken);
     }
 
     private sealed class CapturingDeploymentQueue : IDeploymentQueue

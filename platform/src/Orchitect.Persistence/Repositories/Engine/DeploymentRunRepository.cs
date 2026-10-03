@@ -54,6 +54,12 @@ public sealed class DeploymentRunRepository : IDeploymentRunRepository
             .FirstOrDefaultAsync(r => r.TokenHash == tokenHash, cancellationToken);
     }
 
+    public Task LockAsync(DeploymentRunId id, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM \"DeploymentRuns\" WHERE \"Id\" = {id.Value} FOR UPDATE", cancellationToken);
+    }
+
     public async Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default)
     {
         var entry = _dbContext.DeploymentRuns.Update(run);

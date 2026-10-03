@@ -18,4 +18,9 @@ public interface IDeploymentRunRepository : IRepository<DeploymentRun, Deploymen
     /// Gets the run whose token has the given hash, or null when no run holds it.
     /// </summary>
     Task<DeploymentRun?> GetByTokenHashAsync(string tokenHash, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Locks the run's row until the current transaction ends, so concurrent work on the same run takes turns.
+    /// </summary>
+    Task LockAsync(DeploymentRunId id, CancellationToken cancellationToken = default);
 }
