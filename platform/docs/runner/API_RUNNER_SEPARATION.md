@@ -3,7 +3,7 @@ title: "API / runner separation (target design)"
 status: active
 workstream: runner
 milestone: "Runner Isolation"
-issues: [102, 103, 105, 106, 107, 108, 109, 110, 202, 203, 204]
+issues: [102, 103, 105, 106, 107, 110, 202, 203, 204]
 superseded_by: null
 last_reviewed: 2026-10-02
 ---
@@ -56,7 +56,6 @@ The runner is **thin**: all domain and database logic lives in the API. The runn
                          │  Persistence             │
                          │  Resource Templates      │
                          │  Score Configuration     │
-                         │  Secret resolution       │
                          └────────────┬─────────────┘
                                       ▲
                        /internal/runs/{runId}/*
@@ -67,6 +66,7 @@ The runner is **thin**: all domain and database logic lives in the API. The runn
                          │                          │
                          │  Run API client          │
                          │  Score parsing (git)     │
+                         │  Secret loading          │
                          │  Provisioners            │
                          │  Terraform               │
                          │  Helm                    │
@@ -119,7 +119,7 @@ The container receives only `--run-id`. `--application-id`, `--deployment-id` an
                        │                          (API resolves templates,
                        │                           records resources/instances)
                        ▼
-       GET  /internal/runs/{runId}/secrets     ── RunSecrets (read once)
+       Load mapped secrets into the environment   (unchanged)
                        │
                        ▼
        Execute plan (terraform init/plan/apply or destroy)
@@ -154,7 +154,6 @@ API
 ├── Resource template resolution
 ├── Resource, instance and dependency-graph recording
 ├── Instance status transitions
-├── Secret resolution (mapped secrets only)
 └── Completion handling and exit-code fallback
 ```
 
@@ -171,7 +170,7 @@ Runner
 ├── Fetch run descriptor
 ├── Clone app repo, parse score.yaml (ScoreDriver)
 ├── Submit score, receive plan
-├── Load secrets into the process environment
+├── Load secrets into the process environment (unchanged, §9)
 ├── Download template modules, run provisioners
 ├── Capture output
 ├── Report completion
@@ -187,7 +186,7 @@ The runner has no repositories, no `Orchitect.Persistence` reference and no conn
 Each run gets its own credential, kept as small as possible (#202):
 
 - **Token.** The dispatch layer generates an opaque 256-bit random value when it queues the run. Only its SHA-256 hash is stored, on `DeploymentRun.TokenHash`.
-- **Delivery.** The token is the only entry in `/run/orchitect/secrets.json` (`RunnerSecretsFile`), so it doesn't show up in `docker inspect`. The runner loads the file and deletes it at startup, as it does today.
+- **Delivery.** The token is added to `/run/orchitect/secrets.json` (`RunnerSecretsFile`) in place of the connection string, so it doesn't show up in `docker inspect`. The runner loads the file and deletes it at startup, as it does today.
 - **Lifetime.** `TokenExpiresAt = dispatch time + ExecutorOptions.Timeout + StopGracePeriod`. The run can never outlive that, because the executor kills it first.
 - **Validation.** A dedicated `Runner` authentication scheme accepts the token only if all of these hold:
   - the hash matches a run, and that run is `Queued` or `Running`
@@ -214,7 +213,6 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
 |---|---|---|---|
 | `GET /` | – | `RunDescriptor` | Operation, application repo URL, commit, application/environment IDs. Moves the run to `Running`. |
 | `POST /plan` | `ScoreSubmission` | `RunPlan` | See below. Idempotent: a repeat call returns the stored plan. |
-| `GET /secrets` | – | `RunSecrets` | Mapped secrets only (§9). Read once; a second read returns `410 Gone`. |
 | `POST /complete` | `RunCompletion` | `204` | See §8. Idempotent: a repeat call for a completed run is a no-op. |
 
 **`/plan` behaviour (#204):**
@@ -238,7 +236,6 @@ RunDescriptor   { RunId, Operation, RepositoryUrl, CommitId, ApplicationId, Envi
 ScoreSubmission { ScoreFile }                       // parsed score, contract shape
 RunPlan         { Context: { ProjectName, ApplicationId, EnvironmentId }, Inputs: RunInput[] }
 RunInput        { Key, TemplateType, Source: { BaseUrl, Tag, Path? }, Parameters }
-RunSecrets      { Values: { name → value } }
 RunCompletion   { Outcome: Succeeded | Failed, ErrorSummary? }
 ```
 
@@ -271,15 +268,13 @@ So a run whose report never reaches the API (API down, network failure) still en
 
 # 9. Secrets
 
-Secrets are resolved in the API and handed over narrowly (#108). This also fixes H2.
+Secret injection doesn't change. There is no secrets endpoint on the runner API.
 
-- **API-side resolution.** The API resolves only the `SecretProvider:Mappings` entries plus `ExecutorOptions:Configuration`, using its own identity.
-- **Delivery.** `GET /secrets` returns them once. The runner loads them into its process environment before any Terraform command, as `SecretEnvironmentLoader` does today.
-- **No Key Vault token.** The runner no longer gets one, and `KeyVaultRunnerTokenProvider` is removed.
-- **Providers move to dispatch.** `ISecretProvider` and its implementations move from Execution to Dispatch. The provider-type switches then exist only on the API side (#109).
-- **No logging.** Secret values never appear in logs, traces or exception messages.
+- **Secrets file.** The API still writes `/run/orchitect/secrets.json` with `ExecutorOptions:Configuration` and, for `AzureKeyVault`, the Key Vault token. The only change is that the run token replaces the connection string (§6).
+- **Runner-side resolution.** The runner still resolves the `SecretProvider:Mappings` entries through its own `ISecretProvider` and loads them into its process environment before any Terraform command (`SecretEnvironmentLoader`).
+- **Non-secret config.** `SecretProvider__*` settings still travel as container env, built by `ExecutorOptions.ToEnvironment()`.
 
-Template Terraform can still read whatever is in the runner's environment. That's inherent to running Terraform, but the exposure is now limited to this run's mapped secrets.
+H2 (the Key Vault token covers every secret the API's identity can read) is therefore not addressed by this design and stays open (#108).
 
 ---
 
@@ -302,12 +297,10 @@ The runner needs to reach the API, and only the API (#107):
 | 3 | Contracts, run descriptor endpoint, runner client | #203 |
 | 4 | `/plan`: template resolution and resource recording move to the API | #204 |
 | 5 | `/complete` and the shared `CompleteRun` handler | #106 |
-| 6 | `/secrets` with API-side resolution | #108 |
-| 7 | Runner switched to the client; Persistence reference and connection string removed | #105 |
-| 8 | `ApiBaseUrl` replaces the DB host/port settings | #107 |
-| 9 | Secret-provider strategies, API side only | #109 |
+| 6 | Runner switched to the client; Persistence reference and connection string removed | #105 |
+| 7 | `ApiBaseUrl` replaces the DB host/port settings | #107 |
 
-Steps 1–6 can ship while the runner still uses the database. Step 7 is the switch-over. After it, H1 and A1 are closed.
+Steps 1–5 can ship while the runner still uses the database. Step 6 is the switch-over. After it, H1 and A1 are closed.
 
 ---
 
@@ -315,4 +308,5 @@ Steps 1–6 can ship while the runner still uses the database. Step 7 is the swi
 
 - Per-run logs and progress streaming (A8, #121).
 - Durable queue and bounded concurrency (H3, #111).
+- Changes to secret injection: narrowing the Key Vault token (H2, #108) and secret-provider strategies (A6, #109).
 - Executors other than Docker (H4, #114). The contract doesn't assume Docker: any executor that can start an image with a run ID, a secrets file and a route to the API works.

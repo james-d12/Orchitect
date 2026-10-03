@@ -25,7 +25,7 @@ Severity: 🔴 high, 🟡 medium, 🟢 low.
 | A3 | `Orchitect.Infrastructure.Engine` mixes the control plane and the data plane | 🟡 | Fixed: split into `Orchitect.Engine.Contracts`, `.Dispatch` and `.Execution` | #115, #116 |
 | A4 | The API–runner contract is implicit and untested | 🟡 | Partial: round-trip test added (`db5994b`); argument and env key names moved to `Orchitect.Engine.Contracts` (A3) | #117, #118 |
 | A5 | The executor knows about the database | 🟡 | Open; becomes `ExecutorOptions:ApiBaseUrl` | #107 |
-| A6 | Adding a secret provider means editing switches in separate places | 🟡 | Open; API side only once #108 lands | #109 |
+| A6 | Adding a secret provider means editing switches in separate places | 🟡 | Open | #109 |
 | A7 | Local state mode is the default but broken in this topology | 🟡 | Open | #119 |
 | A8 | Runner observability: no trace propagation, no per-run logs | 🟡 | Open | #120, #121 |
 | A9 | An architecture guard test was silently broken | 🟢 | Fixed: Inventory guard fixed (`129e3b2`); Engine layering tests added in `EngineLayeringTests` and `ApiLayeringTests` | #122 |
@@ -144,7 +144,7 @@ The whole interface is CLI arguments plus env var names assembled from strings i
 
 `IRunnerSecretTokenProvider` has a generic name but a single Key Vault implementation, and it's registered unconditionally. Adding AWS Secrets Manager means editing all of these.
 
-**Recommendation:** use one strategy per provider type, holding both halves ("what the API hands over" and "how the runner resolves"), registered by type. Following the H2 decision (#108), the API resolves the mapped secrets itself, so only the API-side half remains.
+**Recommendation:** use one strategy per provider type, holding both halves ("what the API hands over" and "how the runner resolves"), registered by type. The API/runner separation keeps runner-side resolution, so both halves remain.
 
 ## A7. 🟡 Local state mode is the default but broken in this topology
 
