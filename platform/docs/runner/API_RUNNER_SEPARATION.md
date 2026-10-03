@@ -197,6 +197,8 @@ Each run gets its own credential, kept as small as possible (#202):
   - Runner tokens can't call user endpoints, and user JWTs can't call `/internal/runs`.
   - The two schemes share no keys.
 
+**Status (#202).** Implemented: `RunnerToken` (Dispatch) generates the token when `DeploymentQueue` starts the run, `DeploymentRun.IssueToken` stores the hash and expiry, and finishing the run in any way clears them. The token goes in `secrets.json` as `ORCHITECT_RUN_TOKEN`. The `Runner` scheme (`RunnerAuthenticationHandler`) and policy guard the `/internal/runs/{runId}` group (`MapRunnerGroup`), and the default policy accepts only user JWTs. The connection string stays in `secrets.json` alongside the token until the runner stops using the database (#105).
+
 **Why not a JWT?** A JWT can't be revoked before it expires without a denylist, which needs a DB lookup anyway. It would also be signed with the same HMAC secret as user tokens (`JwtOptions:Secret`). A hashed opaque token gives revocation for free and adds no new key material.
 
 ---

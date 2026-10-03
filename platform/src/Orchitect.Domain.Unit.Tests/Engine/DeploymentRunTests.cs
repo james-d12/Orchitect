@@ -125,6 +125,91 @@ public sealed class DeploymentRunTests
         Assert.Throws<InvalidOperationException>(() => Running().Complete(0, null).Interrupt("late"));
     }
 
+    [Fact]
+    public void IssueToken_Running_StoresHashAndExpiry()
+    {
+        var expiresAt = DateTime.UtcNow.AddHours(1);
+
+        var run = Running().IssueToken("hash", expiresAt);
+
+        Assert.Equal("hash", run.TokenHash);
+        Assert.Equal(expiresAt, run.TokenExpiresAt);
+    }
+
+    [Fact]
+    public void IssueToken_Finished_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            Running().Complete(0, null).IssueToken("hash", DateTime.UtcNow.AddHours(1)));
+    }
+
+    [Fact]
+    public void IssueToken_EmptyHash_Throws()
+    {
+        Assert.Throws<ArgumentException>(() => Running().IssueToken(" ", DateTime.UtcNow.AddHours(1)));
+    }
+
+    [Fact]
+    public void HasValidToken_ActiveAndUnexpired_IsTrue()
+    {
+        var now = DateTime.UtcNow;
+
+        Assert.True(Queued().IssueToken("hash", now.AddMinutes(1)).HasValidToken(now));
+        Assert.True(Running().IssueToken("hash", now.AddMinutes(1)).HasValidToken(now));
+    }
+
+    [Fact]
+    public void HasValidToken_Expired_IsFalse()
+    {
+        var now = DateTime.UtcNow;
+
+        Assert.False(Running().IssueToken("hash", now).HasValidToken(now));
+    }
+
+    [Fact]
+    public void HasValidToken_NoToken_IsFalse()
+    {
+        Assert.False(Running().HasValidToken(DateTime.UtcNow));
+    }
+
+    [Theory]
+    [InlineData(DeploymentRunStatus.Succeeded)]
+    [InlineData(DeploymentRunStatus.Failed)]
+    [InlineData(DeploymentRunStatus.Cancelled)]
+    public void HasValidToken_RunNotActive_IsFalse(DeploymentRunStatus status)
+    {
+        var now = DateTime.UtcNow;
+        var run = Running().IssueToken("hash", now.AddHours(1)) with { Status = status };
+
+        Assert.False(run.HasValidToken(now));
+    }
+
+    [Fact]
+    public void Complete_RevokesToken()
+    {
+        var completed = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1)).Complete(0, null);
+
+        Assert.Null(completed.TokenHash);
+        Assert.Null(completed.TokenExpiresAt);
+    }
+
+    [Fact]
+    public void Interrupt_RevokesToken()
+    {
+        var interrupted = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1)).Interrupt("lost");
+
+        Assert.Null(interrupted.TokenHash);
+        Assert.Null(interrupted.TokenExpiresAt);
+    }
+
+    [Fact]
+    public void Complete_Cancelled_KeepsToken()
+    {
+        var running = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1));
+
+        Assert.Equal("hash", running.Complete(null, new OperationCanceledException()).TokenHash);
+    }
+
     private static DeploymentRun Queued() => DeploymentRun.Queue(new DeploymentId(), DeploymentRunOperation.Provision);
 
     private static DeploymentRun Running() => Queued().Start();

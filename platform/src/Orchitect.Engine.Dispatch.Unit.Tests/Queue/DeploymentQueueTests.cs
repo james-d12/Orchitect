@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -6,6 +7,7 @@ using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
 using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Contracts.Secret;
+using Orchitect.Engine.Dispatch.Auth;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
@@ -195,6 +197,86 @@ public sealed class DeploymentQueueTests
     }
 
     [Fact]
+    public async Task WorkItem_IssuesRunTokenAndStoresOnlyItsHash()
+    {
+        var (deployment, _, services) = Setup();
+        var executor = new FakeExecutor();
+        var options = new ExecutorOptions
+        {
+            Image = "runner:test",
+            Timeout = TimeSpan.FromMinutes(30),
+            StopGracePeriod = TimeSpan.FromMinutes(5)
+        };
+        var before = DateTime.UtcNow;
+        var workItem = await QueueAsync(deployment, executor, options);
+
+        await workItem(services, CancellationToken.None);
+
+        var token = executor.Context!.Secrets[RunnerEnvironment.RunToken];
+        var running = _runs.Updates[0];
+        Assert.Equal(DeploymentRunStatus.Running, running.Status);
+        Assert.Equal(RunnerToken.ComputeHash(token), running.TokenHash);
+        Assert.NotEqual(token, running.TokenHash);
+        Assert.Equal(32, Base64Url.DecodeFromChars(token).Length);
+        Assert.InRange(running.TokenExpiresAt!.Value, before.AddMinutes(35), DateTime.UtcNow.AddMinutes(35));
+        Assert.DoesNotContain(RunnerEnvironment.RunToken, executor.Context.Configuration.Keys);
+        Assert.DoesNotContain(executor.Context.Arguments, a => a.Contains(token, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task WorkItem_EachRunGetsItsOwnToken()
+    {
+        var (first, _, firstServices) = Setup();
+        var firstExecutor = new FakeExecutor();
+        await (await QueueAsync(first, firstExecutor))(firstServices, CancellationToken.None);
+        var (second, _, secondServices) = Setup();
+        var secondExecutor = new FakeExecutor();
+        await (await QueueAsync(second, secondExecutor))(secondServices, CancellationToken.None);
+
+        Assert.NotEqual(firstExecutor.Context!.Secrets[RunnerEnvironment.RunToken],
+            secondExecutor.Context!.Secrets[RunnerEnvironment.RunToken]);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task WorkItem_RunnerExits_RevokesToken(long exitCode)
+    {
+        var (deployment, _, services) = Setup();
+        var workItem = await QueueAsync(deployment, new FakeExecutor { ExitCode = exitCode });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.False(_runs.Run!.IsActive);
+        Assert.Null(_runs.Run.TokenHash);
+        Assert.Null(_runs.Run.TokenExpiresAt);
+    }
+
+    [Fact]
+    public async Task WorkItem_ExecutorReturnsException_RevokesToken()
+    {
+        var (deployment, _, services) = Setup();
+        var workItem = await QueueAsync(deployment,
+            new FakeExecutor { Exception = new InvalidOperationException("boom") });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Null(_runs.Run!.TokenHash);
+    }
+
+    [Fact]
+    public async Task WorkItem_CancelledOnShutdown_KeepsTokenForTheStillRunningRunner()
+    {
+        var (deployment, _, services) = Setup();
+        using var cancellation = new CancellationTokenSource();
+        var workItem = await QueueAsync(deployment, new FakeExecutor { OnExecute = cancellation.Cancel });
+
+        await workItem(services, cancellation.Token);
+
+        Assert.NotNull(_runs.Run!.TokenHash);
+    }
+
+    [Fact]
     public async Task WorkItem_DeploymentMissing_ThrowsWithoutExecuting()
     {
         var (deployment, repository, services) = Setup();
@@ -366,6 +448,7 @@ public sealed class DeploymentQueueTests
     {
         public DeploymentRun? Run { get; set; }
         public List<DeploymentRunStatus> Statuses { get; } = [];
+        public List<DeploymentRun> Updates { get; } = [];
 
         public Task<DeploymentRun?> GetByIdAsync(DeploymentRunId id, CancellationToken cancellationToken = default) =>
             Task.FromResult(Run?.Id == id ? Run : null);
@@ -373,6 +456,7 @@ public sealed class DeploymentQueueTests
         public Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default)
         {
             Statuses.Add(run.Status);
+            Updates.Add(run);
             Run = run;
             return Task.FromResult<DeploymentRun?>(run);
         }
@@ -383,6 +467,9 @@ public sealed class DeploymentQueueTests
         public IEnumerable<DeploymentRun> GetAll() => throw new NotSupportedException();
 
         public Task<DeploymentRun?> GetLatestAsync(DeploymentId deploymentId,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DeploymentRun?> GetByTokenHashAsync(string tokenHash,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

@@ -14,6 +14,10 @@ internal sealed class DeploymentRunConfiguration : IEntityTypeConfiguration<Depl
 
         builder.HasIndex(r => new { r.DeploymentId, r.QueuedAt });
 
+        builder.HasIndex(r => r.TokenHash)
+            .IsUnique()
+            .HasFilter("\"TokenHash\" IS NOT NULL");
+
         builder.Property(r => r.Id)
             .HasConversion(
                 id => id.Value,

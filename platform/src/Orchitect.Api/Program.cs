@@ -1,5 +1,4 @@
-﻿using System.Text;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
@@ -8,9 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Microsoft.VisualStudio.Services.Common;
+using Orchitect.Api.Authentication;
 using Orchitect.Api.Encryption;
 using Orchitect.Api.Endpoints;
 using Orchitect.Api.Jobs;
@@ -68,31 +67,7 @@ try
             .Add(new JsonStringEnumConverter());
     });
 
-    builder.Services
-        .AddAuthentication(options =>
-        {
-            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        })
-        .AddJwtBearer(options =>
-        {
-            options.TokenValidationParameters = new TokenValidationParameters()
-            {
-                ValidateActor = true,
-                ValidateIssuer = true,
-                ValidateIssuerSigningKey = true,
-                ValidateLifetime = true,
-                ValidateAudience = true,
-                ValidateSignatureLast = true,
-
-                ValidIssuer = builder.Configuration["JwtOptions:Issuer"],
-                ValidAudience = builder.Configuration["JwtOptions:Audience"],
-                ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-                IssuerSigningKey = new SymmetricSecurityKey(
-                    Encoding.UTF8.GetBytes(builder.Configuration["JwtOptions:Secret"]!)),
-                ClockSkew = TimeSpan.FromSeconds(30)
-            };
-        });
+    builder.Services.AddOrchitectAuthentication(builder.Configuration);
 
     var corsSettings = builder.Configuration.GetSection(nameof(CorsSettings)).Get<CorsSettings>();
 
@@ -115,8 +90,6 @@ try
                 });
             });
     });
-
-    builder.Services.AddAuthorization();
 
     builder.Services.AddSwaggerGen(options =>
     {

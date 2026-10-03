@@ -88,6 +88,37 @@ public sealed class RunnerContainerSweepServiceTests
     }
 
     [Fact]
+    public async Task SweepAsync_RunWithExitedContainer_RevokesToken()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), RunIdOf(deployment)));
+        _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
+            .Returns(new ContainerInspectResponse { State = new State { ExitCode = 0 } });
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await _runs.Received(1).UpdateAsync(
+            Arg.Is<DeploymentRun>(r => r.Id == RunIdOf(deployment) && r.TokenHash == null && r.TokenExpiresAt == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SweepAsync_RunWithoutContainer_RevokesToken()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers();
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await _runs.Received(1).UpdateAsync(
+            Arg.Is<DeploymentRun>(r => r.Id == RunIdOf(deployment) && r.Status == DeploymentRunStatus.Failed &&
+                                       r.TokenHash == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task SweepAsync_DestroyingWithExitedContainer_BecomesDestroyed()
     {
         var deployment = NewDeployment().Start().ProcessDeploymentStatus(0, null).StartDestroy();
@@ -300,7 +331,8 @@ public sealed class RunnerContainerSweepServiceTests
                 ? DeploymentRunOperation.Destroy
                 : DeploymentRunOperation.Provision;
             var run = DeploymentRun.Queue(deployment.Id, operation);
-            _latestRuns[deployment.Id] = deployment.Status == DeploymentStatus.Pending ? run : run.Start();
+            _latestRuns[deployment.Id] = (deployment.Status == DeploymentStatus.Pending ? run : run.Start())
+                .IssueToken("token-hash", DateTime.UtcNow.AddHours(1));
             _runs.GetLatestAsync(deployment.Id, Arg.Any<CancellationToken>()).Returns(_latestRuns[deployment.Id]);
         }
 
