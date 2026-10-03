@@ -1,6 +1,6 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var postgres = builder.AddPostgres("postgres").WithHostPort(41031);
+var postgres = builder.AddPostgres("postgres").WithHostPort(41031).WithPgWeb();
 var orchitectDb = postgres.AddDatabase("orchitect");
 
 var keyVaultUri = builder.AddParameter("keyvault-uri");

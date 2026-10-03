@@ -6,6 +6,7 @@ using Orchitect.Common.Observability;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Dispatch.Auth;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Secret;
 
@@ -45,10 +46,11 @@ public sealed class DeploymentQueue : IDeploymentQueue
 
             var deployments = sp.GetRequiredService<IDeploymentRepository>();
             var runs = sp.GetRequiredService<IDeploymentRunRepository>();
+            var plans = sp.GetRequiredService<IDeploymentRunPlanRepository>();
 
             try
             {
-                await RunAsync(deployments, runs, request, activity, ct);
+                await RunAsync(deployments, runs, plans, request, activity, ct);
             }
             catch (Exception exception) when (!ct.IsCancellationRequested)
             {
@@ -60,7 +62,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
     }
 
     private async Task RunAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
-        DeploymentQueueRequest request, Activity? activity, CancellationToken ct)
+        IDeploymentRunPlanRepository plans, DeploymentQueueRequest request, Activity? activity, CancellationToken ct)
     {
         var deployment = await deployments.GetByIdAsync(request.DeploymentId, ct)
                          ?? throw new InvalidOperationException(
@@ -94,7 +96,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
             ? new TimeoutException(
                 $"Deployment '{deployment.Id.Value}' was cancelled without the API shutting down.",
                 result.Exception)
-            : result.Exception;
+            : result.Exception ?? await UnplannedRun.FindAsync(plans, run.Id, result.ExitCode, ct);
 
         var processed = deployment.ProcessDeploymentStatus(result.ExitCode, exception);
         if (processed != deployment)

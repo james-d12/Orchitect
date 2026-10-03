@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orchitect.Domain.Engine.Deployment;
+using Orchitect.Engine.Dispatch.Completion;
 
 namespace Orchitect.Engine.Dispatch.Executor;
 
@@ -113,6 +114,7 @@ public sealed class RunnerContainerSweepService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var deployments = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
         var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
+        var plans = scope.ServiceProvider.GetRequiredService<IDeploymentRunPlanRepository>();
         var active = await deployments.GetActiveAsync(_startedAt, cancellationToken);
         var unreconciled = new HashSet<string>();
 
@@ -134,8 +136,11 @@ public sealed class RunnerContainerSweepService : BackgroundService
                     continue;
                 }
 
+                var unplanned = run is { Status: DeploymentRunStatus.Running }
+                    ? await UnplannedRun.FindAsync(plans, run.Id, outcome.ExitCode, cancellationToken)
+                    : null;
                 var reconciled = outcome.ExitCode is { } exitCode
-                    ? deployment.ProcessDeploymentStatus(exitCode, null)
+                    ? deployment.ProcessDeploymentStatus(exitCode, unplanned)
                     : deployment.Interrupt(outcome.Reason!);
 
                 await deployments.UpdateAsync(reconciled, cancellationToken);
@@ -143,7 +148,7 @@ public sealed class RunnerContainerSweepService : BackgroundService
                 var reconciledRun = run switch
                 {
                     { Status: DeploymentRunStatus.Running } when outcome.ExitCode is { } runExitCode =>
-                        run.Complete(runExitCode, null, container?.ID),
+                        run.Complete(runExitCode, unplanned, container?.ID),
                     { IsActive: true } => run.Interrupt(reconciled.ErrorSummary ?? InterruptedRunReason),
                     _ => null
                 };

@@ -8,6 +8,7 @@ using Orchitect.Domain.Engine.Environment;
 using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Contracts.Secret;
 using Orchitect.Engine.Dispatch.Auth;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
@@ -18,6 +19,7 @@ namespace Orchitect.Engine.Dispatch.Unit.Tests.Queue;
 public sealed class DeploymentQueueTests
 {
     private readonly RecordingDeploymentRunRepository _runs = new();
+    private readonly FakeDeploymentRunPlanRepository _plans = new();
 
     [Fact]
     public async Task WorkItem_ExecutorSucceeds_SetsDeployingThenDeployed()
@@ -32,6 +34,38 @@ public sealed class DeploymentQueueTests
         Assert.Equal(0, _runs.Run!.ExitCode);
         Assert.NotNull(_runs.Run.StartedAt);
         Assert.NotNull(_runs.Run.FinishedAt);
+    }
+
+    [Theory]
+    [InlineData(DeploymentRunOperation.Provision)]
+    [InlineData(DeploymentRunOperation.Destroy)]
+    public async Task WorkItem_RunnerExitsZeroWithoutPlan_SetsFailed(DeploymentRunOperation operation)
+    {
+        var (deployment, repository, services) = operation == DeploymentRunOperation.Destroy
+            ? Setup(Deployed().StartDestroy(), operation)
+            : Setup();
+        _plans.Planned = false;
+        var workItem = await QueueAsync(deployment, new FakeExecutor());
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal(DeploymentStatus.Failed, repository.Statuses[^1]);
+        Assert.Equal(UnplannedRun.Message, repository.Deployment!.ErrorSummary);
+        Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Failed], _runs.Statuses);
+        Assert.Equal(0, _runs.Run!.ExitCode);
+        Assert.Equal(UnplannedRun.Message, _runs.Run.ErrorSummary);
+    }
+
+    [Fact]
+    public async Task WorkItem_RunnerExitsNonZeroWithoutPlan_ReportsExitCode()
+    {
+        var (deployment, _, services) = Setup();
+        _plans.Planned = false;
+        var workItem = await QueueAsync(deployment, new FakeExecutor { ExitCode = 1 });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal("The runner exited with code 1.", _runs.Run!.ErrorSummary);
     }
 
     [Fact]
@@ -343,6 +377,7 @@ public sealed class DeploymentQueueTests
         var services = new ServiceCollection()
             .AddSingleton<IDeploymentRepository>(repository)
             .AddSingleton<IDeploymentRunRepository>(_runs)
+            .AddSingleton<IDeploymentRunPlanRepository>(_plans)
             .BuildServiceProvider();
         return (deployment, repository, services);
     }
@@ -441,6 +476,18 @@ public sealed class DeploymentQueueTests
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<IReadOnlyList<Deployment>> GetActiveAsync(DateTime updatedBefore,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeDeploymentRunPlanRepository : IDeploymentRunPlanRepository
+    {
+        public bool Planned { get; set; } = true;
+
+        public Task<DeploymentRunPlan?> GetByRunIdAsync(DeploymentRunId runId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Planned ? DeploymentRunPlan.Create(runId, "{}", []) : null);
+
+        public Task<DeploymentRunPlan?> CreateAsync(DeploymentRunPlan plan,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
