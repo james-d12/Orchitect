@@ -141,8 +141,8 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
 - [ ] Image selection is a single `ExecutorOptions:Image`. When more cloud/IaC combinations are needed, derive the tag from the environment/templates. (#132)
 
 ### 8. Design issues (Hard, from `Runner_Isolation_Branch_Review.md`)
-- [ ] **H1** The runner holds the API's full DB credentials while running untrusted Terraform. First step: a dedicated Postgres role with `SELECT` on the engine tables. Proper fix: the API passes a run manifest and the runner never touches the database. (#102, #104, #105)
-- [ ] **H2** The Key Vault token covers every vault and secret the API's identity can read. Resolve only the mapped secrets in the API, use a runner-only vault, or give the runner its own least-privilege identity. (#108)
+- [ ] **H1** The runner holds the API's full DB credentials while running untrusted Terraform. Decided: the runner calls an internal API with a per-run token and never touches the database. See [API_RUNNER_SEPARATION.md](API_RUNNER_SEPARATION.md) for the design and migration order. (#110, #202, #203, #204, #106, #105)
+- [ ] **H2** The Key Vault token covers every vault and secret the API's identity can read. Not covered by the API/runner separation, which keeps the current secret injection ([API_RUNNER_SEPARATION.md](API_RUNNER_SEPARATION.md) §9). Options: resolve only the mapped secrets in the API and pass them in the secrets file, use a runner-only vault, or give the runner its own least-privilege identity. (#108)
 - [ ] **H3** The deployment queue is serial, blocking and in-memory. Needs a durable queue, bounded concurrency and non-blocking enqueue. One run per application/environment is already enforced by `IX_Deployments_ActiveRun`. Queued work is still lost on restart: `RunnerContainerSweepService` marks those deployments `Failed` instead of running them. (#110, #111)
 - [ ] **H4** A containerised API can't reach Docker, and mounting the socket is root-equivalent. Options: rootless Docker/Podman, a remote Docker host, a small job-launcher service, or a platform-native `IExecutor` (Kubernetes Jobs, Container Apps Jobs, ECS). (#114)
 

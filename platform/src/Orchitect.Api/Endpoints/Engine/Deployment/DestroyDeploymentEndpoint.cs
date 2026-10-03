@@ -88,7 +88,7 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
         }
         catch
         {
-            await repository.UpdateAsync(destroying.Interrupt(), CancellationToken.None);
+            await repository.UpdateAsync(destroying.Interrupt("The destroy could not be queued."), CancellationToken.None);
             throw;
         }
 

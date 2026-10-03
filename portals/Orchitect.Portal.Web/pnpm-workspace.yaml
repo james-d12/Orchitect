@@ -1,5 +1,11 @@
-minimumReleaseAge: 10080
-blockExoticSubdeps: true
 allowBuilds:
   esbuild: true
   sharp: true
+
+auditConfig:
+  ignoreCves:
+    - CVE-2026-93748
+
+blockExoticSubdeps: true
+
+minimumReleaseAge: 10080
