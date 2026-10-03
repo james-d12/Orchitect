@@ -1,4 +1,5 @@
 using Orchitect.Domain.Core;
+using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Domain.Engine.ResourceTemplate;
 
@@ -10,4 +11,10 @@ public interface IResourceTemplateRepository : IRepository<ResourceTemplate, Res
         CancellationToken cancellationToken = default);
 
     Task<bool> DeleteAsync(ResourceTemplateId id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the resource templates that belong to any of the organisations.
+    /// </summary>
+    Task<IReadOnlyList<ResourceTemplate>> GetByOrganisationIdsAsync(IReadOnlyCollection<OrganisationId> organisationIds,
+        CancellationToken cancellationToken = default);
 }

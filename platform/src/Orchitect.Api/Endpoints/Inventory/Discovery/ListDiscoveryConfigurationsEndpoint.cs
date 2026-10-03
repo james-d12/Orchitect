@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
@@ -25,20 +26,21 @@ public sealed class ListDiscoveryConfigurationsEndpoint : IEndpoint
 
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/", HandleAsync)
+        .RequireOrganisationMember()
         .WithName("ListDiscoveryConfigurations")
         .WithSummary("List all discovery configurations for the current organisation")
         .Produces<IEnumerable<ListDiscoveryConfigurationResponse>>(StatusCodes.Status200OK);
 
     private static async Task<Ok<IEnumerable<ListDiscoveryConfigurationResponse>>> HandleAsync(
         [FromQuery]
-        string organisationId,
+        Guid organisationId,
         [FromServices]
         IDiscoveryConfigurationRepository configRepository,
         [FromServices]
         ICredentialRepository credentialRepository,
         CancellationToken cancellationToken)
     {
-        var orgId = new OrganisationId(Guid.Parse(organisationId));
+        var orgId = new OrganisationId(organisationId);
 
         var configs = await configRepository.GetByOrganisationIdAsync(orgId, cancellationToken);
 

@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Application;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
@@ -18,6 +17,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/", HandleAsync)
+        .HandlesOrganisationScope()
         .WithSummary("Creates a new deployment into an environment for an application with a given commit id.");
 
     private sealed record CreateDeploymentResponse(Guid Id, string Status, Uri Location);
@@ -35,8 +35,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             [FromServices]
             IDeploymentQueue deploymentQueue,
             [FromServices]
-            IOrganisationRepository organisationRepository,
-            ClaimsPrincipal user,
+            IOrganisationAccess organisationAccess,
             HttpContext httpContext,
             CancellationToken cancellationToken)
     {
@@ -48,7 +47,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
         var application = await applicationRepository.GetByIdAsync(request.ApplicationId, cancellationToken);
 
         if (application is null ||
-            !await organisationRepository.IsMemberAsync(user, application.OrganisationId, cancellationToken))
+            !await organisationAccess.IsMemberAsync(application.OrganisationId, cancellationToken))
         {
             return TypedResults.BadRequest($"Application with Id: {request.ApplicationId} does not exist.");
         }
@@ -56,7 +55,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
         var environment = await environmentRepository.GetByIdAsync(request.EnvironmentId, cancellationToken);
 
         if (environment is null ||
-            !await organisationRepository.IsMemberAsync(user, environment.OrganisationId, cancellationToken))
+            !await organisationAccess.IsMemberAsync(environment.OrganisationId, cancellationToken))
         {
             return TypedResults.BadRequest($"Environment with Id: {request.EnvironmentId} does not exist.");
         }

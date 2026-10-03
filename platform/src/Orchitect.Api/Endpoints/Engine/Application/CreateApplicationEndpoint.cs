@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Application;
 
 namespace Orchitect.Api.Endpoints.Engine.Application;
@@ -12,6 +13,7 @@ public sealed class CreateApplicationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/", HandleAsync)
+        .RequireOrganisationMember<CreateApplicationRequest>(r => r.OrganisationId)
         .WithSummary("Creates a new application.");
 
     public sealed record CreateApplicationResponse(Guid Id);

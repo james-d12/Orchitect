@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Orchitect.Api.Extensions;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Api.Endpoints.Core.Organisation;
@@ -13,6 +15,7 @@ public sealed class CreateOrganisationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/", HandleAsync)
+        .HandlesOrganisationScope()
         .WithSummary("Creates a new organisation.");
 
     public sealed record CreateOrganisationRequest(string Name);

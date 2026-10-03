@@ -1,3 +1,4 @@
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Git;
 
@@ -7,7 +8,7 @@ namespace Orchitect.Domain.Engine.Application;
 /// Represents an Application that encompasses the Git Repository,
 /// Pipelines, required Resources, and deployed environments for an Application  
 /// </summary>
-public sealed record Application
+public sealed record Application : IEntity
 {
     public required ApplicationId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }

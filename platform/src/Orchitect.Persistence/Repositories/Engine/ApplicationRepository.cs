@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Application;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
@@ -52,5 +53,13 @@ public sealed class ApplicationRepository : IApplicationRepository
         _dbContext.Applications.Remove(application);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<IReadOnlyList<Application>> GetByOrganisationIdsAsync(
+        IReadOnlyCollection<OrganisationId> organisationIds, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Applications.AsNoTracking()
+            .Where(e => organisationIds.Contains(e.OrganisationId))
+            .ToListAsync(cancellationToken);
     }
 }

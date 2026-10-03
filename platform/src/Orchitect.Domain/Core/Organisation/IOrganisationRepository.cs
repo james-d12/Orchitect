@@ -6,9 +6,10 @@ public interface IOrganisationRepository : IRepository<Organisation, Organisatio
     Task<bool> DeleteAsync(OrganisationId id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns whether the identity user is a member of the organisation.
+    /// Returns the organisations with the given ids.
     /// </summary>
-    Task<bool> IsMemberAsync(OrganisationId id, string identityUserId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Organisation>> GetByIdsAsync(IReadOnlyCollection<OrganisationId> ids,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns the ids of the organisations the identity user is a member of.

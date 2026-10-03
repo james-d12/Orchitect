@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace Orchitect.Api.Shared;
 
@@ -19,14 +18,5 @@ public static class ClaimsPrincipalExtensions
         }
 
         return organisationGuid;
-    }
-
-    public static string GetUserId(this ClaimsPrincipal user)
-    {
-        var claim = user.FindFirst(ClaimTypes.NameIdentifier)
-            ?? user.FindFirst(JwtRegisteredClaimNames.Sub)
-            ?? throw new UnauthorizedAccessException("User ID claim not found");
-
-        return claim.Value;
     }
 }

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 
@@ -14,6 +15,7 @@ public sealed class CreateCredentialEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/", HandleAsync)
+        .RequireOrganisationMember<CreateCredentialRequest>(r => r.OrganisationId)
         .WithSummary("Creates a new credential.");
 
     public sealed record CreateCredentialRequest(

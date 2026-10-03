@@ -53,11 +53,12 @@ public sealed class OrganisationRepository : IOrganisationRepository
         return true;
     }
 
-    public Task<bool> IsMemberAsync(OrganisationId id, string identityUserId,
+    public async Task<IReadOnlyList<Organisation>> GetByIdsAsync(IReadOnlyCollection<OrganisationId> ids,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.Set<OrganisationUser>()
-            .AnyAsync(u => u.OrganisationId == id && u.IdentityUserId == identityUserId, cancellationToken);
+        return await _dbContext.Organisations.AsNoTracking()
+            .Where(o => ids.Contains(o.Id))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<OrganisationId>> GetIdsForMemberAsync(string identityUserId,

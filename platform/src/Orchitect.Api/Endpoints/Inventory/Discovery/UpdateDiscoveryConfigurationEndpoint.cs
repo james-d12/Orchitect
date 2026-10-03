@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Domain.Inventory.Discovery.Services;
@@ -19,6 +20,7 @@ public sealed class UpdateDiscoveryConfigurationEndpoint : IEndpoint
 
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPut("/{id:guid}", HandleAsync)
+        .RequireOrganisationMember<UpdateDiscoveryConfigurationRequest>(r => r.OrganisationId)
         .WithName("UpdateDiscoveryConfiguration")
         .WithSummary("Update a discovery configuration")
         .Produces(StatusCodes.Status200OK)

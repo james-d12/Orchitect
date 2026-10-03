@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Domain.Inventory.SourceControl.Requests;
@@ -15,6 +16,7 @@ public sealed class GetAllPullRequestsEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/", Handle)
+        .RequireOrganisationMember<PullRequestQueryRequest>(q => q.OrganisationId)
         .WithSummary("Gets all pull requests by query parameters.");
 
     public sealed record GetAllPullRequestsResponse(

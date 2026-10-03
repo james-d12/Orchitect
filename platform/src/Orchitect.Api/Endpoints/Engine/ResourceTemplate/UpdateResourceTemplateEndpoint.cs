@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Api.Endpoints.Engine.ResourceTemplate;
@@ -14,6 +13,8 @@ public sealed class UpdateResourceTemplateEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPut("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Engine.ResourceTemplate.ResourceTemplate, ResourceTemplateId>(
+            id => new ResourceTemplateId(id))
         .WithSummary("Updates an existing resource template.");
 
     public sealed record UpdateResourceTemplateRequest(string Name, string Type, string Description, ResourceTemplateProvider Provider);
@@ -27,16 +28,12 @@ public sealed class UpdateResourceTemplateEndpoint : IEndpoint
         UpdateResourceTemplateRequest request,
         [FromServices]
         IResourceTemplateRepository repository,
-        [FromServices]
-        IOrganisationRepository organisationRepository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var resourceTemplateId = new ResourceTemplateId(id);
         var existingResourceTemplate = await repository.GetByIdAsync(resourceTemplateId, cancellationToken);
 
-        if (existingResourceTemplate is null ||
-            !await organisationRepository.IsMemberAsync(user, existingResourceTemplate.OrganisationId, cancellationToken))
+        if (existingResourceTemplate is null)
         {
             return TypedResults.NotFound();
         }

@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Application;
 
 namespace Orchitect.Api.Endpoints.Engine.Application;
@@ -14,6 +13,8 @@ public sealed class DeleteApplicationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapDelete("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Engine.Application.Application, Orchitect.Domain.Engine.Application.ApplicationId>(
+            id => new Orchitect.Domain.Engine.Application.ApplicationId(id))
         .WithSummary("Deletes an application by Id.");
 
     private static async Task<Results<NoContent, NotFound>> HandleAsync(
@@ -21,20 +22,9 @@ public sealed class DeleteApplicationEndpoint : IEndpoint
         Guid id,
         [FromServices]
         IApplicationRepository repository,
-        [FromServices]
-        IOrganisationRepository organisationRepository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var applicationId = new Orchitect.Domain.Engine.Application.ApplicationId(id);
-        var existing = await repository.GetByIdAsync(applicationId, cancellationToken);
-
-        if (existing is null ||
-            !await organisationRepository.IsMemberAsync(user, existing.OrganisationId, cancellationToken))
-        {
-            return TypedResults.NotFound();
-        }
-
         var deleted = await repository.DeleteAsync(applicationId, cancellationToken);
 
         if (!deleted)

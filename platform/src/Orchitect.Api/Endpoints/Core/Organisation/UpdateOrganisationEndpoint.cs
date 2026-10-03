@@ -1,10 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Api.Endpoints.Core.Organisation;
@@ -13,6 +13,7 @@ public sealed class UpdateOrganisationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPut("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess()
         .WithSummary("Updates an existing organisation.");
 
     public sealed record UpdateOrganisationRequest(string Name);
@@ -26,13 +27,12 @@ public sealed class UpdateOrganisationEndpoint : IEndpoint
         UpdateOrganisationRequest request,
         [FromServices]
         IOrganisationRepository repository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var organisationId = new OrganisationId(id);
         var existingOrganisation = await repository.GetByIdAsync(organisationId, cancellationToken);
 
-        if (existingOrganisation is null || !await repository.IsMemberAsync(user, organisationId, cancellationToken))
+        if (existingOrganisation is null)
         {
             return TypedResults.NotFound();
         }

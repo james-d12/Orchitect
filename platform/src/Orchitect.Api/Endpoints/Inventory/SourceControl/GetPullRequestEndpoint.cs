@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Domain.Inventory.SourceControl.Services;
 
@@ -15,6 +14,7 @@ public sealed class GetPullRequestEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/{id}", HandleAsync)
+        .RequireOrganisationAccess<PullRequest, PullRequestId>(id => new PullRequestId(id))
         .WithSummary("Gets a pull request by id.");
 
     public sealed record GetPullRequestResponse(
@@ -37,16 +37,12 @@ public sealed class GetPullRequestEndpoint : IEndpoint
         string id,
         [FromServices]
         IPullRequestRepository repository,
-        [FromServices]
-        IOrganisationRepository organisationRepository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var pullRequestId = new PullRequestId(id);
         var pullRequest = await repository.GetByIdAsync(pullRequestId, cancellationToken);
 
-        if (pullRequest is null ||
-            !await organisationRepository.IsMemberAsync(user, pullRequest.OrganisationId, cancellationToken))
+        if (pullRequest is null)
         {
             return TypedResults.NotFound();
         }

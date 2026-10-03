@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Environment;
 
 namespace Orchitect.Api.Endpoints.Engine.Environment;
@@ -12,6 +13,7 @@ public sealed class CreateEnvironmentEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/", HandleAsync)
+        .RequireOrganisationMember<CreateEnvironmentRequest>(r => r.OrganisationId)
         .WithSummary("Creates a new environment.");
 
     public sealed record CreateEnvironmentResponse(Guid Id);

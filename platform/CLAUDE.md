@@ -147,7 +147,7 @@ public static IServiceCollection AddPersistenceServices(this IServiceCollection 
 
 **Endpoint groups**: `MapPrivateGroup()` for authenticated endpoints, `MapPublicGroup()` for anonymous.
 
-**Organisation membership**: private groups run `OrganisationMembershipFilter`, which returns 403 when the caller is not a member of an `organisationId` given in the query, route or an `OrganisationId` property of a bound request. Endpoints that load an entity by id must check its organisation with `IOrganisationRepository.IsMemberAsync(user, ...)` and return 404, and list endpoints without an `organisationId` must filter to `GetMemberOrganisationIdsAsync(user)`. Creating an organisation makes the caller a member.
+**Organisation membership**: every authorised endpoint declares how it is scoped in its `Map`. Use `.RequireOrganisationMember()` for a `Guid organisationId` parameter, `.RequireOrganisationMember<TRequest>(r => r.OrganisationId)` for an id in a request (both 403), `.RequireOrganisationAccess<TEntity, TId>(...)` for an entity loaded by `id` (404), or `.HandlesOrganisationScope()` when the handler filters to `IOrganisationAccess.GetOrganisationIdsAsync()` itself (see `Shared/Authorization`). `OrganisationScopeCoverageTests` fails for an endpoint that declares none. Creating an organisation makes the caller a member.
 
 ## Documentation
 

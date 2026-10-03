@@ -1,9 +1,10 @@
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Domain.Inventory.Discovery;
 
-public sealed record DiscoveryConfiguration
+public sealed record DiscoveryConfiguration : IEntity
 {
     public required DiscoveryConfigurationId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }

@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Inventory.SourceControl;
 using Orchitect.Domain.Inventory.SourceControl.Services;
 
@@ -15,6 +14,7 @@ public sealed class GetRepositoryEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/{id}", HandleAsync)
+        .RequireOrganisationAccess<Repository, RepositoryId>(id => new RepositoryId(id))
         .WithSummary("Gets a repository by id.");
 
     public sealed record GetRepositoryResponse(
@@ -32,16 +32,12 @@ public sealed class GetRepositoryEndpoint : IEndpoint
         string id,
         [FromServices]
         IRepositoryRepository repository,
-        [FromServices]
-        IOrganisationRepository organisationRepository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var repositoryId = new RepositoryId(id);
         var repo = await repository.GetByIdAsync(repositoryId, cancellationToken);
 
-        if (repo is null ||
-            !await organisationRepository.IsMemberAsync(user, repo.OrganisationId, cancellationToken))
+        if (repo is null)
         {
             return TypedResults.NotFound();
         }

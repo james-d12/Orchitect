@@ -199,9 +199,14 @@ public sealed class OrganisationMembershipIntegrationTests(WebApplicationFactory
     {
         var client = await factory.CreateClient().AddAuthorisationHeader();
 
-        var response = await client.GetAsync("/discovery?organisationId=not-a-guid");
+        var query = await client.GetAsync("/discovery?organisationId=not-a-guid");
+        var body = await client.PostAsJsonAsync("/applications", new Domain.Engine.Application.CreateApplicationRequest(
+            _fixture.Create<string>(), "not-a-guid",
+            new Domain.Engine.Application.CreateRepositoryRequest(_fixture.Create<string>(),
+                new Uri("https://github.com/test/repo"), Domain.Engine.Application.RepositoryProvider.GitHub)));
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, query.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, body.StatusCode);
     }
 
     [Fact]

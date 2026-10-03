@@ -2,7 +2,7 @@ using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Domain.Core.Credential;
 
-public sealed record Credential
+public sealed record Credential : IEntity
 {
     public required CredentialId Id { get; init; }
     public required OrganisationId OrganisationId { get; init; }

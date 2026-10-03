@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Environment;
 using Environment = Orchitect.Domain.Engine.Environment.Environment;
 
@@ -52,5 +53,13 @@ public sealed class EnvironmentRepository : IEnvironmentRepository
         _dbContext.Environments.Remove(environment);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<IReadOnlyList<Environment>> GetByOrganisationIdsAsync(
+        IReadOnlyCollection<OrganisationId> organisationIds, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Environments.AsNoTracking()
+            .Where(e => organisationIds.Contains(e.OrganisationId))
+            .ToListAsync(cancellationToken);
     }
 }

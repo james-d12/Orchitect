@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Services;
 
@@ -15,6 +14,7 @@ public sealed class GetCloudSecretEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapGet("/{id}", HandleAsync)
+        .RequireOrganisationAccess<CloudSecret, CloudSecretId>(id => new CloudSecretId(id))
         .WithSummary("Gets a cloud secret by id.");
 
     public sealed record GetCloudSecretResponse(
@@ -31,16 +31,12 @@ public sealed class GetCloudSecretEndpoint : IEndpoint
         string id,
         [FromServices]
         ICloudSecretRepository repository,
-        [FromServices]
-        IOrganisationRepository organisationRepository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var cloudSecretId = new CloudSecretId(id);
         var cloudSecret = await repository.GetByIdAsync(cloudSecretId, cancellationToken);
 
-        if (cloudSecret is null ||
-            !await organisationRepository.IsMemberAsync(user, cloudSecret.OrganisationId, cancellationToken))
+        if (cloudSecret is null)
         {
             return TypedResults.NotFound();
         }

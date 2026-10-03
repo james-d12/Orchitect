@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Discovery;
@@ -16,6 +17,7 @@ public sealed class TriggerDiscoveryEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/{id}/trigger", HandleAsync)
+        .RequireOrganisationMember()
         .WithName("TriggerDiscovery")
         .WithSummary("Manually trigger discovery for a specific configuration")
         .Produces(StatusCodes.Status202Accepted)
@@ -26,7 +28,7 @@ public sealed class TriggerDiscoveryEndpoint : IEndpoint
         [FromRoute]
         Guid id,
         [FromQuery]
-        string organisationId,
+        Guid organisationId,
         [FromServices]
         IDiscoveryConfigurationRepository configRepository,
         [FromServices]
@@ -35,7 +37,7 @@ public sealed class TriggerDiscoveryEndpoint : IEndpoint
         IServiceProvider serviceProvider,
         CancellationToken cancellationToken)
     {
-        var orgId = new OrganisationId(Guid.Parse(organisationId));
+        var orgId = new OrganisationId(organisationId);
         var configId = new DiscoveryConfigurationId(id);
 
         var config = await configRepository.GetByIdAsync(configId, cancellationToken);

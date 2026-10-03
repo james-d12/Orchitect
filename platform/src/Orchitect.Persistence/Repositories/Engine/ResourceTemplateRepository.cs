@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Persistence.Repositories.Engine;
@@ -57,5 +58,13 @@ public sealed class ResourceTemplateRepository : IResourceTemplateRepository
         _dbContext.ResourceTemplates.Remove(resourceTemplate);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<IReadOnlyList<ResourceTemplate>> GetByOrganisationIdsAsync(
+        IReadOnlyCollection<OrganisationId> organisationIds, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.ResourceTemplates.AsNoTracking()
+            .Where(e => organisationIds.Contains(e.OrganisationId))
+            .ToListAsync(cancellationToken);
     }
 }

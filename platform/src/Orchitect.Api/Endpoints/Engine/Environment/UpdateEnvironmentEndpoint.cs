@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Environment;
 
 namespace Orchitect.Api.Endpoints.Engine.Environment;
@@ -14,6 +13,7 @@ public sealed class UpdateEnvironmentEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPut("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Engine.Environment.Environment, EnvironmentId>(id => new EnvironmentId(id))
         .WithSummary("Updates an existing environment.");
 
     public sealed record UpdateEnvironmentRequest(string Name, string Description);
@@ -27,16 +27,12 @@ public sealed class UpdateEnvironmentEndpoint : IEndpoint
         UpdateEnvironmentRequest request,
         [FromServices]
         IEnvironmentRepository repository,
-        [FromServices]
-        IOrganisationRepository organisationRepository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var environmentId = new EnvironmentId(id);
         var existingEnvironment = await repository.GetByIdAsync(environmentId, cancellationToken);
 
-        if (existingEnvironment is null ||
-            !await organisationRepository.IsMemberAsync(user, existingEnvironment.OrganisationId, cancellationToken))
+        if (existingEnvironment is null)
         {
             return TypedResults.NotFound();
         }

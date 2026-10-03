@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
-using Orchitect.Domain.Core.Organisation;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Application;
 
 namespace Orchitect.Api.Endpoints.Engine.Application;
@@ -14,6 +13,8 @@ public sealed class UpdateApplicationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPut("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess<Orchitect.Domain.Engine.Application.Application, Orchitect.Domain.Engine.Application.ApplicationId>(
+            id => new Orchitect.Domain.Engine.Application.ApplicationId(id))
         .WithSummary("Updates an existing application.");
 
     public sealed record UpdateApplicationRequest(string Name, UpdateRepositoryRequest Repository);
@@ -34,16 +35,12 @@ public sealed class UpdateApplicationEndpoint : IEndpoint
         UpdateApplicationRequest request,
         [FromServices]
         IApplicationRepository repository,
-        [FromServices]
-        IOrganisationRepository organisationRepository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var applicationId = new Orchitect.Domain.Engine.Application.ApplicationId(id);
         var existingApplication = await repository.GetByIdAsync(applicationId, cancellationToken);
 
-        if (existingApplication is null ||
-            !await organisationRepository.IsMemberAsync(user, existingApplication.OrganisationId, cancellationToken))
+        if (existingApplication is null)
         {
             return TypedResults.NotFound();
         }

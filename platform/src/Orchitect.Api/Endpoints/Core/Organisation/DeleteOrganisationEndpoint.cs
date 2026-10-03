@@ -1,10 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
+using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Api.Endpoints.Core.Organisation;
@@ -13,6 +13,7 @@ public sealed class DeleteOrganisationEndpoint : IEndpoint
 {
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapDelete("/{id:guid}", HandleAsync)
+        .RequireOrganisationAccess()
         .WithSummary("Deletes an organisation by Id.");
 
     private static async Task<Results<NoContent, NotFound>> HandleAsync(
@@ -20,16 +21,9 @@ public sealed class DeleteOrganisationEndpoint : IEndpoint
         Guid id,
         [FromServices]
         IOrganisationRepository repository,
-        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var organisationId = new OrganisationId(id);
-
-        if (!await repository.IsMemberAsync(user, organisationId, cancellationToken))
-        {
-            return TypedResults.NotFound();
-        }
-
         var deleted = await repository.DeleteAsync(organisationId, cancellationToken);
 
         if (!deleted)
