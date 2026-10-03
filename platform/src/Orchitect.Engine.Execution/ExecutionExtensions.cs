@@ -113,15 +113,17 @@ public static class ExecutionExtensions
                     : Guid.Empty;
                 options.Token = configuration[RunnerEnvironment.RunToken] ?? string.Empty;
             })
-            .Validate(options => options.GetValidationError() is null,
-                "The runner API needs a base URL, a run ID and a run token.");
+            .ValidateOnStart();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<RunnerApiOptions>, RunnerApiOptionsValidator>());
 
         var httpClient = services.AddHttpClient<IRunnerApiClient, RunnerApiClient>((provider, client) =>
             {
                 var options = provider.GetRequiredService<IOptions<RunnerApiOptions>>().Value;
-                var baseUrl = options.BaseUrl!.ToString();
+                var baseUrl = options.BaseUrl!.AbsoluteUri;
 
                 client.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : $"{baseUrl}/");
+                client.Timeout = Timeout.InfiniteTimeSpan;
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.Token);
                 client.DefaultRequestHeaders.Add(RunnerContract.HeaderName,
                     RunnerContract.Version.ToString(CultureInfo.InvariantCulture));
@@ -135,6 +137,7 @@ public static class ExecutionExtensions
         {
             var options = context.ServiceProvider.GetRequiredService<IOptions<RunnerApiOptions>>().Value;
 
+            pipeline.AddTimeout(options.TotalTimeout);
             pipeline.AddRetry(new HttpRetryStrategyOptions
             {
                 MaxRetryAttempts = options.MaxRetryAttempts,
@@ -142,6 +145,7 @@ public static class ExecutionExtensions
                 BackoffType = DelayBackoffType.Exponential,
                 UseJitter = true
             });
+            pipeline.AddTimeout(options.AttemptTimeout);
         });
 
         return services;

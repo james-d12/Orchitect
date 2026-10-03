@@ -41,10 +41,12 @@ public sealed class RunnerApiIntegrationTests
 
         // Act
         var response = await client.GetAsync(RunnerRoutes.ForRun(run.Id.Value));
+        var json = await response.Content.ReadAsStringAsync();
         var body = await response.Content.ReadFromJsonAsync<RunDescriptor>(RunnerContract.JsonOptions);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains($"\"operation\":\"{expectedOperation}\"", json);
         Assert.Equal(new RunDescriptor(
             run.Id.Value,
             expectedOperation,
