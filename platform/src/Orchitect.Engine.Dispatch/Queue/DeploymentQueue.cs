@@ -5,7 +5,9 @@ using Microsoft.Extensions.Options;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Dispatch.Auth;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Secret;
 
@@ -48,11 +50,12 @@ public sealed class DeploymentQueue : IDeploymentQueue
 
             var deployments = sp.GetRequiredService<IDeploymentRepository>();
             var runs = sp.GetRequiredService<IDeploymentRunRepository>();
+            var completer = sp.GetRequiredService<IRunCompleter>();
             using var stop = _cancellation.Track(request.RunId);
 
             try
             {
-                await RunAsync(deployments, runs, request, activity, stop.StopRequested, ct);
+                await RunAsync(deployments, runs, completer, request, activity, stop.StopRequested, ct);
             }
             catch (Exception exception) when (!ct.IsCancellationRequested)
             {
@@ -64,7 +67,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
     }
 
     private async Task RunAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
-        DeploymentQueueRequest request, Activity? activity, CancellationToken stopRequested, CancellationToken ct)
+        IRunCompleter completer, DeploymentQueueRequest request, Activity? activity, CancellationToken stopRequested, CancellationToken ct)
     {
         var deployment = await deployments.GetByIdAsync(request.DeploymentId, ct)
                          ?? throw new InvalidOperationException(
@@ -108,7 +111,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
 
         if (result.Stopped && result.ExitCode != 0)
         {
-            await CancelAsync(deployments, runs, deployment, run, result);
+            await CancelAsync(deployments, runs, completer, deployment, run, result);
             return;
         }
 
@@ -131,7 +134,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
     }
 
     private async Task CancelAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
-        Deployment deployment, DeploymentRun run, ExecutorResult result)
+        IRunCompleter completer, Deployment deployment, DeploymentRun run, ExecutorResult result)
     {
         var cancelled = deployment.Cancel();
         await deployments.UpdateAsync(cancelled, CancellationToken.None);
@@ -140,6 +143,16 @@ public sealed class DeploymentQueue : IDeploymentQueue
 
         _logger.LogInformation("Deployment {DeploymentId} is {Status} after run {RunId} was cancelled.",
             cancelled.Id.Value, cancelled.Status, cancelledRun.Id.Value);
+
+        try
+        {
+            await completer.CompleteAsync(cancelledRun.Id, RunOutcome.Failed, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Could not finish the instances of cancelled run {RunId}.",
+                cancelledRun.Id.Value);
+        }
     }
 
     private async Task<DeploymentRun?> ClaimAsync(IDeploymentRunRepository runs, DeploymentRun started,

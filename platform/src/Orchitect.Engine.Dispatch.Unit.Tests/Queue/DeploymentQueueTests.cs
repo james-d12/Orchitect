@@ -6,8 +6,10 @@ using Microsoft.Extensions.Options;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
 using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Secret;
 using Orchitect.Engine.Dispatch.Auth;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
@@ -19,6 +21,7 @@ public sealed class DeploymentQueueTests
 {
     private readonly RecordingDeploymentRunRepository _runs = new();
     private readonly DeploymentRunCancellation _cancellation = new();
+    private readonly RecordingRunCompleter _completer = new();
 
     [Fact]
     public async Task WorkItem_ExecutorSucceeds_SetsDeployingThenDeployed()
@@ -363,6 +366,34 @@ public sealed class DeploymentQueueTests
         Assert.Equal("container-1", _runs.Run.RunnerId);
         Assert.NotNull(_runs.Run.FinishedAt);
         Assert.Null(_runs.Run.TokenHash);
+        Assert.Equal([(_runs.Run.Id, RunOutcome.Failed)], _completer.Calls);
+    }
+
+    [Fact]
+    public async Task WorkItem_StopRequestedAndCompleterFails_StillCancels()
+    {
+        var (deployment, repository, services) = Setup();
+        _completer.Fail = true;
+        var workItem = await QueueAsync(deployment,
+            new FakeExecutor { OnExecute = () => _cancellation.RequestStop(_runs.Run!.Id) });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, DeploymentStatus.Cancelled], repository.Statuses);
+        Assert.Equal(DeploymentRunStatus.Cancelled, _runs.Run!.Status);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task WorkItem_RunnerExitsWithoutCancel_LeavesInstancesToTheRunner(long exitCode)
+    {
+        var (deployment, _, services) = Setup();
+        var workItem = await QueueAsync(deployment, new FakeExecutor { ExitCode = exitCode });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Empty(_completer.Calls);
     }
 
     [Fact]
@@ -472,6 +503,7 @@ public sealed class DeploymentQueueTests
         var services = new ServiceCollection()
             .AddSingleton<IDeploymentRepository>(repository)
             .AddSingleton<IDeploymentRunRepository>(_runs)
+            .AddSingleton<IRunCompleter>(_completer)
             .BuildServiceProvider();
         return (deployment, repository, services);
     }
@@ -540,6 +572,23 @@ public sealed class DeploymentQueueTests
 
         public Task<bool> SignalStopAsync(string runId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class RecordingRunCompleter : IRunCompleter
+    {
+        public List<(DeploymentRunId, RunOutcome)> Calls { get; } = [];
+        public bool Fail { get; set; }
+
+        public Task CompleteAsync(DeploymentRunId runId, RunOutcome outcome, CancellationToken cancellationToken)
+        {
+            if (Fail)
+            {
+                throw new InvalidOperationException("Database unavailable.");
+            }
+
+            Calls.Add((runId, outcome));
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class StaticTokenProvider(IReadOnlyDictionary<string, string> environment)

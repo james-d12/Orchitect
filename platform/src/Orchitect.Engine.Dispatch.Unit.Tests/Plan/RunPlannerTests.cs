@@ -67,6 +67,21 @@ public sealed class RunPlannerTests
     }
 
     [Fact]
+    public async Task PlanAsync_CancelRequested_ThrowsWithoutRecording()
+    {
+        var run = _context.AddRun(DeploymentRun.Queue(_context.Deployment.Id, DeploymentRunOperation.Provision)
+            .Start().RequestCancel(DateTime.UtcNow));
+
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.CreatePlanner().PlanAsync(run.Id, Score(("storage", StorageType, null)), CancellationToken.None));
+
+        Assert.Equal(RunPlanFailure.RunNotRunning, exception.Failure);
+        Assert.Empty(_context.Plans.Items);
+        Assert.Empty(_context.Resources.Items);
+        Assert.Empty(_context.Instances.Items);
+    }
+
+    [Fact]
     public async Task PlanAsync_Provision_ReturnsContextAndResolvedInputs()
     {
         var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Provision,

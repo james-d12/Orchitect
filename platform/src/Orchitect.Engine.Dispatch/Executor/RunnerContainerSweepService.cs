@@ -5,6 +5,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orchitect.Domain.Engine.Deployment;
+using Orchitect.Engine.Contracts.Runner.Api;
+using Orchitect.Engine.Dispatch.Completion;
 
 namespace Orchitect.Engine.Dispatch.Executor;
 
@@ -113,6 +115,7 @@ public sealed class RunnerContainerSweepService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var deployments = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
         var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
+        var completer = scope.ServiceProvider.GetRequiredService<IRunCompleter>();
         var active = await deployments.GetActiveAsync(_startedAt, cancellationToken);
         var unreconciled = new HashSet<string>();
 
@@ -158,6 +161,11 @@ public sealed class RunnerContainerSweepService : BackgroundService
 
                 await deployments.UpdateAsync(reconciled, cancellationToken);
 
+                if (cancelled && run is not null)
+                {
+                    await CompleteCancelledRunAsync(completer, run.Id, cancellationToken);
+                }
+
                 _logger.LogInformation(
                     "Deployment {DeploymentId} was left {PreviousStatus} by an earlier API process and is now {Status}.",
                     deployment.Id.Value, deployment.Status, reconciled.Status);
@@ -171,6 +179,19 @@ public sealed class RunnerContainerSweepService : BackgroundService
         }
 
         return unreconciled;
+    }
+
+    private async Task CompleteCancelledRunAsync(IRunCompleter completer, DeploymentRunId runId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await completer.CompleteAsync(runId, RunOutcome.Failed, cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(exception, "Could not finish the instances of cancelled run {RunId}.", runId.Value);
+        }
     }
 
     private static async Task<ReconcileOutcome?> ReconcileAsync(

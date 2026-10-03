@@ -7,6 +7,8 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
+using Orchitect.Engine.Contracts.Runner.Api;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
@@ -20,6 +22,7 @@ public sealed class RunnerContainerSweepServiceTests
     private readonly IContainerOperations _containers = Substitute.For<IContainerOperations>();
     private readonly IDeploymentRepository _deployments = Substitute.For<IDeploymentRepository>();
     private readonly IDeploymentRunRepository _runs = Substitute.For<IDeploymentRunRepository>();
+    private readonly IRunCompleter _completer = Substitute.For<IRunCompleter>();
     private readonly Dictionary<DeploymentId, DeploymentRun> _latestRuns = [];
     private readonly RunnerContainerSweepService _service;
 
@@ -30,6 +33,7 @@ public sealed class RunnerContainerSweepServiceTests
 
         _service = new RunnerContainerSweepService(
             new ServiceCollection().AddSingleton(docker).AddSingleton(_deployments).AddSingleton(_runs)
+                .AddSingleton(_completer)
                 .BuildServiceProvider(),
             Options.Create(new ExecutorOptions
             {
@@ -85,6 +89,7 @@ public sealed class RunnerContainerSweepServiceTests
         await _runs.Received(1).UpdateAsync(Arg.Is<DeploymentRun>(r => r.ExitCode == exitCode && r.RunnerId == "old"),
             Arg.Any<CancellationToken>());
         await AssertRemovedAsync("old");
+        await _completer.DidNotReceiveWithAnyArgs().CompleteAsync(default, default, default);
     }
 
     [Theory]
@@ -108,6 +113,8 @@ public sealed class RunnerContainerSweepServiceTests
                                        r.CancelRequestedAt != null),
             Arg.Any<CancellationToken>());
         await AssertRemovedAsync("old");
+        await _completer.Received(expected == DeploymentStatus.Cancelled ? 1 : 0)
+            .CompleteAsync(RunIdOf(deployment), RunOutcome.Failed, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -117,6 +124,24 @@ public sealed class RunnerContainerSweepServiceTests
         SetActiveDeployments(deployment);
         RequestCancel(deployment);
         SetContainers();
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Cancelled);
+        await AssertRunUpdatedAsync(deployment, DeploymentRunStatus.Cancelled);
+        await _completer.Received(1).CompleteAsync(RunIdOf(deployment), RunOutcome.Failed,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SweepAsync_CancelledRunCompleterFails_StillCancels()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        RequestCancel(deployment);
+        SetContainers();
+        _completer.CompleteAsync(Arg.Any<DeploymentRunId>(), Arg.Any<RunOutcome>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("Database unavailable."));
 
         await _service.SweepAsync(CancellationToken.None);
 

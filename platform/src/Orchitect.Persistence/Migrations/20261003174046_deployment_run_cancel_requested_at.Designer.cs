@@ -13,7 +13,7 @@ using Orchitect.Persistence;
 namespace Orchitect.Persistence.Migrations
 {
     [DbContext(typeof(OrchitectDbContext))]
-    [Migration("20261003170338_deployment_run_cancel_requested_at")]
+    [Migration("20261003174046_deployment_run_cancel_requested_at")]
     partial class deployment_run_cancel_requested_at
     {
         /// <inheritdoc />
@@ -507,6 +507,29 @@ namespace Orchitect.Persistence.Migrations
                     b.HasIndex("DeploymentId", "QueuedAt");
 
                     b.ToTable("DeploymentRuns", (string)null);
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Engine.Deployment.DeploymentRunPlan", b =>
+                {
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Contents")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("timezone('utc', now())");
+
+                    b.Property<string>("Instances")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("RunId");
+
+                    b.ToTable("DeploymentRunPlans", (string)null);
                 });
 
             modelBuilder.Entity("Orchitect.Domain.Engine.Environment.Environment", b =>
@@ -1350,6 +1373,15 @@ namespace Orchitect.Persistence.Migrations
                     b.HasOne("Orchitect.Domain.Engine.Deployment.Deployment", null)
                         .WithMany()
                         .HasForeignKey("DeploymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Engine.Deployment.DeploymentRunPlan", b =>
+                {
+                    b.HasOne("Orchitect.Domain.Engine.Deployment.DeploymentRun", null)
+                        .WithOne()
+                        .HasForeignKey("Orchitect.Domain.Engine.Deployment.DeploymentRunPlan", "RunId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
