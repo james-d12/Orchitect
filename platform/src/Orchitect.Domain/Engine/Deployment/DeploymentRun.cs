@@ -76,16 +76,6 @@ public sealed record DeploymentRun
         };
     }
 
-    public DeploymentRun Interrupt(string reason)
-    {
-        if (!IsActive)
-        {
-            throw new InvalidOperationException($"Run '{Id.Value}' cannot be interrupted while {Status}.");
-        }
-
-        return Finish(DeploymentRunStatus.Failed, null, reason);
-    }
-
     public DeploymentRun RequestCancel(DateTime now)
     {
         if (!IsActive)
@@ -103,41 +93,54 @@ public sealed record DeploymentRun
             throw new InvalidOperationException($"Run '{Id.Value}' cannot be cancelled while {Status}.");
         }
 
-        var run = runnerId is null ? this : this with { RunnerId = runnerId };
-
-        return run.Finish(DeploymentRunStatus.Cancelled, exitCode, null);
+        return Finish(DeploymentRunStatus.Cancelled, exitCode, null, runnerId);
     }
 
-    public DeploymentRun Complete(long? exitCode, Exception? exception, string? runnerId = null)
+    public DeploymentRun Succeed(long? exitCode = null, string? runnerId = null)
     {
         if (Status != DeploymentRunStatus.Running)
         {
-            throw new InvalidOperationException($"Run '{Id.Value}' cannot complete while {Status}.");
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot succeed while {Status}.");
         }
 
-        if (exitCode is null && exception is null)
+        return Finish(DeploymentRunStatus.Succeeded, exitCode, null, runnerId);
+    }
+
+    public DeploymentRun Fail(string errorSummary, long? exitCode = null, string? runnerId = null)
+    {
+        if (!IsActive)
         {
-            throw new ArgumentException("A run result needs an exit code or an exception.");
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot fail while {Status}.");
         }
 
-        var run = runnerId is null ? this : this with { RunnerId = runnerId };
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorSummary);
 
-        return exception switch
+        return Finish(DeploymentRunStatus.Failed, exitCode, errorSummary, runnerId);
+    }
+
+    public DeploymentRun RecordExit(long exitCode, string? runnerId = null)
+    {
+        if (IsActive)
         {
-            OperationCanceledException => run,
-            not null => run.Finish(DeploymentRunStatus.Failed, exitCode, exception.Message),
-            null when exitCode == 0 => run.Finish(DeploymentRunStatus.Succeeded, exitCode, null),
-            _ => run.Finish(DeploymentRunStatus.Failed, exitCode, $"The runner exited with code {exitCode}.")
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot record its exit while {Status}.");
+        }
+
+        return this with
+        {
+            ExitCode = ExitCode ?? exitCode,
+            RunnerId = RunnerId ?? runnerId
         };
     }
 
-    private DeploymentRun Finish(DeploymentRunStatus status, long? exitCode, string? errorSummary)
+    private DeploymentRun Finish(DeploymentRunStatus status, long? exitCode, string? errorSummary,
+        string? runnerId)
     {
         return this with
         {
             Status = status,
             FinishedAt = DateTime.UtcNow,
             ExitCode = exitCode,
+            RunnerId = runnerId ?? RunnerId,
             TokenHash = null,
             TokenExpiresAt = null,
             ErrorSummary = errorSummary is { Length: > ErrorSummaryMaxLength }

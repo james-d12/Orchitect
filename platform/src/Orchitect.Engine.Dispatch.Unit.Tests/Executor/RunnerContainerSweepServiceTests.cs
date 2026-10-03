@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
 using Orchitect.Engine.Contracts.Runner.Api;
@@ -32,8 +33,14 @@ public sealed class RunnerContainerSweepServiceTests
         docker.Containers.Returns(_containers);
 
         _service = new RunnerContainerSweepService(
-            new ServiceCollection().AddSingleton(docker).AddSingleton(_deployments).AddSingleton(_runs)
+            new ServiceCollection()
+                .AddLogging()
+                .AddSingleton<IUnitOfWork, PassThroughUnitOfWork>()
+                .AddSingleton(docker)
+                .AddSingleton(_deployments)
+                .AddSingleton(_runs)
                 .AddSingleton(_completer)
+                .AddScoped<IRunCompletionHandler, RunCompletionHandler>()
                 .BuildServiceProvider(),
             Options.Create(new ExecutorOptions
             {
@@ -89,7 +96,8 @@ public sealed class RunnerContainerSweepServiceTests
         await _runs.Received(1).UpdateAsync(Arg.Is<DeploymentRun>(r => r.ExitCode == exitCode && r.RunnerId == "old"),
             Arg.Any<CancellationToken>());
         await AssertRemovedAsync("old");
-        await _completer.DidNotReceiveWithAnyArgs().CompleteAsync(default, default, default);
+        await _completer.Received(1).CompleteAsync(RunIdOf(deployment),
+            exitCode == 0 ? RunOutcome.Succeeded : RunOutcome.Failed, Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -167,6 +175,30 @@ public sealed class RunnerContainerSweepServiceTests
     }
 
     [Fact]
+    public async Task SweepAsync_RunAlreadyReported_KeepsReportedOutcomeAndRecordsExitCode()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        var reported = _latestRuns[deployment.Id].Fail("terraform apply failed");
+        _runs.GetLatestAsync(deployment.Id, Arg.Any<CancellationToken>()).Returns(reported);
+        _runs.GetByIdAsync(reported.Id, Arg.Any<CancellationToken>()).Returns(reported);
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), reported.Id));
+        _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
+            .Returns(new ContainerInspectResponse { State = new State { ExitCode = 0 } });
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await _runs.Received(1).UpdateAsync(
+            Arg.Is<DeploymentRun>(r => r.Status == DeploymentRunStatus.Failed && r.ExitCode == 0 &&
+                                       r.ErrorSummary == "terraform apply failed"),
+            Arg.Any<CancellationToken>());
+        await _deployments.Received(1).UpdateAsync(
+            Arg.Is<Deployment>(d => d.Status == DeploymentStatus.Failed && d.ErrorSummary == "terraform apply failed"),
+            Arg.Any<CancellationToken>());
+        await _completer.Received(1).CompleteAsync(reported.Id, RunOutcome.Failed, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task SweepAsync_RunWithExitedContainer_RevokesToken()
     {
         var deployment = NewDeployment().Start();
@@ -200,7 +232,7 @@ public sealed class RunnerContainerSweepServiceTests
     [Fact]
     public async Task SweepAsync_DestroyingWithExitedContainer_BecomesDestroyed()
     {
-        var deployment = NewDeployment().Start().ProcessDeploymentStatus(0, null).StartDestroy();
+        var deployment = NewDeployment().Start().Succeed().StartDestroy();
         SetActiveDeployments(deployment);
         SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), RunIdOf(deployment)));
         _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
@@ -413,6 +445,9 @@ public sealed class RunnerContainerSweepServiceTests
             _latestRuns[deployment.Id] = (deployment.Status == DeploymentStatus.Pending ? run : run.Start())
                 .IssueToken("token-hash", DateTime.UtcNow.AddHours(1));
             _runs.GetLatestAsync(deployment.Id, Arg.Any<CancellationToken>()).Returns(_latestRuns[deployment.Id]);
+            _runs.GetByIdAsync(_latestRuns[deployment.Id].Id, Arg.Any<CancellationToken>())
+                .Returns(_latestRuns[deployment.Id]);
+            _deployments.GetByIdAsync(deployment.Id, Arg.Any<CancellationToken>()).Returns(deployment);
         }
 
         _deployments.GetActiveAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
@@ -421,10 +456,21 @@ public sealed class RunnerContainerSweepServiceTests
 
     private DeploymentRunId RunIdOf(Deployment deployment) => _latestRuns[deployment.Id].Id;
 
+    private sealed class PassThroughUnitOfWork : IUnitOfWork
+    {
+        public Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> work,
+            CancellationToken cancellationToken = default) => work(cancellationToken);
+
+        public Task ExecuteAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default) =>
+            work(cancellationToken);
+    }
+
     private void RequestCancel(Deployment deployment)
     {
         _latestRuns[deployment.Id] = _latestRuns[deployment.Id].RequestCancel(DateTime.UtcNow);
         _runs.GetLatestAsync(deployment.Id, Arg.Any<CancellationToken>()).Returns(_latestRuns[deployment.Id]);
+        _runs.GetByIdAsync(_latestRuns[deployment.Id].Id, Arg.Any<CancellationToken>())
+            .Returns(_latestRuns[deployment.Id]);
     }
 
     private Task<DeploymentRun?> AssertRunUpdatedAsync(Deployment deployment, DeploymentRunStatus status) =>

@@ -35,7 +35,7 @@ builder.Services.AddRunnerServices(builder.Configuration);
 builder.Services.AddRunServices();
 builder.Services.AddScoped<IRunnerApiClient>(sp => new InProcessRunnerApiClient(
     sp.GetRequiredService<IRunPlanner>(),
-    sp.GetRequiredService<IRunCompleter>(),
+    sp.GetRequiredService<IRunCompletionHandler>(),
     Guid.TryParse(builder.Configuration[RunnerEnvironment.RunId], out var runId)
         ? new DeploymentRunId(runId)
         : throw new InvalidOperationException($"{RunnerEnvironment.RunId} must be set to the run's id.")));

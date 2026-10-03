@@ -27,6 +27,7 @@ public static class DispatchExtensions
     {
         services.TryAddScoped<IRunPlanner, RunPlanner>();
         services.TryAddScoped<IRunCompleter, RunCompleter>();
+        services.TryAddScoped<IRunCompletionHandler, RunCompletionHandler>();
         return services;
     }
 

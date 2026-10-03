@@ -14,7 +14,8 @@ public static class RunnerEndpoints
     {
         endpoints.MapRunnerGroup()
             .MapEndpoint<GetRunDescriptorEndpoint>()
-            .MapEndpoint<CreateRunPlanEndpoint>();
+            .MapEndpoint<CreateRunPlanEndpoint>()
+            .MapEndpoint<CompleteRunEndpoint>();
     }
 
     public static RouteGroupBuilder MapRunnerGroup(this IEndpointRouteBuilder endpoints)

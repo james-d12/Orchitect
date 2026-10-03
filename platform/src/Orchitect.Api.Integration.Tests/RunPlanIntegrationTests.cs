@@ -381,6 +381,145 @@ public sealed class RunPlanIntegrationTests : IAsyncLifetime
         Assert.All(resources, r => Assert.False(graph.ContainsResource(r.Id)));
     }
 
+    [Fact]
+    public async Task Complete_ProvisionSucceeds_DeploysAndActivatesInstances()
+    {
+        var (run, client) = await PlanRunAsync(DeploymentRunOperation.Provision);
+
+        var response = await CompleteAsync(client, run, new RunCompletion(RunOutcome.Succeeded, null));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var (deployment, stored) = await LoadRunAsync(run.Id);
+        Assert.Equal(DeploymentStatus.Deployed, deployment.Status);
+        Assert.Equal(DeploymentRunStatus.Succeeded, stored.Status);
+        Assert.Null(stored.TokenHash);
+        Assert.Null(stored.ExitCode);
+        var (_, instances, _) = await LoadStateAsync();
+        Assert.Equal(3, instances.Count);
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Active, i.Status));
+        Assert.All(instances, i => Assert.Equal("orders", i.Output!.Workspace));
+    }
+
+    [Fact]
+    public async Task Complete_ProvisionFails_FailsDeploymentAndInstancesWithTheSummary()
+    {
+        var (run, client) = await PlanRunAsync(DeploymentRunOperation.Provision);
+
+        var response = await CompleteAsync(client, run, new RunCompletion(RunOutcome.Failed, "terraform apply failed"));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var (deployment, stored) = await LoadRunAsync(run.Id);
+        Assert.Equal(DeploymentStatus.Failed, deployment.Status);
+        Assert.Equal("terraform apply failed", deployment.ErrorSummary);
+        Assert.Equal(DeploymentRunStatus.Failed, stored.Status);
+        Assert.Equal("terraform apply failed", stored.ErrorSummary);
+        var (_, instances, _) = await LoadStateAsync();
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Failed, i.Status));
+    }
+
+    [Fact]
+    public async Task Complete_DestroySucceeds_DestroysDeploymentAndReleasesResources()
+    {
+        await RunAsync(DeploymentRunOperation.Provision, MultiResourceScore("Standard_LRS"), RunOutcome.Succeeded);
+        var (run, client) = await PlanRunAsync(DeploymentRunOperation.Destroy);
+
+        var response = await CompleteAsync(client, run, new RunCompletion(RunOutcome.Succeeded, null));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var (deployment, _) = await LoadRunAsync(run.Id);
+        Assert.Equal(DeploymentStatus.Destroyed, deployment.Status);
+        var (resources, instances, graph) = await LoadStateAsync();
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Removed, i.Status));
+        Assert.All(resources, r => Assert.Empty(r.Consumers));
+        Assert.All(resources, r => Assert.False(graph!.ContainsResource(r.Id)));
+    }
+
+    [Fact]
+    public async Task Complete_ReportRepeated_RejectsTheRevokedTokenAndKeepsTheFirstOutcome()
+    {
+        var (run, client) = await PlanRunAsync(DeploymentRunOperation.Provision);
+        await CompleteAsync(client, run, new RunCompletion(RunOutcome.Succeeded, null));
+
+        var response = await CompleteAsync(client, run, new RunCompletion(RunOutcome.Failed, "late"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var (deployment, stored) = await LoadRunAsync(run.Id);
+        Assert.Equal(DeploymentStatus.Deployed, deployment.Status);
+        Assert.Equal(DeploymentRunStatus.Succeeded, stored.Status);
+        var (_, instances, _) = await LoadStateAsync();
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Active, i.Status));
+    }
+
+    [Fact]
+    public async Task Complete_ExitCodeAfterReport_IsOnlyRecorded()
+    {
+        var (run, client) = await PlanRunAsync(DeploymentRunOperation.Provision);
+        await CompleteAsync(client, run, new RunCompletion(RunOutcome.Failed, "terraform apply failed"));
+
+        using var scope = _factory.Services.CreateScope();
+        var completed = await scope.ServiceProvider.GetRequiredService<IRunCompletionHandler>()
+            .CompleteAsync(run.Id, RunResult.FromExitCode(0, "container-1"), CancellationToken.None);
+
+        Assert.False(completed);
+        var (deployment, stored) = await LoadRunAsync(run.Id);
+        Assert.Equal(DeploymentStatus.Failed, deployment.Status);
+        Assert.Equal(DeploymentRunStatus.Failed, stored.Status);
+        Assert.Equal(0, stored.ExitCode);
+        Assert.Equal("container-1", stored.RunnerId);
+        var (_, instances, _) = await LoadStateAsync();
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Failed, i.Status));
+    }
+
+    [Fact]
+    public async Task Complete_OutcomeUnknown_Returns400BadRequest()
+    {
+        var (run, client) = await PlanRunAsync(DeploymentRunOperation.Provision);
+
+        var response = await client.PostAsync(RunnerRoutes.ForRun(run.Id.Value, RunnerRoutes.Complete),
+            new StringContent("""{"outcome":7}""", System.Text.Encoding.UTF8, "application/json"));
+        var body = await response.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(CompleteRunEndpoint.InvalidOutcomeErrorCode, Assert.Single(body!.Errors).Code);
+        Assert.Equal(DeploymentRunStatus.Running, (await LoadRunAsync(run.Id)).Run.Status);
+    }
+
+    private async Task<(DeploymentRun Run, HttpClient Client)> PlanRunAsync(DeploymentRunOperation operation)
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var deployments = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
+            var deployment = await deployments.GetByIdAsync(_deployment.Id)
+                             ?? throw new InvalidOperationException("The deployment was not found.");
+            await deployments.UpdateAsync(operation == DeploymentRunOperation.Destroy
+                ? deployment.Start().Succeed().StartDestroy()
+                : deployment.Start());
+        }
+
+        var (run, client) = await StartRunAsync(operation);
+        var response = await client.PostAsJsonAsync(RunnerRoutes.ForRun(run.Id.Value, RunnerRoutes.Plan),
+            new ScoreSubmission(MultiResourceScore("Standard_LRS")), RunnerContract.JsonOptions);
+        response.EnsureSuccessStatusCode();
+
+        return (run, client);
+    }
+
+    private static Task<HttpResponseMessage> CompleteAsync(HttpClient client, DeploymentRun run,
+        RunCompletion completion) =>
+        client.PostAsJsonAsync(RunnerRoutes.ForRun(run.Id.Value, RunnerRoutes.Complete), completion,
+            RunnerContract.JsonOptions);
+
+    private async Task<(Deployment Deployment, DeploymentRun Run)> LoadRunAsync(DeploymentRunId runId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var run = await scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>().GetByIdAsync(runId)
+                  ?? throw new InvalidOperationException("The run was not found.");
+        var deployment = await scope.ServiceProvider.GetRequiredService<IDeploymentRepository>()
+                             .GetByIdAsync(run.DeploymentId)
+                         ?? throw new InvalidOperationException("The deployment was not found.");
+        return (deployment, run);
+    }
+
     private async Task RunAsync(DeploymentRunOperation operation, ScoreFile scoreFile, RunOutcome outcome)
     {
         var (run, client) = await StartRunAsync(operation);

@@ -128,13 +128,13 @@ public sealed class RunnerAuthenticationTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    public async Task RunnerApi_WhenTokenWasRevokedByCompletion_ShouldReturn401Unauthorized(long exitCode)
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RunnerApi_WhenTokenWasRevokedByCompletion_ShouldReturn401Unauthorized(bool succeeded)
     {
         // Arrange
         var (run, token) = IssueToken(Running());
-        _runs.Update(run.Complete(exitCode, null));
+        _runs.Update(succeeded ? run.Succeed(0) : run.Fail("The runner exited with code 1.", 1));
 
         // Act
         var response = await SendAsync(RunUrl(run.Id), token.Value);
@@ -148,7 +148,7 @@ public sealed class RunnerAuthenticationTests : IAsyncLifetime
     {
         // Arrange
         var (run, token) = IssueToken(Running());
-        _runs.Update(run.Interrupt("The API restarted before the run finished."));
+        _runs.Update(run.Fail("The API restarted before the run finished."));
 
         // Act
         var response = await SendAsync(RunUrl(run.Id), token.Value);

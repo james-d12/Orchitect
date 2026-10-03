@@ -281,12 +281,19 @@ Three callers share that handler:
 | Caller | When | Outcome source |
 |---|---|---|
 | `POST /complete` | The runner reports | The report. The exit code is recorded later but doesn't override it. |
-| `DeploymentQueue` | The executor returns and the run is still `Running` (no report arrived) | Exit code, using today's `ProcessDeploymentStatus` mapping |
+| `DeploymentQueue` | The executor returns and the run is still `Running` (no report arrived) | Exit code, mapped by `RunResult.FromExitCode` |
 | `RunnerContainerSweepService` | The API restarted mid-run | Exit code of the labelled container, or `Failed` when there is none |
 
 So a run whose report never reaches the API (API down, network failure) still ends in a consistent state. The runner retries `/complete` with backoff before it exits.
 
-**Stale run writes.** `DeploymentQueue` keeps the `DeploymentRun` it read when the run started and writes the whole row back when the executor returns (`run.Complete(...)`, `run.Interrupt(...)`). Once `/complete` writes the outcome and revokes the token, that write would overwrite them. The queue must re-read the run before completing it, or the update must only apply while the run is still `Running`. This is also why the plan lives in its own table rather than on `DeploymentRun`.
+**Status (#106).** Implemented:
+
+- **Handler.** `IRunCompletionHandler` (Dispatch, `Completion/`) takes a `RunResult`: the outcome, an error summary, and the exit code and container ID when they are known. In one transaction it locks the run's row (`IDeploymentRunRepository.LockAsync`), re-reads the run and the deployment, and finishes the run (which revokes the token). It sets the `Deployment` only while the deployment is still active for this run's operation and this is its latest run. After the commit it calls `IRunCompleter` (#204) with the run's final outcome to move the planned instances and, after a destroy, release the resources.
+- **Stale run writes.** These are gone. The handler always works from the run it re-read under the lock, so a report and the exit-code fallback that race take turns, and the second one only records its exit code. On a `DeploymentRunConflictException` from a writer that doesn't lock, such as a cancel request, it retries once with a fresh read.
+- **Repeat calls.** For a run that has already completed, the handler only fills in a missing exit code and container ID, and returns `false`. A repeat `POST /complete` never reaches the handler, because completion revoked the token: it gets `401`.
+- **Cancellation.** It stays outside the handler. When a stopped runner exits non-zero and the run is still active, the queue and the sweep cancel it as before (#210). If the runner already reported, the report wins.
+- **Endpoint.** `POST /internal/runs/{runId}/complete` (`CompleteRunEndpoint`) returns `204`, or `400` with `InvalidRunOutcome` for an outcome outside `Succeeded`/`Failed`.
+- **Runner.** `EngineOrchestrator` reports through `IRunnerApiClient.CompleteAsync`. Until #105 that is `InProcessRunnerApiClient`, which calls the handler directly. A runner that crashes before reporting is settled by the exit-code fallback, so its instances no longer stay `Provisioning` or `Removing`.
 
 ---
 

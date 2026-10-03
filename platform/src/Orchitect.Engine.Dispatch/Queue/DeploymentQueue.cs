@@ -51,23 +51,26 @@ public sealed class DeploymentQueue : IDeploymentQueue
             var deployments = sp.GetRequiredService<IDeploymentRepository>();
             var runs = sp.GetRequiredService<IDeploymentRunRepository>();
             var completer = sp.GetRequiredService<IRunCompleter>();
+            var completion = sp.GetRequiredService<IRunCompletionHandler>();
             using var stop = _cancellation.Track(request.RunId);
 
             try
             {
-                await RunAsync(deployments, runs, completer, request, activity, stop.StopRequested, ct);
+                await RunAsync(deployments, runs, completer, completion, request, activity, stop.StopRequested,
+                    ct);
             }
             catch (Exception exception) when (!ct.IsCancellationRequested)
             {
                 activity.RecordException(exception);
-                await FailOwnedRunAsync(deployments, runs, request, exception);
+                await FailRunAsync(completion, request, exception);
                 throw;
             }
         });
     }
 
     private async Task RunAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
-        IRunCompleter completer, DeploymentQueueRequest request, Activity? activity, CancellationToken stopRequested, CancellationToken ct)
+        IRunCompleter completer, IRunCompletionHandler completion, DeploymentQueueRequest request, Activity? activity,
+        CancellationToken stopRequested, CancellationToken ct)
     {
         var deployment = await deployments.GetByIdAsync(request.DeploymentId, ct)
                          ?? throw new InvalidOperationException(
@@ -109,28 +112,36 @@ public sealed class DeploymentQueue : IDeploymentQueue
 
         var result = await ExecuteAsync(request, run, token, stopRequested, ct);
 
-        if (result.Stopped && result.ExitCode != 0)
+        if (result.Exception is OperationCanceledException && ct.IsCancellationRequested)
+        {
+            _logger.LogInformation(
+                "Run {RunId} of deployment {DeploymentId} was left running because the API is shutting down.",
+                run.Id.Value, deployment.Id.Value);
+            return;
+        }
+
+        if (result.Stopped && result.ExitCode != 0 &&
+            (await runs.GetByIdAsync(run.Id, CancellationToken.None))?.IsActive == true)
         {
             await CancelAsync(deployments, runs, completer, deployment, run, result);
             return;
         }
 
-        var exception = result.Exception is OperationCanceledException && !ct.IsCancellationRequested
-            ? new TimeoutException(
-                $"Deployment '{deployment.Id.Value}' was cancelled without the API shutting down.",
-                result.Exception)
-            : result.Exception;
-
-        var processed = deployment.ProcessDeploymentStatus(result.ExitCode, exception);
-        if (processed != deployment)
+        var runResult = result switch
         {
-            await deployments.UpdateAsync(processed, CancellationToken.None);
-        }
+            { Exception: OperationCanceledException } => RunResult.Failure(
+                $"Deployment '{deployment.Id.Value}' was cancelled without the API shutting down.",
+                result.ExitCode, result.RunnerId),
+            { Exception: { } exception } => RunResult.Failure(exception.Message, result.ExitCode, result.RunnerId),
+            { ExitCode: { } exitCode } => RunResult.FromExitCode(exitCode, result.RunnerId),
+            _ => throw new InvalidOperationException("A run result needs an exit code or an exception.")
+        };
 
-        var completed = await UpdateRunAsync(runs, run, r => r.Complete(result.ExitCode, exception, result.RunnerId));
+        var completed = await completion.CompleteAsync(run.Id, runResult, CancellationToken.None);
 
-        _logger.LogInformation("Deployment {DeploymentId} is {Status} after run {RunId} {RunStatus}.",
-            processed.Id.Value, processed.Status, completed.Id.Value, completed.Status);
+        _logger.LogInformation(
+            "Run {RunId} of deployment {DeploymentId} exited with {ExitCode}; {Source} decided its outcome.",
+            run.Id.Value, deployment.Id.Value, result.ExitCode, completed ? "the exit code" : "the runner's report");
     }
 
     private async Task CancelAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
@@ -200,32 +211,13 @@ public sealed class DeploymentQueue : IDeploymentQueue
         return next == run ? run : await runs.UpdateAsync(next, CancellationToken.None) ?? next;
     }
 
-    private async Task FailOwnedRunAsync(IDeploymentRepository deployments, IDeploymentRunRepository runs,
-        DeploymentQueueRequest request, Exception failure)
+    private async Task FailRunAsync(IRunCompletionHandler completion, DeploymentQueueRequest request,
+        Exception failure)
     {
         try
         {
-            var run = await runs.GetByIdAsync(request.RunId, CancellationToken.None);
-
-            if (run is null)
-            {
-                return;
-            }
-
-            var deployment = await deployments.GetByIdAsync(request.DeploymentId, CancellationToken.None);
-            var owned = run.Operation == DeploymentRunOperation.Destroy
-                ? deployment?.Status == DeploymentStatus.Destroying
-                : deployment?.Status is DeploymentStatus.Pending or DeploymentStatus.Deploying;
-
-            if (deployment is not null && owned)
-            {
-                await deployments.UpdateAsync(deployment.Interrupt(failure.Message), CancellationToken.None);
-                _logger.LogWarning(
-                    "Deployment {DeploymentId} was {Status} when its work item failed and is now Failed.",
-                    deployment.Id.Value, deployment.Status);
-            }
-
-            await UpdateRunAsync(runs, run, r => r.IsActive ? r.Interrupt(failure.Message) : r);
+            await completion.CompleteAsync(request.RunId, RunResult.Failure(failure.Message),
+                CancellationToken.None);
         }
         catch (Exception exception)
         {

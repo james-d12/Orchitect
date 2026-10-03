@@ -46,77 +46,181 @@ public sealed class DeploymentRunTests
         Assert.Throws<InvalidOperationException>(() => Running().Start());
     }
 
+    [Fact]
+    public void Succeed_Running_RecordsExitCodeAndRunner()
+    {
+        var succeeded = Running().Succeed(0, "container-1");
+
+        Assert.Equal(DeploymentRunStatus.Succeeded, succeeded.Status);
+        Assert.Equal(0, succeeded.ExitCode);
+        Assert.Equal("container-1", succeeded.RunnerId);
+        Assert.Null(succeeded.ErrorSummary);
+        Assert.NotNull(succeeded.FinishedAt);
+        Assert.False(succeeded.IsActive);
+    }
+
+    [Fact]
+    public void Succeed_FromReport_LeavesExitCodeUnset()
+    {
+        var succeeded = Running().Succeed();
+
+        Assert.Equal(DeploymentRunStatus.Succeeded, succeeded.Status);
+        Assert.Null(succeeded.ExitCode);
+    }
+
+    [Fact]
+    public void Succeed_NotRunning_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => Queued().Succeed(0));
+        Assert.Throws<InvalidOperationException>(() => Running().Fail("failed").Succeed(0));
+    }
+
+    [Fact]
+    public void Fail_Running_RecordsErrorSummary()
+    {
+        var failed = Running().Fail("The runner exited with code 2.", 2, "container-1");
+
+        Assert.Equal(DeploymentRunStatus.Failed, failed.Status);
+        Assert.Equal("The runner exited with code 2.", failed.ErrorSummary);
+        Assert.Equal(2, failed.ExitCode);
+        Assert.Equal("container-1", failed.RunnerId);
+        Assert.NotNull(failed.FinishedAt);
+    }
+
+    [Fact]
+    public void Fail_Queued_Fails()
+    {
+        var failed = Queued().Fail("could not queue");
+
+        Assert.Equal(DeploymentRunStatus.Failed, failed.Status);
+        Assert.Equal("could not queue", failed.ErrorSummary);
+        Assert.NotNull(failed.FinishedAt);
+    }
+
+    [Fact]
+    public void Fail_LongErrorSummary_IsTruncated()
+    {
+        var failed = Running().Fail(new string('x', 5000));
+
+        Assert.Equal(DeploymentRun.ErrorSummaryMaxLength, failed.ErrorSummary!.Length);
+    }
+
     [Theory]
-    [InlineData(0, DeploymentRunStatus.Succeeded)]
-    [InlineData(1, DeploymentRunStatus.Failed)]
-    [InlineData(137, DeploymentRunStatus.Failed)]
-    public void Complete_ExitCode_DecidesStatusAndIsRecorded(long exitCode, DeploymentRunStatus expected)
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Fail_BlankErrorSummary_Throws(string errorSummary)
     {
-        var completed = Running().Complete(exitCode, null, "container-1");
-
-        Assert.Equal(expected, completed.Status);
-        Assert.Equal(exitCode, completed.ExitCode);
-        Assert.Equal("container-1", completed.RunnerId);
-        Assert.NotNull(completed.FinishedAt);
-        Assert.False(completed.IsActive);
+        Assert.Throws<ArgumentException>(() => Running().Fail(errorSummary));
     }
 
     [Fact]
-    public void Complete_NonZeroExitCode_SetsErrorSummary()
+    public void Fail_Finished_Throws()
     {
-        var completed = Running().Complete(2, null);
-
-        Assert.Equal("The runner exited with code 2.", completed.ErrorSummary);
+        Assert.Throws<InvalidOperationException>(() => Running().Succeed(0).Fail("late"));
     }
 
     [Fact]
-    public void Complete_Exception_FailsWithMessage()
+    public void RecordExit_AfterReport_KeepsOutcomeAndRecordsExitCode()
     {
-        var completed = Running().Complete(null, new TimeoutException("too slow"));
+        var reported = Running().Fail("terraform apply failed");
 
-        Assert.Equal(DeploymentRunStatus.Failed, completed.Status);
-        Assert.Equal("too slow", completed.ErrorSummary);
-        Assert.Null(completed.ExitCode);
+        var recorded = reported.RecordExit(0, "container-1");
+
+        Assert.Equal(DeploymentRunStatus.Failed, recorded.Status);
+        Assert.Equal("terraform apply failed", recorded.ErrorSummary);
+        Assert.Equal(0, recorded.ExitCode);
+        Assert.Equal("container-1", recorded.RunnerId);
     }
 
     [Fact]
-    public void Complete_Cancelled_StaysRunning()
+    public void RecordExit_ExitCodeAlreadyRecorded_KeepsIt()
     {
-        var running = Running();
+        var finished = Running().Fail("The runner exited with code 1.", 1, "container-1");
 
-        var completed = running.Complete(null, new OperationCanceledException());
-
-        Assert.Equal(running, completed);
+        Assert.Equal(finished, finished.RecordExit(0, "container-2"));
     }
 
     [Fact]
-    public void Complete_LongErrorSummary_IsTruncated()
+    public void RecordExit_Active_Throws()
     {
-        var completed = Running().Complete(null, new InvalidOperationException(new string('x', 5000)));
-
-        Assert.Equal(DeploymentRun.ErrorSummaryMaxLength, completed.ErrorSummary!.Length);
+        Assert.Throws<InvalidOperationException>(() => Running().RecordExit(0));
     }
 
     [Fact]
-    public void Complete_NoResult_Throws()
+    public void IssueToken_Running_StoresHashAndExpiry()
     {
-        Assert.Throws<ArgumentException>(() => Running().Complete(null, null));
+        var expiresAt = DateTime.UtcNow.AddHours(1);
+
+        var run = Running().IssueToken("hash", expiresAt);
+
+        Assert.Equal("hash", run.TokenHash);
+        Assert.Equal(expiresAt, run.TokenExpiresAt);
     }
 
     [Fact]
-    public void Complete_NotRunning_Throws()
+    public void IssueToken_Finished_Throws()
     {
-        Assert.Throws<InvalidOperationException>(() => Queued().Complete(0, null));
+        Assert.Throws<InvalidOperationException>(() =>
+            Running().Succeed(0).IssueToken("hash", DateTime.UtcNow.AddHours(1)));
     }
 
     [Fact]
-    public void Interrupt_Queued_Fails()
+    public void IssueToken_EmptyHash_Throws()
     {
-        var interrupted = Queued().Interrupt("could not queue");
+        Assert.Throws<ArgumentException>(() => Running().IssueToken(" ", DateTime.UtcNow.AddHours(1)));
+    }
 
-        Assert.Equal(DeploymentRunStatus.Failed, interrupted.Status);
-        Assert.Equal("could not queue", interrupted.ErrorSummary);
-        Assert.NotNull(interrupted.FinishedAt);
+    [Fact]
+    public void HasValidToken_ActiveAndUnexpired_IsTrue()
+    {
+        var now = DateTime.UtcNow;
+
+        Assert.True(Queued().IssueToken("hash", now.AddMinutes(1)).HasValidToken(now));
+        Assert.True(Running().IssueToken("hash", now.AddMinutes(1)).HasValidToken(now));
+    }
+
+    [Fact]
+    public void HasValidToken_Expired_IsFalse()
+    {
+        var now = DateTime.UtcNow;
+
+        Assert.False(Running().IssueToken("hash", now).HasValidToken(now));
+    }
+
+    [Fact]
+    public void HasValidToken_NoToken_IsFalse()
+    {
+        Assert.False(Running().HasValidToken(DateTime.UtcNow));
+    }
+
+    [Theory]
+    [InlineData(DeploymentRunStatus.Succeeded)]
+    [InlineData(DeploymentRunStatus.Failed)]
+    [InlineData(DeploymentRunStatus.Cancelled)]
+    public void HasValidToken_RunNotActive_IsFalse(DeploymentRunStatus status)
+    {
+        var now = DateTime.UtcNow;
+        var run = Running().IssueToken("hash", now.AddHours(1)) with { Status = status };
+
+        Assert.False(run.HasValidToken(now));
+    }
+
+    [Fact]
+    public void Succeed_RevokesToken()
+    {
+        var succeeded = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1)).Succeed(0);
+
+        Assert.Null(succeeded.TokenHash);
+        Assert.Null(succeeded.TokenExpiresAt);
+    }
+
+    [Fact]
+    public void Fail_RevokesToken()
+    {
+        var failed = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1)).Fail("lost");
+
+        Assert.Null(failed.TokenHash);
+        Assert.Null(failed.TokenExpiresAt);
     }
 
     [Fact]
@@ -169,114 +273,23 @@ public sealed class DeploymentRunTests
     [Fact]
     public void RequestCancel_Finished_Throws()
     {
-        Assert.Throws<InvalidOperationException>(() => Running().Complete(0, null).RequestCancel(DateTime.UtcNow));
+        Assert.Throws<InvalidOperationException>(() => Running().Succeed(0).RequestCancel(DateTime.UtcNow));
     }
 
     [Fact]
-    public void CompleteOrCancel_KeepsCancelRequestedAt()
+    public void SucceedOrCancel_KeepsCancelRequestedAt()
     {
         var now = DateTime.UtcNow;
         var requested = Running().RequestCancel(now);
 
-        Assert.Equal(now, requested.Complete(0, null).CancelRequestedAt);
+        Assert.Equal(now, requested.Succeed(0).CancelRequestedAt);
         Assert.Equal(now, requested.Cancel(143).CancelRequestedAt);
     }
 
     [Fact]
     public void Cancel_Finished_Throws()
     {
-        Assert.Throws<InvalidOperationException>(() => Running().Complete(0, null).Cancel());
-    }
-
-    [Fact]
-    public void Interrupt_Finished_Throws()
-    {
-        Assert.Throws<InvalidOperationException>(() => Running().Complete(0, null).Interrupt("late"));
-    }
-
-    [Fact]
-    public void IssueToken_Running_StoresHashAndExpiry()
-    {
-        var expiresAt = DateTime.UtcNow.AddHours(1);
-
-        var run = Running().IssueToken("hash", expiresAt);
-
-        Assert.Equal("hash", run.TokenHash);
-        Assert.Equal(expiresAt, run.TokenExpiresAt);
-    }
-
-    [Fact]
-    public void IssueToken_Finished_Throws()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            Running().Complete(0, null).IssueToken("hash", DateTime.UtcNow.AddHours(1)));
-    }
-
-    [Fact]
-    public void IssueToken_EmptyHash_Throws()
-    {
-        Assert.Throws<ArgumentException>(() => Running().IssueToken(" ", DateTime.UtcNow.AddHours(1)));
-    }
-
-    [Fact]
-    public void HasValidToken_ActiveAndUnexpired_IsTrue()
-    {
-        var now = DateTime.UtcNow;
-
-        Assert.True(Queued().IssueToken("hash", now.AddMinutes(1)).HasValidToken(now));
-        Assert.True(Running().IssueToken("hash", now.AddMinutes(1)).HasValidToken(now));
-    }
-
-    [Fact]
-    public void HasValidToken_Expired_IsFalse()
-    {
-        var now = DateTime.UtcNow;
-
-        Assert.False(Running().IssueToken("hash", now).HasValidToken(now));
-    }
-
-    [Fact]
-    public void HasValidToken_NoToken_IsFalse()
-    {
-        Assert.False(Running().HasValidToken(DateTime.UtcNow));
-    }
-
-    [Theory]
-    [InlineData(DeploymentRunStatus.Succeeded)]
-    [InlineData(DeploymentRunStatus.Failed)]
-    [InlineData(DeploymentRunStatus.Cancelled)]
-    public void HasValidToken_RunNotActive_IsFalse(DeploymentRunStatus status)
-    {
-        var now = DateTime.UtcNow;
-        var run = Running().IssueToken("hash", now.AddHours(1)) with { Status = status };
-
-        Assert.False(run.HasValidToken(now));
-    }
-
-    [Fact]
-    public void Complete_RevokesToken()
-    {
-        var completed = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1)).Complete(0, null);
-
-        Assert.Null(completed.TokenHash);
-        Assert.Null(completed.TokenExpiresAt);
-    }
-
-    [Fact]
-    public void Interrupt_RevokesToken()
-    {
-        var interrupted = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1)).Interrupt("lost");
-
-        Assert.Null(interrupted.TokenHash);
-        Assert.Null(interrupted.TokenExpiresAt);
-    }
-
-    [Fact]
-    public void Complete_Cancelled_KeepsToken()
-    {
-        var running = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1));
-
-        Assert.Equal("hash", running.Complete(null, new OperationCanceledException()).TokenHash);
+        Assert.Throws<InvalidOperationException>(() => Running().Succeed(0).Cancel());
     }
 
     private static DeploymentRun Queued() => DeploymentRun.Queue(new DeploymentId(), DeploymentRunOperation.Provision);
