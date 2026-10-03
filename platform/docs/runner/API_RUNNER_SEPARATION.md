@@ -3,7 +3,7 @@ title: "API / runner separation (target design)"
 status: active
 workstream: runner
 milestone: "Runner Isolation"
-issues: [102, 103, 105, 106, 107, 110, 202, 203, 204]
+issues: [102, 103, 105, 106, 107, 110, 202, 203, 204, 213, 214, 215]
 superseded_by: null
 last_reviewed: 2026-10-03
 ---
@@ -252,9 +252,9 @@ The round-trip test (#117) and the shared constants (#118) cover whatever env/ar
 - **Contract.** `RunInput` also carries `TemplateName`, which keeps the Terraform module names (and so the state addresses) unchanged, and `Provider` (`RunInputProvider`), which picks the provisioner. Renaming a template therefore changes its module addresses, and Terraform destroys and recreates its resources.
 - **Runner.** Provisioners, drivers and validators take `RunInput`/`RunContext`, and Execution no longer references any resource repository. `EngineOrchestrator` parses the score, calls `IRunnerApiClient.SubmitScoreAsync`, executes the plan and reports through `CompleteAsync`. Until #105, the runner registers `InProcessRunnerApiClient`, which calls `IRunPlanner` and `IRunCompleter` directly over its database connection. That is why `Orchitect.Runner` references `Orchitect.Engine.Dispatch` for now. #105 removes the reference and the Dockerfile `COPY`, and adds a layering test that the runner doesn't reference Dispatch.
 - **Follow-ups.** These behaviours moved over unchanged and are now the API's to fix:
-  - Destroy resolves each template's latest active version, not the version the instance was provisioned with (`ResourceInstance.TemplateVersionId`). After a version bump, destroy runs a different module, and a template with no active version can't be destroyed.
-  - A resource shared through the score's `id` is moved to `Removing` and `Removed` by one consumer's destroy, even while other applications still consume it.
-  - The API trusts the submitted score. `Metadata.Name` becomes `RunContext.ProjectName`, which fills the backend's `{projectName}` placeholder, and `id` picks resource slugs across the environment. Once the runner is untrusted (#105, H1), the project name should come from the application and `id` claims should be checked.
+  - Destroy resolves each template's latest active version, not the version the instance was provisioned with (`ResourceInstance.TemplateVersionId`). After a version bump, destroy runs a different module, and a template with no active version can't be destroyed (#213).
+  - A resource shared through the score's `id` is moved to `Removing` and `Removed` by one consumer's destroy, even while other applications still consume it (#214).
+  - The API trusts the submitted score. `Metadata.Name` becomes `RunContext.ProjectName`, which fills the backend's `{projectName}` placeholder, and `id` picks resource slugs across the environment. Once the runner is untrusted (#105, H1), the project name should come from the application and `id` claims should be checked (#215).
 
 **Status (#203).** Implemented:
 
