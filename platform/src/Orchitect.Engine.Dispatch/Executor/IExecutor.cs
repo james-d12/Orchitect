@@ -29,7 +29,7 @@ public sealed record ExecutorContext
     public TimeSpan? Timeout { get; init; }
 }
 
-public sealed record ExecutorResult(long? ExitCode, Exception? Exception = null);
+public sealed record ExecutorResult(long? ExitCode, Exception? Exception = null, string? RunnerId = null);
 
 public interface IExecutor
 {

@@ -19,6 +19,8 @@ public sealed class RunnerContainerSweepServiceTests
 
     private readonly IContainerOperations _containers = Substitute.For<IContainerOperations>();
     private readonly IDeploymentRepository _deployments = Substitute.For<IDeploymentRepository>();
+    private readonly IDeploymentRunRepository _runs = Substitute.For<IDeploymentRunRepository>();
+    private readonly Dictionary<DeploymentId, DeploymentRun> _latestRuns = [];
     private readonly RunnerContainerSweepService _service;
 
     public RunnerContainerSweepServiceTests()
@@ -27,7 +29,8 @@ public sealed class RunnerContainerSweepServiceTests
         docker.Containers.Returns(_containers);
 
         _service = new RunnerContainerSweepService(
-            new ServiceCollection().AddSingleton(docker).AddSingleton(_deployments).BuildServiceProvider(),
+            new ServiceCollection().AddSingleton(docker).AddSingleton(_deployments).AddSingleton(_runs)
+                .BuildServiceProvider(),
             Options.Create(new ExecutorOptions
             {
                 Image = "orchitect-runner:test",
@@ -60,24 +63,59 @@ public sealed class RunnerContainerSweepServiceTests
         await _service.SweepAsync(CancellationToken.None);
 
         await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Failed);
+        await AssertRunUpdatedAsync(deployment, DeploymentRunStatus.Failed);
     }
 
     [Theory]
-    [InlineData(0, DeploymentStatus.Deployed)]
-    [InlineData(1, DeploymentStatus.Failed)]
+    [InlineData(0, DeploymentStatus.Deployed, DeploymentRunStatus.Succeeded)]
+    [InlineData(1, DeploymentStatus.Failed, DeploymentRunStatus.Failed)]
     public async Task SweepAsync_DeployingWithExitedContainer_AppliesExitCodeThenRemovesContainer(long exitCode,
-        DeploymentStatus expected)
+        DeploymentStatus expected, DeploymentRunStatus expectedRun)
     {
         var deployment = NewDeployment().Start();
         SetActiveDeployments(deployment);
-        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), deployment.Id));
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), RunIdOf(deployment)));
         _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
             .Returns(new ContainerInspectResponse { State = new State { ExitCode = exitCode } });
 
         await _service.SweepAsync(CancellationToken.None);
 
         await AssertUpdatedAsync(deployment.Id, expected);
+        await AssertRunUpdatedAsync(deployment, expectedRun);
+        await _runs.Received(1).UpdateAsync(Arg.Is<DeploymentRun>(r => r.ExitCode == exitCode && r.RunnerId == "old"),
+            Arg.Any<CancellationToken>());
         await AssertRemovedAsync("old");
+    }
+
+    [Fact]
+    public async Task SweepAsync_RunWithExitedContainer_RevokesToken()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), RunIdOf(deployment)));
+        _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
+            .Returns(new ContainerInspectResponse { State = new State { ExitCode = 0 } });
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await _runs.Received(1).UpdateAsync(
+            Arg.Is<DeploymentRun>(r => r.Id == RunIdOf(deployment) && r.TokenHash == null && r.TokenExpiresAt == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SweepAsync_RunWithoutContainer_RevokesToken()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers();
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await _runs.Received(1).UpdateAsync(
+            Arg.Is<DeploymentRun>(r => r.Id == RunIdOf(deployment) && r.Status == DeploymentRunStatus.Failed &&
+                                       r.TokenHash == null),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -85,13 +123,14 @@ public sealed class RunnerContainerSweepServiceTests
     {
         var deployment = NewDeployment().Start().ProcessDeploymentStatus(0, null).StartDestroy();
         SetActiveDeployments(deployment);
-        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), deployment.Id));
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), RunIdOf(deployment)));
         _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
             .Returns(new ContainerInspectResponse { State = new State { ExitCode = 0 } });
 
         await _service.SweepAsync(CancellationToken.None);
 
         await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Destroyed);
+        await AssertRunUpdatedAsync(deployment, DeploymentRunStatus.Succeeded);
     }
 
     [Theory]
@@ -101,7 +140,7 @@ public sealed class RunnerContainerSweepServiceTests
     {
         var deployment = NewDeployment().Start();
         SetActiveDeployments(deployment);
-        SetContainers(Container("old", state, DateTime.UtcNow.AddMinutes(-1), deployment.Id));
+        SetContainers(Container("old", state, DateTime.UtcNow.AddMinutes(-1), RunIdOf(deployment)));
 
         await _service.SweepAsync(CancellationToken.None);
 
@@ -126,11 +165,52 @@ public sealed class RunnerContainerSweepServiceTests
     {
         var deployment = NewDeployment().Start();
         SetActiveDeployments(deployment);
-        SetContainers(Container("running", "running", DateTime.UtcNow.AddMinutes(-1), deployment.Id));
+        SetContainers(Container("running", "running", DateTime.UtcNow.AddMinutes(-1), RunIdOf(deployment)));
 
         await _service.SweepAsync(CancellationToken.None);
 
         await _deployments.DidNotReceive().UpdateAsync(Arg.Any<Deployment>(), Arg.Any<CancellationToken>());
+        await _runs.DidNotReceive().UpdateAsync(Arg.Any<DeploymentRun>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SweepAsync_DeployingWithContainerOfDeploymentIdOnly_IsFailed()
+    {
+        var deployment = NewDeployment().Start();
+        SetActiveDeployments(deployment);
+        SetContainers(Container("legacy", "running", DateTime.UtcNow.AddMinutes(-1),
+            new DeploymentRunId(deployment.Id.Value)));
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Failed);
+        await AssertRunUpdatedAsync(deployment, DeploymentRunStatus.Failed);
+    }
+
+    [Fact]
+    public async Task SweepAsync_DeployingWithoutRunAndContainerOfDeploymentId_IsLeftActive()
+    {
+        var deployment = NewDeployment().Start();
+        _deployments.GetActiveAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([deployment]);
+        SetContainers(Container("legacy", "running", DateTime.UtcNow.AddMinutes(-1),
+            new DeploymentRunId(deployment.Id.Value)));
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await _deployments.DidNotReceive().UpdateAsync(Arg.Any<Deployment>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SweepAsync_DeployingWithoutRun_IsFailed()
+    {
+        var deployment = NewDeployment().Start();
+        _deployments.GetActiveAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([deployment]);
+        SetContainers();
+
+        await _service.SweepAsync(CancellationToken.None);
+
+        await AssertUpdatedAsync(deployment.Id, DeploymentStatus.Failed);
+        await _runs.DidNotReceive().UpdateAsync(Arg.Any<DeploymentRun>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -139,7 +219,7 @@ public sealed class RunnerContainerSweepServiceTests
         var failing = NewDeployment().Start();
         var pending = NewDeployment();
         SetActiveDeployments(failing, pending);
-        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), failing.Id));
+        SetContainers(Container("old", "exited", DateTime.UtcNow.AddMinutes(-1), RunIdOf(failing)));
         _containers.InspectContainerAsync("old", Arg.Any<CancellationToken>())
             .ThrowsAsync(new DockerApiException(System.Net.HttpStatusCode.InternalServerError, "boom"));
 
@@ -228,7 +308,7 @@ public sealed class RunnerContainerSweepServiceTests
     }
 
     private static ContainerListResponse Container(string id, string state, DateTime created,
-        DeploymentId? runId = null) => new()
+        DeploymentRunId? runId = null) => new()
         {
             ID = id,
             State = state,
@@ -243,9 +323,29 @@ public sealed class RunnerContainerSweepServiceTests
     private static Deployment NewDeployment() =>
         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)), "test@example.com");
 
-    private void SetActiveDeployments(params Deployment[] deployments) =>
+    private void SetActiveDeployments(params Deployment[] deployments)
+    {
+        foreach (var deployment in deployments)
+        {
+            var operation = deployment.Status == DeploymentStatus.Destroying
+                ? DeploymentRunOperation.Destroy
+                : DeploymentRunOperation.Provision;
+            var run = DeploymentRun.Queue(deployment.Id, operation);
+            _latestRuns[deployment.Id] = (deployment.Status == DeploymentStatus.Pending ? run : run.Start())
+                .IssueToken("token-hash", DateTime.UtcNow.AddHours(1));
+            _runs.GetLatestAsync(deployment.Id, Arg.Any<CancellationToken>()).Returns(_latestRuns[deployment.Id]);
+        }
+
         _deployments.GetActiveAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(deployments);
+    }
+
+    private DeploymentRunId RunIdOf(Deployment deployment) => _latestRuns[deployment.Id].Id;
+
+    private Task<DeploymentRun?> AssertRunUpdatedAsync(Deployment deployment, DeploymentRunStatus status) =>
+        _runs.Received(1).UpdateAsync(
+            Arg.Is<DeploymentRun>(r => r.Id == RunIdOf(deployment) && r.Status == status),
+            Arg.Any<CancellationToken>());
 
     private Task<Deployment?> AssertUpdatedAsync(DeploymentId id, DeploymentStatus status) =>
         _deployments.Received(1).UpdateAsync(Arg.Is<Deployment>(d => d.Id == id && d.Status == status),

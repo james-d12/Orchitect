@@ -1,8 +1,7 @@
-namespace Orchitect.Engine.Execution.Configuration.Score.Models;
+namespace Orchitect.Engine.Contracts.Score;
 
 public sealed record ScoreFile
 {
-    // maps resource-name -> ScoreResource
     public required string ApiVersion { get; init; }
     public required ScoreMetadata Metadata { get; init; }
     public Dictionary<string, ScoreResource>? Resources { get; init; }

@@ -5,7 +5,7 @@ using Orchitect.Domain.Engine.Environment;
 using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceDependency;
 using Orchitect.Domain.Engine.ResourceInstance;
-using Orchitect.Engine.Execution.Configuration.Score.Models;
+using Orchitect.Engine.Contracts.Score;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Engine.Execution.Integration.Tests;

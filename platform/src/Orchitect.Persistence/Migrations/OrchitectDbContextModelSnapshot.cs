@@ -437,6 +437,66 @@ namespace Orchitect.Persistence.Migrations
                     b.ToTable("Deployments", (string)null);
                 });
 
+            modelBuilder.Entity("Orchitect.Domain.Engine.Deployment.DeploymentRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeploymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ErrorSummary")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<long?>("ExitCode")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LogLocation")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("QueuedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("timezone('utc', now())");
+
+                    b.Property<string>("RunnerId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("TokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasFilter("\"TokenHash\" IS NOT NULL");
+
+                    b.HasIndex("DeploymentId", "QueuedAt");
+
+                    b.ToTable("DeploymentRuns", (string)null);
+                });
+
             modelBuilder.Entity("Orchitect.Domain.Engine.Environment.Environment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1269,6 +1329,15 @@ namespace Orchitect.Persistence.Migrations
                     b.HasOne("Orchitect.Domain.Engine.Environment.Environment", null)
                         .WithMany()
                         .HasForeignKey("EnvironmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Engine.Deployment.DeploymentRun", b =>
+                {
+                    b.HasOne("Orchitect.Domain.Engine.Deployment.Deployment", null)
+                        .WithMany()
+                        .HasForeignKey("DeploymentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -5,7 +5,7 @@ workstream: runner
 milestone: "Runner Isolation"
 issues: [102, 103, 105, 106, 107, 110, 202, 203, 204]
 superseded_by: null
-last_reviewed: 2026-10-02
+last_reviewed: 2026-10-03
 ---
 
 # Orchitect Runner Architecture
@@ -82,9 +82,9 @@ The Runner is a worker attached to exactly one run. Every request goes from the 
 
 # 3. Run identity
 
-The runner API needs a stable run ID (#110). Today `RunId = DeploymentId`, but one deployment can have several runs (provision, destroy, retries), and the token and every endpoint below are scoped to a single run.
+The runner API needs a stable run ID, because one deployment can have several runs (provision, destroy, retries), and the token and every endpoint below are scoped to a single run.
 
-`DeploymentRun` is a prerequisite:
+`DeploymentRun` provides it (#110). Every provision and destroy creates one, and its ID is the container name, the `orchitect.run-id` label and `ORCHITECT_RUN_ID`:
 
 | Field | Purpose |
 |---|---|
@@ -197,6 +197,8 @@ Each run gets its own credential, kept as small as possible (#202):
   - Runner tokens can't call user endpoints, and user JWTs can't call `/internal/runs`.
   - The two schemes share no keys.
 
+**Status (#202).** Implemented: `RunnerToken` (Dispatch) generates the token when `DeploymentQueue` starts the run, `DeploymentRun.IssueToken` stores the hash and expiry, and finishing the run in any way clears them. The token goes in `secrets.json` as `ORCHITECT_RUN_TOKEN`. The `Runner` scheme (`RunnerAuthenticationHandler`) and policy guard the `/internal/runs/{runId}` group (`MapRunnerGroup`), and the default policy accepts only user JWTs. The connection string stays in `secrets.json` alongside the token until the runner stops using the database (#105).
+
 **Why not a JWT?** A JWT can't be revoked before it expires without a denylist, which needs a DB lookup anyway. It would also be signed with the same HMAC secret as user tokens (`JwtOptions:Secret`). A hashed opaque token gives revocation for free and adds no new key material.
 
 ---
@@ -211,7 +213,7 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
 
 | Method & path | Request | Response | Notes |
 |---|---|---|---|
-| `GET /` | – | `RunDescriptor` | Operation, application repo URL, commit, application/environment IDs. Moves the run to `Running`. |
+| `GET /` | – | `RunDescriptor` | Operation, application repo URL, commit, application/environment IDs. |
 | `POST /plan` | `ScoreSubmission` | `RunPlan` | See below. Idempotent: a repeat call returns the stored plan. |
 | `POST /complete` | `RunCompletion` | `204` | See §8. Idempotent: a repeat call for a completed run is a no-op. |
 
@@ -226,7 +228,7 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
   - Find the recorded resources for the score's resources and their removable instances.
   - Move those instances to `Removing`.
 - **Either:**
-  - Return the `ProvisionContext` (project name, application/environment IDs) and one `RunInput` per resource.
+  - Return the `RunContext` (project name, application/environment IDs) and one `RunInput` per resource.
   - Each `RunInput` holds the key, template type, version source URL/tag, and parameters.
 
 **DTO sketch:**
@@ -240,6 +242,13 @@ RunCompletion   { Outcome: Succeeded | Failed, ErrorSummary? }
 ```
 
 The round-trip test (#117) and the shared constants (#118) cover whatever env/arg contract is left (backend config, OTel).
+
+**Status (#203).** Implemented:
+
+- **Contracts.** `RunnerRoutes`, `RunnerContract` (header name, version and the shared JSON options), `RunDescriptor`, `ScoreSubmission`, `RunPlan`, `RunContext`, `RunInput`, `RunInputSource`, `RunCompletion` and `RunOutcome` are in `Orchitect.Engine.Contracts/Runner/Api/`. The score models (`ScoreFile` and friends) moved to `Orchitect.Engine.Contracts/Score/` so `ScoreSubmission` can carry the parsed score.
+- **Versioning.** `RunnerContractFilter` runs on every endpoint in `MapRunnerGroup` and returns `400` with the `RunnerContractMismatch` error code when the header is missing or different. Authentication runs first, so a request without a valid token still gets `401`.
+- **Descriptor.** `GET /internal/runs/{runId}` (`GetRunDescriptorEndpoint`). `DeploymentQueue` already moves the run to `Running` when it issues the token, so the endpoint only reads.
+- **Client.** `IRunnerApiClient` in `Orchitect.Engine.Execution`, registered by `AddRunnerApiClient(configuration)`. It reads `ORCHITECT_API_URL`, `ORCHITECT_RUN_ID` and `ORCHITECT_RUN_TOKEN`, sends the token and the contract header, and retries transient failures (5xx, 408, 429, network errors) with exponential backoff and jitter. Each attempt times out after 10s and the whole call after 2 minutes, so a hung request is retried rather than eating the budget. Missing or malformed settings fail options validation with a message naming the variable, at host start (`ValidateOnStart`). It replaces the default resilience handler from `AddServiceDefaults`, so retries don't stack. The runner doesn't use it yet (#105), and nothing sets `ORCHITECT_API_URL` until #107.
 
 ---
 

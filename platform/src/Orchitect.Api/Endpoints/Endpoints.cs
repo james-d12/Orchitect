@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Orchitect.Api.Endpoints.Core;
 using Orchitect.Api.Endpoints.Engine;
+using Orchitect.Api.Endpoints.Internal;
 using Orchitect.Api.Endpoints.Inventory;
 
 namespace Orchitect.Api.Endpoints;
@@ -12,5 +13,6 @@ public static class Endpoints
         app.MapCoreEndpoints();
         app.MapEngineEndpoints();
         app.MapInventoryEndpoints();
+        app.MapRunnerEndpoints();
     }
 }

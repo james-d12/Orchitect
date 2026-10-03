@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using AutoFixture;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -11,7 +12,7 @@ using Orchitect.Api.Integration.Tests.Helpers;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
-using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Dispatch.Auth;
 using Orchitect.Engine.Dispatch.Queue;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
@@ -111,8 +112,38 @@ public sealed class DeploymentIntegrationTests
         Assert.Equal(DeploymentStatus.Destroying, (await GetDeploymentAsync(deployment.Id)).Status);
         Assert.EndsWith($"{DeploymentsUrl}/{deployment.Id.Value}", response.Headers.Location?.ToString());
         var request = Assert.Single(_queue.Requests);
-        Assert.Equal(new DeploymentQueueRequest(deployment.ApplicationId, deployment.Id, RunnerOperation.Destroy),
-            request);
+        var run = await GetLatestRunAsync(deployment.Id);
+        Assert.Equal(new DeploymentQueueRequest(run.Id, deployment.ApplicationId, deployment.Id), request);
+        Assert.Equal(DeploymentRunOperation.Destroy, run.Operation);
+        Assert.Equal(DeploymentRunStatus.Queued, run.Status);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenGettingDeploymentAfterDestroy_ShouldReturnDestroyRunAsLatest()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
+        var created = await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(applicationId, environmentId, NewCommitId()));
+        var deploymentId = Assert.Single(_queue.Requests).DeploymentId;
+        var provisionRun = await GetLatestRunAsync(deploymentId);
+        await UpdateDeploymentAsync((await GetDeploymentAsync(deploymentId)).Start().ProcessDeploymentStatus(0, null));
+        await client.DeleteAsync($"{DeploymentsUrl}/{deploymentId.Value}");
+
+        // Act
+        var response = await client.GetAsync($"{DeploymentsUrl}/{deploymentId.Value}");
+        var body = await response.ReadFromJsonAsync<GetDeploymentEndpoint.GetDeploymentResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, created.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body?.LatestRun);
+        Assert.Equal(2, _queue.Requests.Count);
+        Assert.Equal(_queue.Requests[1].RunId.Value, body.LatestRun.Id);
+        Assert.NotEqual(provisionRun.Id.Value, body.LatestRun.Id);
+        Assert.Equal(nameof(DeploymentRunOperation.Destroy), body.LatestRun.Operation);
+        Assert.Equal(nameof(DeploymentRunStatus.Queued), body.LatestRun.Status);
     }
 
     [Fact]
@@ -167,6 +198,9 @@ public sealed class DeploymentIntegrationTests
         Assert.Equal(DeploymentStatus.Failed, latest.Status);
         Assert.NotNull(latest.CompletedAt);
         Assert.Equal("The deployment could not be queued.", latest.ErrorSummary);
+        var run = await GetLatestRunAsync(latest.Id);
+        Assert.Equal(DeploymentRunStatus.Failed, run.Status);
+        Assert.Equal("The deployment could not be queued.", run.ErrorSummary);
     }
 
     [Fact]
@@ -185,6 +219,9 @@ public sealed class DeploymentIntegrationTests
         var failed = await GetDeploymentAsync(deployment.Id);
         Assert.Equal(DeploymentStatus.Failed, failed.Status);
         Assert.Equal("The destroy could not be queued.", failed.ErrorSummary);
+        var run = await GetLatestRunAsync(deployment.Id);
+        Assert.Equal(DeploymentRunOperation.Destroy, run.Operation);
+        Assert.Equal(DeploymentRunStatus.Failed, run.Status);
     }
 
     [Fact]
@@ -251,10 +288,128 @@ public sealed class DeploymentIntegrationTests
         // Assert
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var request = Assert.Single(_queue.Requests);
-        Assert.Equal(RunnerOperation.Provision, request.Operation);
         var deployment = await GetDeploymentAsync(request.DeploymentId);
         Assert.Equal("test@example.com", deployment.RequestedBy);
         Assert.Null(deployment.StartedAt);
+        var run = await GetLatestRunAsync(request.DeploymentId);
+        Assert.Equal(request.RunId, run.Id);
+        Assert.Equal(DeploymentRunOperation.Provision, run.Operation);
+        Assert.Equal(DeploymentRunStatus.Queued, run.Status);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenGettingCreatedDeployment_ShouldReturnLatestRun()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var (applicationId, environmentId) = await SeedApplicationAndEnvironmentAsync(client);
+        await client.PostAsJsonAsync(DeploymentsUrl,
+            new CreateDeploymentRequest(applicationId, environmentId, NewCommitId()));
+        var request = Assert.Single(_queue.Requests);
+
+        // Act
+        var response = await client.GetAsync($"{DeploymentsUrl}/{request.DeploymentId.Value}");
+        var body = await response.ReadFromJsonAsync<GetDeploymentEndpoint.GetDeploymentResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body?.LatestRun);
+        Assert.Equal(request.RunId.Value, body.LatestRun.Id);
+        Assert.Equal(nameof(DeploymentRunOperation.Provision), body.LatestRun.Operation);
+        Assert.Equal(nameof(DeploymentRunStatus.Queued), body.LatestRun.Status);
+        Assert.Null(body.LatestRun.StartedAt);
+        Assert.Null(body.LatestRun.ExitCode);
+    }
+
+    [Fact]
+    public async Task DeploymentRunRepository_WhenUpdatingRun_ShouldPersistResult()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deployed);
+        var run = DeploymentRun.Queue(deployment.Id, DeploymentRunOperation.Provision);
+
+        // Act
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
+            await runs.CreateAsync(run);
+            await runs.UpdateAsync(run.Start().Complete(1, null, "container-1"));
+        }
+
+        // Assert
+        var stored = await GetLatestRunAsync(deployment.Id);
+        Assert.Equal(run.Id, stored.Id);
+        Assert.Equal(DeploymentRunStatus.Failed, stored.Status);
+        Assert.Equal(1, stored.ExitCode);
+        Assert.Equal("container-1", stored.RunnerId);
+        Assert.Equal("The runner exited with code 1.", stored.ErrorSummary);
+        Assert.NotNull(stored.StartedAt);
+        Assert.NotNull(stored.FinishedAt);
+    }
+
+    [Fact]
+    public async Task DeploymentRunRepository_WhenGettingByTokenHash_ShouldReturnRunUntilRevoked()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deploying);
+        var token = RunnerToken.Generate();
+        var run = DeploymentRun.Queue(deployment.Id, DeploymentRunOperation.Provision).Start()
+            .IssueToken(token.Hash, DateTime.UtcNow.AddHours(1));
+        using var scope = _factory.Services.CreateScope();
+        var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
+        await runs.CreateAsync(run);
+
+        // Act
+        var issued = await runs.GetByTokenHashAsync(token.Hash);
+        await runs.UpdateAsync(run.Complete(0, null));
+        var revoked = await runs.GetByTokenHashAsync(token.Hash);
+
+        // Assert
+        Assert.Equal(run.Id, issued?.Id);
+        Assert.Null(revoked);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenUsingRunnerToken_ShouldReturn401Unauthorized()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deploying);
+        var token = RunnerToken.Generate();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>().CreateAsync(
+                DeploymentRun.Queue(deployment.Id, DeploymentRunOperation.Provision).Start()
+                    .IssueToken(token.Hash, DateTime.UtcNow.AddHours(1)));
+        }
+
+        var runnerClient = _factory.CreateClient();
+        runnerClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
+
+        // Act
+        var response = await runnerClient.GetAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeploymentApi_WhenGettingDeploymentWithoutRuns_ShouldReturnNullLatestRun()
+    {
+        // Arrange
+        var client = await _factory.CreateClient().AddAuthorisationHeader();
+        var deployment = await SeedDeploymentAsync(client, DeploymentStatus.Deployed);
+
+        // Act
+        var response = await client.GetAsync($"{DeploymentsUrl}/{deployment.Id.Value}");
+        var body = await response.ReadFromJsonAsync<GetDeploymentEndpoint.GetDeploymentResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Null(body.LatestRun);
     }
 
     [Theory]
@@ -400,6 +555,15 @@ public sealed class DeploymentIntegrationTests
         var deployment = await scope.ServiceProvider.GetRequiredService<IDeploymentRepository>().GetByIdAsync(id);
         ArgumentNullException.ThrowIfNull(deployment);
         return deployment;
+    }
+
+    private async Task<DeploymentRun> GetLatestRunAsync(DeploymentId deploymentId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var run = await scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>()
+            .GetLatestAsync(deploymentId);
+        ArgumentNullException.ThrowIfNull(run);
+        return run;
     }
 
     private async Task<Deployment> GetLatestDeploymentAsync(ApplicationId applicationId, EnvironmentId environmentId)

@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Shared;
 using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Dispatch.Queue;
 
 namespace Orchitect.Api.Endpoints.Engine.Deployment;
@@ -28,6 +27,8 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
             Guid id,
             [FromServices]
             IDeploymentRepository repository,
+            [FromServices]
+            IDeploymentRunRepository runRepository,
             [FromServices]
             IDeploymentQueue deploymentQueue,
             HttpContext httpContext,
@@ -66,15 +67,26 @@ public sealed class DestroyDeploymentEndpoint : IEndpoint
             return TypedResults.Conflict(exception.Message);
         }
 
+        DeploymentRun? run = null;
+
         try
         {
+            run = await runRepository.CreateAsync(
+                DeploymentRun.Queue(destroying.Id, DeploymentRunOperation.Destroy), cancellationToken)
+                ?? throw new InvalidOperationException("The destroy run could not be created.");
             await deploymentQueue.QueueDeploymentTaskAsync(
-                new DeploymentQueueRequest(destroying.ApplicationId, destroying.Id, RunnerOperation.Destroy),
-                cancellationToken);
+                new DeploymentQueueRequest(run.Id, destroying.ApplicationId, destroying.Id), cancellationToken);
         }
         catch
         {
-            await repository.UpdateAsync(destroying.Interrupt("The destroy could not be queued."), CancellationToken.None);
+            const string reason = "The destroy could not be queued.";
+            await repository.UpdateAsync(destroying.Interrupt(reason), CancellationToken.None);
+
+            if (run is not null)
+            {
+                await runRepository.UpdateAsync(run.Interrupt(reason), CancellationToken.None);
+            }
+
             throw;
         }
 

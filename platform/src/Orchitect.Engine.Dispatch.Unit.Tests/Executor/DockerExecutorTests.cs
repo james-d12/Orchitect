@@ -58,6 +58,22 @@ public sealed class DockerExecutorTests : IDisposable
     }
 
     [Fact]
+    public async Task ExecuteAsync_NamesAndLabelsContainerByRunIdAndReturnsContainerId()
+    {
+        CreateContainerParameters? created = null;
+        _ = _containers.CreateContainerAsync(Arg.Do<CreateContainerParameters>(p => created = p),
+            Arg.Any<CancellationToken>());
+        SetWait(_ => Task.FromResult(new ContainerWaitResponse { StatusCode = 0 }));
+
+        var result = await ExecuteAsync();
+
+        Assert.Equal("orchitect-runner-run-1", created!.Name);
+        Assert.Equal("run-1", created.Labels[RunnerContainerLabels.RunId]);
+        Assert.Contains($"{RunnerEnvironment.RunId}=run-1", created.Env);
+        Assert.Equal(ContainerId, result.RunnerId);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_CopiesSecretsBeforeStartAndKeepsThemOutOfEnv()
     {
         CreateContainerParameters? created = null;
