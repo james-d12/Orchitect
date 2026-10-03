@@ -261,6 +261,30 @@ public sealed class RunPlanIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Plan_RunCancelRequested_Returns409WithoutRecording()
+    {
+        // Arrange
+        var (run, client) = await StartRunAsync(DeploymentRunOperation.Provision);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>()
+                .UpdateAsync(run.RequestCancel(DateTime.UtcNow));
+        }
+
+        // Act
+        var response = await client.PostAsJsonAsync(RunnerRoutes.ForRun(run.Id.Value, RunnerRoutes.Plan),
+            new ScoreSubmission(MultiResourceScore("Standard_LRS")), RunnerContract.JsonOptions);
+        var body = await response.ReadFromJsonAsync<ErrorResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(CreateRunPlanEndpoint.ConflictErrorCode, Assert.Single(body!.Errors).Code);
+        var (resources, instances, _) = await LoadStateAsync();
+        Assert.Empty(resources);
+        Assert.Empty(instances);
+    }
+
+    [Fact]
     public async Task Finish_ProvisionSucceeds_PersistsActiveInstancesWithOutput()
     {
         await RunAsync(DeploymentRunOperation.Provision, MultiResourceScore("Standard_LRS"), RunOutcome.Succeeded);

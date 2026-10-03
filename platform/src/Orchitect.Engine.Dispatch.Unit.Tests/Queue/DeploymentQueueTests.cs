@@ -6,8 +6,10 @@ using Microsoft.Extensions.Options;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.Environment;
 using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Secret;
 using Orchitect.Engine.Dispatch.Auth;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
@@ -18,6 +20,8 @@ namespace Orchitect.Engine.Dispatch.Unit.Tests.Queue;
 public sealed class DeploymentQueueTests
 {
     private readonly RecordingDeploymentRunRepository _runs = new();
+    private readonly DeploymentRunCancellation _cancellation = new();
+    private readonly RecordingRunCompleter _completer = new();
 
     [Fact]
     public async Task WorkItem_ExecutorSucceeds_SetsDeployingThenDeployed()
@@ -156,7 +160,7 @@ public sealed class DeploymentQueueTests
 
         Assert.False(executor.Executed);
         Assert.Equal([DeploymentStatus.Failed], repository.Statuses);
-        Assert.Equal([DeploymentRunStatus.Failed], _runs.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Failed], _runs.Statuses);
     }
 
     [Fact]
@@ -172,7 +176,7 @@ public sealed class DeploymentQueueTests
             await workItem(services, cancellation.Token));
 
         Assert.Empty(repository.Statuses);
-        Assert.Empty(_runs.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running], _runs.Statuses);
     }
 
     [Fact]
@@ -277,6 +281,162 @@ public sealed class DeploymentQueueTests
     }
 
     [Fact]
+    public async Task WorkItem_RunCancelledWhileQueued_DoesNotExecute()
+    {
+        var (deployment, repository, services) = Setup();
+        var executor = new FakeExecutor();
+        var workItem = await QueueAsync(deployment, executor);
+        _runs.Run = _runs.Run!.Cancel();
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.False(executor.Executed);
+        Assert.Empty(repository.Statuses);
+        Assert.Empty(_runs.Statuses);
+    }
+
+    [Fact]
+    public async Task WorkItem_RunCancelledWhileClaiming_DoesNotExecuteOrStartDeployment()
+    {
+        var (deployment, repository, services) = Setup();
+        var executor = new FakeExecutor();
+        var workItem = await QueueAsync(deployment, executor);
+        _runs.Conflicts = 1;
+        _runs.ConcurrentChange = run => run.Cancel();
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.False(executor.Executed);
+        Assert.Empty(repository.Statuses);
+        Assert.Equal(DeploymentRunStatus.Cancelled, _runs.Run!.Status);
+    }
+
+    [Fact]
+    public async Task WorkItem_RunChangedWhileClaimingButStillQueued_FailsRun()
+    {
+        var (deployment, _, services) = Setup();
+        var executor = new FakeExecutor();
+        var workItem = await QueueAsync(deployment, executor);
+        _runs.Conflicts = 1;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await workItem(services, CancellationToken.None));
+
+        Assert.False(executor.Executed);
+        Assert.Equal(DeploymentRunStatus.Failed, _runs.Run!.Status);
+    }
+
+    [Fact]
+    public async Task WorkItem_CancelRequestedButRunnerSucceeded_CompletesFreshRunAsSucceeded()
+    {
+        var (deployment, repository, services) = Setup();
+        var requestedAt = DateTime.UtcNow;
+        var workItem = await QueueAsync(deployment, new FakeExecutor
+        {
+            OnExecute = () =>
+            {
+                _runs.Conflicts = 1;
+                _runs.ConcurrentChange = run => run.RequestCancel(requestedAt);
+            }
+        });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, DeploymentStatus.Deployed], repository.Statuses);
+        Assert.Equal(DeploymentRunStatus.Succeeded, _runs.Run!.Status);
+        Assert.Equal(requestedAt, _runs.Run.CancelRequestedAt);
+    }
+
+    [Fact]
+    public async Task WorkItem_StopRequestedWhileRunning_CancelsDeploymentAndRun()
+    {
+        var (deployment, repository, services) = Setup();
+        var executor = new FakeExecutor
+        {
+            RunnerId = "container-1",
+            OnExecute = () => Assert.True(_cancellation.RequestStop(_runs.Run!.Id))
+        };
+        var workItem = await QueueAsync(deployment, executor);
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, DeploymentStatus.Cancelled], repository.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Cancelled], _runs.Statuses);
+        Assert.Equal(143, _runs.Run!.ExitCode);
+        Assert.Equal("container-1", _runs.Run.RunnerId);
+        Assert.NotNull(_runs.Run.FinishedAt);
+        Assert.Null(_runs.Run.TokenHash);
+        Assert.Equal([(_runs.Run.Id, RunOutcome.Failed)], _completer.Calls);
+    }
+
+    [Fact]
+    public async Task WorkItem_StopRequestedAndCompleterFails_StillCancels()
+    {
+        var (deployment, repository, services) = Setup();
+        _completer.Fail = true;
+        var workItem = await QueueAsync(deployment,
+            new FakeExecutor { OnExecute = () => _cancellation.RequestStop(_runs.Run!.Id) });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, DeploymentStatus.Cancelled], repository.Statuses);
+        Assert.Equal(DeploymentRunStatus.Cancelled, _runs.Run!.Status);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task WorkItem_RunnerExitsWithoutCancel_LeavesInstancesToTheRunner(long exitCode)
+    {
+        var (deployment, _, services) = Setup();
+        var workItem = await QueueAsync(deployment, new FakeExecutor { ExitCode = exitCode });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Empty(_completer.Calls);
+    }
+
+    [Fact]
+    public async Task WorkItem_DestroyStopRequested_CancelsDeploymentAndRun()
+    {
+        var (deployment, repository, services) = Setup(Deployed().StartDestroy(), DeploymentRunOperation.Destroy);
+        var workItem = await QueueAsync(deployment,
+            new FakeExecutor { OnExecute = () => _cancellation.RequestStop(_runs.Run!.Id) });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Cancelled], repository.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Cancelled], _runs.Statuses);
+    }
+
+    [Fact]
+    public async Task WorkItem_StopRequestedAfterRunnerSucceeded_KeepsDeployed()
+    {
+        var (deployment, repository, services) = Setup();
+        var workItem = await QueueAsync(deployment, new FakeExecutor
+        {
+            StoppedExitCode = 0,
+            OnExecute = () => _cancellation.RequestStop(_runs.Run!.Id)
+        });
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal([DeploymentStatus.Deploying, DeploymentStatus.Deployed], repository.Statuses);
+        Assert.Equal([DeploymentRunStatus.Running, DeploymentRunStatus.Succeeded], _runs.Statuses);
+    }
+
+    [Fact]
+    public async Task WorkItem_Finished_StopsTrackingRun()
+    {
+        var (deployment, _, services) = Setup();
+        var workItem = await QueueAsync(deployment, new FakeExecutor());
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.False(_cancellation.RequestStop(_runs.Run!.Id));
+    }
+
+    [Fact]
     public async Task WorkItem_DeploymentMissing_ThrowsWithoutExecuting()
     {
         var (deployment, repository, services) = Setup();
@@ -343,6 +503,7 @@ public sealed class DeploymentQueueTests
         var services = new ServiceCollection()
             .AddSingleton<IDeploymentRepository>(repository)
             .AddSingleton<IDeploymentRunRepository>(_runs)
+            .AddSingleton<IRunCompleter>(_completer)
             .BuildServiceProvider();
         return (deployment, repository, services);
     }
@@ -355,6 +516,7 @@ public sealed class DeploymentQueueTests
         var queue = new DeploymentQueue(processor, executor,
             Options.Create(options ?? new ExecutorOptions { Image = "runner:test" }),
             tokenProvider ?? new StaticTokenProvider(new Dictionary<string, string>()),
+            _cancellation,
             NullLogger<DeploymentQueue>.Instance);
 
         await queue.QueueDeploymentTaskAsync(
@@ -380,6 +542,7 @@ public sealed class DeploymentQueueTests
     private sealed class FakeExecutor : IExecutor
     {
         public long ExitCode { get; init; }
+        public long? StoppedExitCode { get; init; } = 143;
         public string? RunnerId { get; init; }
         public Exception? Exception { get; init; }
         public Action? OnExecute { get; init; }
@@ -399,7 +562,32 @@ public sealed class DeploymentQueueTests
                 return Task.FromResult(new ExecutorResult(null, new OperationCanceledException(cancellationToken)));
             }
 
+            if (context.StopRequested.IsCancellationRequested)
+            {
+                return Task.FromResult(new ExecutorResult(StoppedExitCode, RunnerId: RunnerId, Stopped: true));
+            }
+
             return Task.FromResult(Exception is null ? new ExecutorResult(ExitCode, RunnerId: RunnerId) : new ExecutorResult(null, Exception));
+        }
+
+        public Task<bool> SignalStopAsync(string runId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class RecordingRunCompleter : IRunCompleter
+    {
+        public List<(DeploymentRunId, RunOutcome)> Calls { get; } = [];
+        public bool Fail { get; set; }
+
+        public Task CompleteAsync(DeploymentRunId runId, RunOutcome outcome, CancellationToken cancellationToken)
+        {
+            if (Fail)
+            {
+                throw new InvalidOperationException("Database unavailable.");
+            }
+
+            Calls.Add((runId, outcome));
+            return Task.CompletedTask;
         }
     }
 
@@ -449,12 +637,21 @@ public sealed class DeploymentQueueTests
         public DeploymentRun? Run { get; set; }
         public List<DeploymentRunStatus> Statuses { get; } = [];
         public List<DeploymentRun> Updates { get; } = [];
+        public int Conflicts { get; set; }
+        public Func<DeploymentRun, DeploymentRun> ConcurrentChange { get; set; } = run => run;
 
         public Task<DeploymentRun?> GetByIdAsync(DeploymentRunId id, CancellationToken cancellationToken = default) =>
             Task.FromResult(Run?.Id == id ? Run : null);
 
         public Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default)
         {
+            if (Conflicts > 0)
+            {
+                Conflicts--;
+                Run = ConcurrentChange(Run!);
+                throw new DeploymentRunConflictException(run.Id);
+            }
+
             Statuses.Add(run.Status);
             Updates.Add(run);
             Run = run;

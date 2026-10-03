@@ -68,11 +68,15 @@ public sealed class DeploymentRunRepository : IDeploymentRunRepository
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new DeploymentRunConflictException(run.Id, exception);
+        }
         finally
         {
             entry.State = EntityState.Detached;
         }
 
-        return run;
+        return entry.Entity;
     }
 }

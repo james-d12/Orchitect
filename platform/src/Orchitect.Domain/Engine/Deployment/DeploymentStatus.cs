@@ -8,5 +8,6 @@ public enum DeploymentStatus
     Failed,
     RolledBack,
     Destroying,
-    Destroyed
+    Destroyed,
+    Cancelled
 }

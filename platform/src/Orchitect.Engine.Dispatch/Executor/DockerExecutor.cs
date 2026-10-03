@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using Microsoft.Extensions.Configuration;
@@ -44,6 +45,43 @@ public sealed class DockerExecutor : IExecutor
         {
             return new ExecutorResult(null, exception);
         }
+    }
+
+    public async Task<bool> SignalStopAsync(string runId, CancellationToken cancellationToken = default)
+    {
+        var containers = await _docker.Containers.ListContainersAsync(
+            new ContainersListParameters
+            {
+                Filters = new Dictionary<string, IDictionary<string, bool>>
+                {
+                    ["label"] = new Dictionary<string, bool> { [$"{RunnerContainerLabels.RunId}={runId}"] = true }
+                }
+            },
+            cancellationToken);
+
+        var signalled = false;
+
+        foreach (var container in containers)
+        {
+            try
+            {
+                await _docker.Containers.KillContainerAsync(
+                    container.ID,
+                    new ContainerKillParameters { Signal = "SIGTERM" },
+                    cancellationToken);
+                signalled = true;
+                _logger.LogInformation("Sent SIGTERM to runner container {ContainerId} of run {RunId}.",
+                    container.ID, runId);
+            }
+            catch (DockerApiException exception) when (exception.StatusCode is HttpStatusCode.Conflict
+                                                           or HttpStatusCode.NotFound)
+            {
+                _logger.LogInformation(exception, "Runner container {ContainerId} of run {RunId} is not running.",
+                    container.ID, runId);
+            }
+        }
+
+        return signalled;
     }
 
     private async Task<ExecutorResult> RunAsync(ExecutorContext context, CancellationToken cancellationToken)
@@ -137,6 +175,14 @@ public sealed class DockerExecutor : IExecutor
         {
             await CopySecretsAsync(container.ID, secrets, cancellationToken);
 
+            if (context.StopRequested.IsCancellationRequested)
+            {
+                _logger.LogInformation("Run {RunId} was stopped before runner container {ContainerId} started.",
+                    context.RunId, container.ID);
+                activity?.AddEvent(new ActivityEvent("container.stopped"));
+                return new ExecutorResult(null, RunnerId: container.ID, Stopped: true);
+            }
+
             var started = await _docker.Containers.StartContainerAsync(
                 container.ID,
                 new ContainerStartParameters(),
@@ -155,12 +201,26 @@ public sealed class DockerExecutor : IExecutor
 
             var stopwatch = Stopwatch.StartNew();
 
-            var wait = await WaitForExitAsync(container.ID, context.Timeout, cancellationToken);
+            var wait = await WaitForExitAsync(container.ID, context.Timeout, context.StopRequested,
+                cancellationToken);
+            if (wait is null && context.StopRequested.IsCancellationRequested)
+            {
+                activity?.AddEvent(new ActivityEvent("container.stopped"));
+                _logger.LogInformation(
+                    "Run {RunId} was asked to stop. Stopping runner container {ContainerId}.",
+                    context.RunId, container.ID);
+                var exitCode = await StopContainerAsync(container.ID, context, logStreaming, logCancellation,
+                    cancellationToken);
+                activity?.SetTag("container.exit_code", exitCode);
+                return new ExecutorResult(exitCode, RunnerId: container.ID, Stopped: true);
+            }
+
             if (wait is null)
             {
                 activity?.AddEvent(new ActivityEvent("container.timed_out"));
-                await StopTimedOutContainerAsync(container.ID, context, logStreaming, logCancellation,
-                    cancellationToken);
+                _logger.LogWarning("Runner container {ContainerId} did not finish within {Timeout}. Stopping it.",
+                    container.ID, context.Timeout);
+                await StopContainerAsync(container.ID, context, logStreaming, logCancellation, cancellationToken);
                 throw new TimeoutException($"Runner '{context.RunId}' did not finish within {context.Timeout}.");
             }
 
@@ -366,9 +426,11 @@ public sealed class DockerExecutor : IExecutor
     private async Task<ContainerWaitResponse?> WaitForExitAsync(
         string containerId,
         TimeSpan? timeout,
+        CancellationToken stopRequested,
         CancellationToken cancellationToken)
     {
-        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timeoutCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopRequested);
         if (timeout is not null)
         {
             timeoutCancellation.CancelAfter(timeout.Value);
@@ -385,7 +447,7 @@ public sealed class DockerExecutor : IExecutor
         }
     }
 
-    private async Task StopTimedOutContainerAsync(
+    private async Task<long?> StopContainerAsync(
         string containerId,
         ExecutorContext context,
         Task logStreaming,
@@ -394,24 +456,33 @@ public sealed class DockerExecutor : IExecutor
     {
         var gracePeriod = context.StopGracePeriod ?? DefaultStopGracePeriod;
 
-        _logger.LogWarning(
-            "Runner container {ContainerId} did not finish within {Timeout}. Stopping it with a grace period of {GracePeriod}.",
-            containerId, context.Timeout, gracePeriod);
+        _logger.LogInformation("Sending SIGTERM to runner container {ContainerId} with a grace period of {GracePeriod}.",
+            containerId, gracePeriod);
 
-        await _docker.Containers.KillContainerAsync(
-            containerId,
-            new ContainerKillParameters { Signal = "SIGTERM" },
-            cancellationToken);
+        try
+        {
+            await _docker.Containers.KillContainerAsync(
+                containerId,
+                new ContainerKillParameters { Signal = "SIGTERM" },
+                cancellationToken);
+        }
+        catch (DockerApiException exception) when (exception.StatusCode == HttpStatusCode.Conflict)
+        {
+            _logger.LogInformation(exception, "Runner container {ContainerId} had already exited.", containerId);
+        }
 
-        if (await WaitForExitAsync(containerId, gracePeriod, cancellationToken) is null)
+        var wait = await WaitForExitAsync(containerId, gracePeriod, CancellationToken.None, cancellationToken);
+
+        if (wait is null)
         {
             _logger.LogWarning("Runner container {ContainerId} did not stop within {GracePeriod}; it will be killed.",
                 containerId, gracePeriod);
             await logCancellation.CancelAsync();
-            return;
+            return null;
         }
 
         await WaitForOutputAsync(containerId, logStreaming, logCancellation);
+        return wait.StatusCode;
     }
 
     private async Task WaitForOutputAsync(

@@ -21,7 +21,7 @@ public interface IRunPlanner
     /// resources, instances and dependency graph and moves the instances to Provisioning; a destroy moves the
     /// recorded instances to Removing. The records and the plan are stored in one transaction, so a repeat or
     /// concurrent call returns the stored plan without recording again. Throws <see cref="RunPlanException"/> when
-    /// the run or the score can't be planned.
+    /// the run or the score can't be planned, including when the run was asked to cancel before it was planned.
     /// </summary>
     Task<RunPlan> PlanAsync(DeploymentRunId runId, ScoreFile scoreFile, CancellationToken cancellationToken);
 }
@@ -94,6 +94,12 @@ public sealed partial class RunPlanner : IRunPlanner
         {
             throw new RunPlanException(RunPlanFailure.RunNotRunning,
                 $"Run '{runId.Value}' cannot be planned while {run.Status}.");
+        }
+
+        if (run.CancelRequestedAt is not null)
+        {
+            throw new RunPlanException(RunPlanFailure.RunNotRunning,
+                $"Run '{runId.Value}' cannot be planned because it was asked to cancel.");
         }
 
         var deployment = await _deploymentRepository.GetByIdAsync(run.DeploymentId, cancellationToken)

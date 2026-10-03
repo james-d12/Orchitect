@@ -71,7 +71,8 @@ public sealed record Deployment
     public bool IsActive => Status is DeploymentStatus.Pending or DeploymentStatus.Deploying
         or DeploymentStatus.Destroying;
 
-    public bool CanDestroy => Status is DeploymentStatus.Deployed or DeploymentStatus.Failed;
+    public bool CanDestroy => Status is DeploymentStatus.Deployed or DeploymentStatus.Failed
+        or DeploymentStatus.Cancelled;
 
     public Deployment StartDestroy()
     {
@@ -91,6 +92,16 @@ public sealed record Deployment
         }
 
         return Complete(DeploymentStatus.Failed, reason);
+    }
+
+    public Deployment Cancel()
+    {
+        if (!IsActive)
+        {
+            throw new InvalidOperationException($"Deployment '{Id.Value}' cannot be cancelled while {Status}.");
+        }
+
+        return Complete(DeploymentStatus.Cancelled, null);
     }
 
     public Deployment ProcessDeploymentStatus(long? exitCode, Exception? exception)

@@ -5,6 +5,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orchitect.Domain.Engine.Deployment;
+using Orchitect.Engine.Contracts.Runner.Api;
+using Orchitect.Engine.Dispatch.Completion;
 
 namespace Orchitect.Engine.Dispatch.Executor;
 
@@ -113,6 +115,7 @@ public sealed class RunnerContainerSweepService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var deployments = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
         var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
+        var completer = scope.ServiceProvider.GetRequiredService<IRunCompleter>();
         var active = await deployments.GetActiveAsync(_startedAt, cancellationToken);
         var unreconciled = new HashSet<string>();
 
@@ -134,14 +137,17 @@ public sealed class RunnerContainerSweepService : BackgroundService
                     continue;
                 }
 
-                var reconciled = outcome.ExitCode is { } exitCode
-                    ? deployment.ProcessDeploymentStatus(exitCode, null)
-                    : deployment.Interrupt(outcome.Reason!);
-
-                await deployments.UpdateAsync(reconciled, cancellationToken);
+                var cancelled = run?.CancelRequestedAt is not null && outcome.ExitCode != 0;
+                var reconciled = (cancelled, outcome.ExitCode) switch
+                {
+                    (true, _) => deployment.Cancel(),
+                    (false, { } exitCode) => deployment.ProcessDeploymentStatus(exitCode, null),
+                    _ => deployment.Interrupt(outcome.Reason!)
+                };
 
                 var reconciledRun = run switch
                 {
+                    { IsActive: true } when cancelled => run.Cancel(outcome.ExitCode, container?.ID),
                     { Status: DeploymentRunStatus.Running } when outcome.ExitCode is { } runExitCode =>
                         run.Complete(runExitCode, null, container?.ID),
                     { IsActive: true } => run.Interrupt(reconciled.ErrorSummary ?? InterruptedRunReason),
@@ -151,6 +157,13 @@ public sealed class RunnerContainerSweepService : BackgroundService
                 if (reconciledRun is not null)
                 {
                     await runs.UpdateAsync(reconciledRun, cancellationToken);
+                }
+
+                await deployments.UpdateAsync(reconciled, cancellationToken);
+
+                if (cancelled && run is not null)
+                {
+                    await CompleteCancelledRunAsync(completer, run.Id, cancellationToken);
                 }
 
                 _logger.LogInformation(
@@ -166,6 +179,19 @@ public sealed class RunnerContainerSweepService : BackgroundService
         }
 
         return unreconciled;
+    }
+
+    private async Task CompleteCancelledRunAsync(IRunCompleter completer, DeploymentRunId runId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await completer.CompleteAsync(runId, RunOutcome.Failed, cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(exception, "Could not finish the instances of cancelled run {RunId}.", runId.Value);
+        }
     }
 
     private static async Task<ReconcileOutcome?> ReconcileAsync(

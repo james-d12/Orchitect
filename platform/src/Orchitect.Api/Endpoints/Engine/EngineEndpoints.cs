@@ -53,7 +53,8 @@ public static class EngineEndpoints
         endpoints1.MapPrivateGroup()
             .MapEndpoint<CreateDeploymentEndpoint>()
             .MapEndpoint<GetDeploymentEndpoint>()
-            .MapEndpoint<DestroyDeploymentEndpoint>();
+            .MapEndpoint<DestroyDeploymentEndpoint>()
+            .MapEndpoint<CancelDeploymentEndpoint>();
     }
 
     private static void MapResourceTemplateEndpoints(this IEndpointRouteBuilder endpoints)

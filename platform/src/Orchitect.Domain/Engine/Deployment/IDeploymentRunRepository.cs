@@ -4,6 +4,9 @@ namespace Orchitect.Domain.Engine.Deployment;
 
 public interface IDeploymentRunRepository : IRepository<DeploymentRun, DeploymentRunId>
 {
+    /// <summary>
+    /// Saves a run read earlier, throwing <see cref="DeploymentRunConflictException"/> when it changed since then.
+    /// </summary>
     Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default);
 
     /// <summary>
