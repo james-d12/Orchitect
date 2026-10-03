@@ -23,11 +23,12 @@ GitHub issues hold the work; these docs hold the design and the reasoning behind
 | Doc | Status | Workstream | Summary |
 |---|---|---|---|
 | [runner/RUNNER_TODO.md](runner/RUNNER_TODO.md) | active | runner | Runner operator guide (config, build) plus the remaining checklist |
-| [runner/API_RUNNER_SEPARATION.md](runner/API_RUNNER_SEPARATION.md) | active | runner | Target design: runner without DB access, using a run manifest (unfinished) |
+| [runner/API_RUNNER_SEPARATION.md](runner/API_RUNNER_SEPARATION.md) | active | runner | Target design: thin runner that calls an internal run API (auth, contract, status, secrets, migration order) |
 | [runner/Runner_Isolation_Branch_Review.md](runner/Runner_Isolation_Branch_Review.md) | active | runner | Code review E1–E15, M1–M10, H1–H4 (E/M done, H open) |
 | [runner/Runner_Isolation_Branch_Review_Architecture.md](runner/Runner_Isolation_Branch_Review_Architecture.md) | active | runner | Architecture review A1–A10 |
 | [resource/RESOURCE_DOMAIN_REFACTOR_PLAN_PHASE_2.md](resource/RESOURCE_DOMAIN_REFACTOR_PLAN_PHASE_2.md) | active | resource | Requirements, bindings, deltas and snapshots (not started; Step 3 needs a rethink) |
 | [resource/resource-workflows.md](resource/resource-workflows.md) | reference | resource | Resource lifecycle workflows and state diagram |
+| [resource/domain-model-conventions.md](resource/domain-model-conventions.md) | reference | resource | Immutable vs guarded-mutation aggregate shapes, and when to use each |
 | [architecture/HIGH_LEVEL_ARCHITECTURE.md](architecture/HIGH_LEVEL_ARCHITECTURE.md) | reference | architecture | Core plus capabilities, and the dependency rules |
 | [architecture/High Level Diagram.drawio](architecture/High%20Level%20Diagram.drawio) | reference | architecture | Architecture diagram |
 | [architecture/JWT_BEST_PRACTICES.md](architecture/JWT_BEST_PRACTICES.md) | reference | security | JWT / RFC 8725 guidance |

@@ -55,6 +55,14 @@ public sealed class ApplicationRepository : IApplicationRepository
         return true;
     }
 
+    public async Task<IReadOnlyList<Application>> GetByOrganisationAsync(OrganisationId organisationId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Applications.AsNoTracking()
+            .Where(a => a.OrganisationId == organisationId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Application>> GetByOrganisationIdsAsync(
         IReadOnlyCollection<OrganisationId> organisationIds, CancellationToken cancellationToken = default)
     {

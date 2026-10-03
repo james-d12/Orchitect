@@ -23,7 +23,11 @@ public sealed class GetDeploymentEndpoint : IEndpoint
         string CommitId,
         string Status,
         DateTime CreatedAt,
-        DateTime UpdatedAt);
+        DateTime UpdatedAt,
+        string RequestedBy,
+        DateTime? StartedAt,
+        DateTime? CompletedAt,
+        string? ErrorSummary);
 
     private static async Task<Results<Ok<GetDeploymentResponse>, NotFound>> HandleAsync(
         [FromRoute]
@@ -46,6 +50,10 @@ public sealed class GetDeploymentEndpoint : IEndpoint
             deployment.CommitId.Value,
             deployment.Status.ToString(),
             deployment.CreatedAt,
-            deployment.UpdatedAt));
+            deployment.UpdatedAt,
+            deployment.RequestedBy,
+            deployment.StartedAt,
+            deployment.CompletedAt,
+            deployment.ErrorSummary));
     }
 }

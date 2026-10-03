@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Orchitect.Api.Extensions;
 using Orchitect.Api.Shared;
 using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Engine.Application;
@@ -68,7 +69,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
                 $"Deployment with Id: {latest.Id.Value} is still {latest.Status} for this application and environment.");
         }
 
-        var deployment = Orchitect.Domain.Engine.Deployment.Deployment.Create(request);
+        var deployment = Orchitect.Domain.Engine.Deployment.Deployment.Create(request, httpContext.User.GetRequestedBy());
         Orchitect.Domain.Engine.Deployment.Deployment? deploymentResponse;
 
         try
@@ -93,7 +94,7 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
         }
         catch
         {
-            await repository.UpdateAsync(deploymentResponse.Interrupt(), CancellationToken.None);
+            await repository.UpdateAsync(deploymentResponse.Interrupt("The deployment could not be queued."), CancellationToken.None);
             throw;
         }
 

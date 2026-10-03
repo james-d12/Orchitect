@@ -9,6 +9,12 @@ public interface IApplicationRepository : IRepository<Application, ApplicationId
     Task<bool> DeleteAsync(ApplicationId id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the applications that belong to an organisation.
+    /// </summary>
+    Task<IReadOnlyList<Application>> GetByOrganisationAsync(OrganisationId organisationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns the applications that belong to any of the organisations.
     /// </summary>
     Task<IReadOnlyList<Application>> GetByOrganisationIdsAsync(IReadOnlyCollection<OrganisationId> organisationIds,

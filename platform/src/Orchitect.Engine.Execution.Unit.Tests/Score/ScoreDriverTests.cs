@@ -89,7 +89,7 @@ public sealed class ScoreDriverTests : IDisposable
         }, new OrganisationId());
 
     private static Deployment NewDeployment() =>
-        Deployment.Create(new ApplicationId(), new EnvironmentId(Guid.NewGuid()), new CommitId(new string('a', 40)));
+        Deployment.Create(new ApplicationId(), new EnvironmentId(Guid.NewGuid()), new CommitId(new string('a', 40)), "test@example.com");
 
     private sealed class ScoreGitCommandLine : IGitCommandLine, IDisposable
     {

@@ -80,7 +80,7 @@ public sealed class OrganisationMembershipIntegrationTests(WebApplicationFactory
 
         using var scope = factory.Services.CreateScope();
         var deployment = await scope.ServiceProvider.GetRequiredService<IDeploymentRepository>().CreateAsync(
-            Deployment.Create(new ApplicationId(application.Id), new EnvironmentId(environmentId), NewCommitId()));
+            Deployment.Create(new ApplicationId(application.Id), new EnvironmentId(environmentId), NewCommitId(), "test@example.com"));
         ArgumentNullException.ThrowIfNull(deployment);
         return deployment;
     }

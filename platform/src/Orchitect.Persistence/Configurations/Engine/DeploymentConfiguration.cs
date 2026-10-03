@@ -60,5 +60,7 @@ internal sealed class DeploymentConfiguration : IEntityTypeConfiguration<Deploym
         builder.Property(d => d.Status).HasConversion<string>();
         builder.Property(d => d.CreatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
         builder.Property(d => d.UpdatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
+        builder.Property(d => d.RequestedBy).IsRequired().HasMaxLength(Deployment.RequestedByMaxLength);
+        builder.Property(d => d.ErrorSummary).HasMaxLength(Deployment.ErrorSummaryMaxLength);
     }
 }

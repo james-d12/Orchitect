@@ -13,6 +13,15 @@ public static class ClaimsPrincipalExtensions
         return new OrganisationId(organisationGuid);
     }
 
+    public static string GetRequestedBy(this ClaimsPrincipal user)
+    {
+        var claim = user.FindFirst(ClaimTypes.Email)
+                    ?? user.FindFirst(ClaimTypes.NameIdentifier)
+                    ?? throw new UnauthorizedAccessException("User claim not found");
+
+        return claim.Value;
+    }
+
     public static string GetUserId(this ClaimsPrincipal user)
     {
         var claim = user.FindFirst(ClaimTypes.NameIdentifier)

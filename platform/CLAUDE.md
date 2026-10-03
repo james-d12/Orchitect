@@ -56,6 +56,7 @@ dotnet test src/Orchitect.Engine.Execution.Unit.Tests
 ```
 
 Test projects:
+- `Orchitect.AppHost.E2E.Tests`: boots the real Aspire AppHost and checks every resource becomes healthy (needs Docker, Node.js and pnpm)
 - `Orchitect.Api.Integration.Tests`: endpoints and repositories against Postgres in Testcontainers (needs Docker)
 - `Orchitect.Domain.Unit.Tests`: domain entity behaviour (e.g. deployment status transitions)
 - `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue and token minting, plus the API-to-runner contract round-trip and the Engine layering guard tests
