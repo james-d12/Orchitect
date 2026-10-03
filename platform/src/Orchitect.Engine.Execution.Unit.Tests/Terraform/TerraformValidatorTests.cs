@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Terraform;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
@@ -25,11 +24,10 @@ public sealed class TerraformValidatorTests : IDisposable
         var git = new TerraformModuleDownloaderTests.FakeGitCommandLine();
         var commandLine = new InspectingTerraformCommandLine();
         var validator = CreateValidator(git, commandLine);
-        var template = Template(ResourceTemplateProvider.Terraform);
-        List<TerraformPlanInput> inputs =
+        List<RunInput> inputs =
         [
-            new(template, new Dictionary<string, string> { ["name"] = "payments" }, "paymentstorage"),
-            new(template, new Dictionary<string, string> { ["name"] = "other" }, "otherpaymentstorage")
+            Input(new Dictionary<string, string> { ["name"] = "payments" }, "paymentstorage"),
+            Input(new Dictionary<string, string> { ["name"] = "other" }, "otherpaymentstorage")
         ];
 
         var results = await validator.ValidateAsync(inputs);
@@ -44,8 +42,8 @@ public sealed class TerraformValidatorTests : IDisposable
     {
         var git = new TerraformModuleDownloaderTests.FakeGitCommandLine();
         var validator = CreateValidator(git, new InspectingTerraformCommandLine());
-        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Helm),
-            new Dictionary<string, string> { ["name"] = "payments" }, "paymentstorage");
+        var input = Input(new Dictionary<string, string> { ["name"] = "payments" }, "paymentstorage",
+            RunInputProvider.Helm);
 
         var results = await validator.ValidateAsync([input]);
 
@@ -58,8 +56,7 @@ public sealed class TerraformValidatorTests : IDisposable
     {
         var validator = CreateValidator(new TerraformModuleDownloaderTests.FakeGitCommandLine(),
             new InspectingTerraformCommandLine());
-        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
-            new Dictionary<string, string> { ["name"] = "payments", ["sku"] = "premium" }, "paymentstorage");
+        var input = Input(new Dictionary<string, string> { ["name"] = "payments", ["sku"] = "premium" }, "paymentstorage");
 
         var results = await validator.ValidateAsync([input]);
 
@@ -72,8 +69,7 @@ public sealed class TerraformValidatorTests : IDisposable
     {
         var validator = CreateValidator(new TerraformModuleDownloaderTests.FakeGitCommandLine(),
             new InspectingTerraformCommandLine());
-        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
-            new Dictionary<string, string> { ["Name"] = "payments" }, "paymentstorage");
+        var input = Input(new Dictionary<string, string> { ["Name"] = "payments" }, "paymentstorage");
 
         var results = await validator.ValidateAsync([input]);
 
@@ -88,8 +84,7 @@ public sealed class TerraformValidatorTests : IDisposable
             """{"variables":{"replicas":{"name":"replicas","type":"number","required":true}}}""";
         var validator = CreateValidator(new TerraformModuleDownloaderTests.FakeGitCommandLine(),
             new InspectingTerraformCommandLine(_ => new CommandLineResult(moduleJson, string.Empty, 0)));
-        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
-            new Dictionary<string, string> { ["replicas"] = "three" }, "paymentstorage");
+        var input = Input(new Dictionary<string, string> { ["replicas"] = "three" }, "paymentstorage");
 
         var results = await validator.ValidateAsync([input]);
 
@@ -107,8 +102,7 @@ public sealed class TerraformValidatorTests : IDisposable
             """;
         var validator = CreateValidator(new TerraformModuleDownloaderTests.FakeGitCommandLine(),
             new InspectingTerraformCommandLine(_ => new CommandLineResult(diagnosticsJson, string.Empty, 1)));
-        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
-            [], "paymentstorage");
+        var input = Input(new Dictionary<string, string>(), "paymentstorage");
 
         var results = await validator.ValidateAsync([input]);
 
@@ -125,10 +119,8 @@ public sealed class TerraformValidatorTests : IDisposable
             : new CommandLineResult(
                 """{"variables":{"name":{"name":"name","type":"string","required":true}}}""", string.Empty, 0));
         var validator = CreateValidator(git, commandLine);
-        var broken = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform, "broken"),
-            [], "broken");
-        var healthy = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
-            new Dictionary<string, string> { ["name"] = "payments" }, "healthy");
+        var broken = Input(new Dictionary<string, string>(), "broken", folderPath: "broken");
+        var healthy = Input(new Dictionary<string, string> { ["name"] = "payments" }, "healthy");
 
         var results = await validator.ValidateAsync([broken, healthy]);
 
@@ -141,8 +133,7 @@ public sealed class TerraformValidatorTests : IDisposable
     public async Task ValidateAsync_TfFilesOnlyInSubdirectory_IsModuleInvalid()
     {
         var validator = CreateValidator(new NestedOnlyGitCommandLine(), new InspectingTerraformCommandLine());
-        var input = new TerraformPlanInput(Template(ResourceTemplateProvider.Terraform),
-            new Dictionary<string, string> { ["name"] = "payments" }, "paymentstorage");
+        var input = Input(new Dictionary<string, string> { ["name"] = "payments" }, "paymentstorage");
 
         var results = await validator.ValidateAsync([input]);
 
@@ -154,24 +145,11 @@ public sealed class TerraformValidatorTests : IDisposable
             new TerraformModuleDownloader(NullLogger<TerraformModuleDownloader>.Instance, git, _cacheRoot),
             commandLine);
 
-    private static ResourceTemplate Template(ResourceTemplateProvider provider, string folderPath = "") =>
-        ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest
-        {
-            OrganisationId = new OrganisationId(),
-            Name = "Azure Storage Account",
-            Type = "azure-storage-account",
-            Description = "A storage account.",
-            Provider = provider,
-            Version = "1.0.0",
-            Source = new ResourceTemplateVersionSource
-            {
-                BaseUrl = new Uri("https://example.com/storage.git"),
-                Tag = string.Empty,
-                FolderPath = folderPath
-            },
-            Notes = string.Empty,
-            State = ResourceTemplateVersionState.Active
-        });
+    private static RunInput Input(IReadOnlyDictionary<string, string> parameters, string key,
+        RunInputProvider provider = RunInputProvider.Terraform, string folderPath = "") =>
+        TerraformTestData.Input(provider, key, parameters, "Azure Storage Account",
+            new RunInputSource(new Uri("https://example.com/storage.git"), string.Empty,
+                string.IsNullOrEmpty(folderPath) ? null : folderPath));
 
     private sealed class NestedOnlyGitCommandLine : IGitCommandLine
     {

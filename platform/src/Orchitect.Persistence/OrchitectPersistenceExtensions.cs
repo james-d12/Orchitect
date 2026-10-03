@@ -51,6 +51,8 @@ public static class OrchitectPersistenceExtensions
                 .UseLoggerFactory(loggerFactory)
                 .EnableSensitiveDataLogging());
 
+        services.TryAddScoped<IUnitOfWork, UnitOfWork>();
+
         services.TryAddScoped<IOrganisationRepository, OrganisationRepository>();
         services.TryAddScoped<ICredentialRepository, CredentialRepository>();
 
@@ -69,6 +71,7 @@ public static class OrchitectPersistenceExtensions
         services.TryAddScoped<IEnvironmentRepository, EnvironmentRepository>();
         services.TryAddScoped<IDeploymentRepository, DeploymentRepository>();
         services.TryAddScoped<IDeploymentRunRepository, DeploymentRunRepository>();
+        services.TryAddScoped<IDeploymentRunPlanRepository, DeploymentRunPlanRepository>();
         services.TryAddScoped<IResourceRepository, ResourceRepository>();
         services.TryAddScoped<IResourceInstanceRepository, ResourceInstanceRepository>();
         services.TryAddScoped<IResourceDependencyGraphRepository, ResourceDependencyGraphRepository>();

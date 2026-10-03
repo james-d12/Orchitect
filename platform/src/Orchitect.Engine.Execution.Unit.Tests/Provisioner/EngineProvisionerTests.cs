@@ -1,4 +1,4 @@
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner;
 using Orchitect.Engine.Execution.Unit.Tests.Terraform;
 
@@ -6,16 +6,16 @@ namespace Orchitect.Engine.Execution.Unit.Tests.Provisioner;
 
 public sealed class EngineProvisionerTests
 {
-    private readonly RecordingProvisioner _terraform = new(ResourceTemplateProvider.Terraform);
-    private readonly RecordingProvisioner _helm = new(ResourceTemplateProvider.Helm);
+    private readonly RecordingProvisioner _terraform = new(RunInputProvider.Terraform);
+    private readonly RecordingProvisioner _helm = new(RunInputProvider.Helm);
 
     [Fact]
     public async Task ProvisionAsync_MixedProviders_RoutesEachGroupToItsProvisioner()
     {
         var context = TerraformTestData.NewContext();
-        var storage = Input(ResourceTemplateProvider.Terraform, "storage");
-        var network = Input(ResourceTemplateProvider.Terraform, "network");
-        var chart = Input(ResourceTemplateProvider.Helm, "chart");
+        var storage = Input(RunInputProvider.Terraform, "storage");
+        var network = Input(RunInputProvider.Terraform, "network");
+        var chart = Input(RunInputProvider.Helm, "chart");
 
         await new EngineProvisioner([_terraform, _helm]).ProvisionAsync([storage, chart, network], context);
 
@@ -30,8 +30,8 @@ public sealed class EngineProvisionerTests
     public async Task DeleteAsync_MixedProviders_RoutesEachGroupToItsProvisioner()
     {
         var context = TerraformTestData.NewContext();
-        var storage = Input(ResourceTemplateProvider.Terraform, "storage");
-        var chart = Input(ResourceTemplateProvider.Helm, "chart");
+        var storage = Input(RunInputProvider.Terraform, "storage");
+        var chart = Input(RunInputProvider.Helm, "chart");
 
         await new EngineProvisioner([_terraform, _helm]).DeleteAsync([storage, chart], context);
 
@@ -47,9 +47,9 @@ public sealed class EngineProvisionerTests
     {
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             new EngineProvisioner([_terraform]).ProvisionAsync(
-                [Input(ResourceTemplateProvider.Helm, "chart")], TerraformTestData.NewContext()));
+                [Input(RunInputProvider.Helm, "chart")], TerraformTestData.NewContext()));
 
-        Assert.Contains(nameof(ResourceTemplateProvider.Helm), exception.Message);
+        Assert.Contains(nameof(RunInputProvider.Helm), exception.Message);
     }
 
     [Fact]
@@ -57,22 +57,22 @@ public sealed class EngineProvisionerTests
     {
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             new EngineProvisioner([_terraform]).DeleteAsync(
-                [Input(ResourceTemplateProvider.Helm, "chart")], TerraformTestData.NewContext()));
+                [Input(RunInputProvider.Helm, "chart")], TerraformTestData.NewContext()));
 
-        Assert.Contains(nameof(ResourceTemplateProvider.Helm), exception.Message);
+        Assert.Contains(nameof(RunInputProvider.Helm), exception.Message);
     }
 
-    private static ProvisionInput Input(ResourceTemplateProvider provider, string key) =>
-        new(TerraformTestData.Template(provider), [], key);
+    private static RunInput Input(RunInputProvider provider, string key) =>
+        TerraformTestData.Input(provider, key);
 
-    private sealed class RecordingProvisioner(ResourceTemplateProvider provider) : IProvisioner
+    private sealed class RecordingProvisioner(RunInputProvider provider) : IProvisioner
     {
-        public ResourceTemplateProvider Provider => provider;
-        public List<ProvisionInput>? Provisioned { get; private set; }
-        public List<ProvisionInput>? Deleted { get; private set; }
-        public ProvisionContext? Context { get; private set; }
+        public RunInputProvider Provider => provider;
+        public List<RunInput>? Provisioned { get; private set; }
+        public List<RunInput>? Deleted { get; private set; }
+        public RunContext? Context { get; private set; }
 
-        public Task ProvisionAsync(List<ProvisionInput> inputs, ProvisionContext context,
+        public Task ProvisionAsync(List<RunInput> inputs, RunContext context,
             CancellationToken cancellationToken = default)
         {
             Provisioned = inputs;
@@ -80,7 +80,7 @@ public sealed class EngineProvisionerTests
             return Task.CompletedTask;
         }
 
-        public Task DeleteAsync(List<ProvisionInput> inputs, ProvisionContext context,
+        public Task DeleteAsync(List<RunInput> inputs, RunContext context,
             CancellationToken cancellationToken = default)
         {
             Deleted = inputs;

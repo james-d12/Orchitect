@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Helm;
 using Orchitect.Engine.Execution.Provisioner.Helm.Models;
 using Orchitect.Engine.Execution.Unit.Tests.Terraform;
@@ -34,20 +33,10 @@ public sealed class HelmValidatorTests : IDisposable
     public async Task ValidateAsync_NonHelmProvider_ReturnsWrongProvider()
     {
         var result = await CreateValidator().ValidateAsync(
-            Template(ResourceTemplateProvider.Terraform), []);
+            Input(RunInputProvider.Terraform));
 
         Assert.Equal(HelmValidationResultState.WrongProvider, result.State);
         Assert.Null(result.Config);
-        Assert.Equal(0, _git.CloneCount);
-    }
-
-    [Fact]
-    public async Task ValidateAsync_NoActiveVersion_ReturnsTemplateNotFound()
-    {
-        var result = await CreateValidator().ValidateAsync(
-            TerraformTestData.Template(ResourceTemplateProvider.Helm), []);
-
-        Assert.Equal(HelmValidationResultState.TemplateNotFound, result.State);
         Assert.Equal(0, _git.CloneCount);
     }
 
@@ -56,7 +45,7 @@ public sealed class HelmValidatorTests : IDisposable
     {
         _git.Succeeds = false;
 
-        var result = await CreateValidator().ValidateAsync(Template(), []);
+        var result = await CreateValidator().ValidateAsync(Input());
 
         Assert.Equal(HelmValidationResultState.ModuleNotFound, result.State);
         await _parser.DidNotReceiveWithAnyArgs().ParseHelmConfigAsync(default!);
@@ -65,8 +54,8 @@ public sealed class HelmValidatorTests : IDisposable
     [Fact]
     public async Task ValidateAsync_UnknownInput_ReturnsInputNotPresent()
     {
-        var result = await CreateValidator().ValidateAsync(Template(),
-            new Dictionary<string, string> { ["replicaCount"] = "3", ["missing.key"] = "x" });
+        var result = await CreateValidator().ValidateAsync(Input(
+            parameters: new Dictionary<string, string> { ["replicaCount"] = "3", ["missing.key"] = "x" }));
 
         Assert.Equal(HelmValidationResultState.InputNotPresent, result.State);
         Assert.Contains("missing.key", result.Message);
@@ -76,8 +65,8 @@ public sealed class HelmValidatorTests : IDisposable
     [Fact]
     public async Task ValidateAsync_KnownInputsCaseInsensitive_ReturnsValidWithConfig()
     {
-        var result = await CreateValidator().ValidateAsync(Template(),
-            new Dictionary<string, string> { ["REPLICACOUNT"] = "3", ["image.tag"] = "v2" });
+        var result = await CreateValidator().ValidateAsync(Input(
+            parameters: new Dictionary<string, string> { ["REPLICACOUNT"] = "3", ["image.tag"] = "v2" }));
 
         Assert.Equal(HelmValidationResultState.Valid, result.State);
         Assert.NotNull(result.Config);
@@ -87,10 +76,10 @@ public sealed class HelmValidatorTests : IDisposable
     [Fact]
     public async Task ValidateAsync_FolderPathSet_ParsesSubfolder()
     {
-        await CreateValidator().ValidateAsync(Template(folderPath: "charts/orders"), []);
+        await CreateValidator().ValidateAsync(Input(folderPath: "charts/orders"));
 
         await _parser.Received(1).ParseHelmConfigAsync(
-            Arg.Is<string>(directory => directory.EndsWith(Path.Combine("1.0.0", "charts/orders"))));
+            Arg.Is<string>(directory => directory.EndsWith(Path.Combine("v1.0.0", "charts/orders"))));
     }
 
     [Fact]
@@ -105,23 +94,9 @@ public sealed class HelmValidatorTests : IDisposable
 
     private HelmValidator CreateValidator() => new(NullLogger<HelmValidator>.Instance, _git, _parser);
 
-    private ResourceTemplate Template(ResourceTemplateProvider provider = ResourceTemplateProvider.Helm,
-        string folderPath = "") =>
-        ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest
-        {
-            OrganisationId = new OrganisationId(),
-            Name = _templateName,
-            Type = "helm-chart",
-            Description = "An orders chart.",
-            Provider = provider,
-            Version = "1.0.0",
-            Source = new ResourceTemplateVersionSource
-            {
-                BaseUrl = new Uri("https://example.com/charts.git"),
-                FolderPath = folderPath,
-                Tag = string.Empty
-            },
-            Notes = string.Empty,
-            State = ResourceTemplateVersionState.Active
-        });
+    private RunInput Input(RunInputProvider provider = RunInputProvider.Helm,
+        IReadOnlyDictionary<string, string>? parameters = null, string? folderPath = null) =>
+        new("chart", _templateName, "helm-chart", provider,
+            new RunInputSource(new Uri("https://example.com/charts.git"), "v1.0.0", folderPath),
+            parameters ?? new Dictionary<string, string>());
 }
