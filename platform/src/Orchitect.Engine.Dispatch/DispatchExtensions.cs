@@ -47,6 +47,7 @@ public static class DispatchExtensions
     {
         services.AddHostedService<QueuedHostedService>();
         services.AddSingleton<IBackgroundTaskQueueProcessor>(_ => new BackgroundTaskQueueProcessor(5));
+        services.AddSingleton<IDeploymentRunCancellation, DeploymentRunCancellation>();
         services.AddScoped<IDeploymentQueue, DeploymentQueue>();
     }
 }

@@ -38,7 +38,8 @@ public sealed class GetDeploymentEndpoint : IEndpoint
         DateTime? StartedAt,
         DateTime? FinishedAt,
         long? ExitCode,
-        string? ErrorSummary);
+        string? ErrorSummary,
+        DateTime? CancelRequestedAt);
 
     private static async Task<Results<Ok<GetDeploymentResponse>, NotFound>> HandleAsync(
         [FromRoute]
@@ -80,6 +81,7 @@ public sealed class GetDeploymentEndpoint : IEndpoint
                     run.StartedAt,
                     run.FinishedAt,
                     run.ExitCode,
-                    run.ErrorSummary)));
+                    run.ErrorSummary,
+                    run.CancelRequestedAt)));
     }
 }

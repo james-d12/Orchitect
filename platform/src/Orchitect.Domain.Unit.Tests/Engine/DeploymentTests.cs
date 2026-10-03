@@ -158,6 +158,35 @@ public sealed class DeploymentTests
     }
 
     [Fact]
+    public void Cancel_Active_BecomesCancelled()
+    {
+        var cancelled = Deploying().Cancel();
+
+        Assert.Equal(DeploymentStatus.Cancelled, NewDeployment().Cancel().Status);
+        Assert.Equal(DeploymentStatus.Cancelled, cancelled.Status);
+        Assert.Equal(DeploymentStatus.Cancelled, Destroying().Cancel().Status);
+        Assert.False(cancelled.IsActive);
+        Assert.NotNull(cancelled.CompletedAt);
+        Assert.Null(cancelled.ErrorSummary);
+    }
+
+    [Fact]
+    public void Cancel_Finished_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => Deploying().ProcessDeploymentStatus(0, null).Cancel());
+        Assert.Throws<InvalidOperationException>(() => Deploying().Cancel().Cancel());
+    }
+
+    [Fact]
+    public void StartDestroy_Cancelled_BecomesDestroying()
+    {
+        var cancelled = Deploying().Cancel();
+
+        Assert.True(cancelled.CanDestroy);
+        Assert.Equal(DeploymentStatus.Destroying, cancelled.StartDestroy().Status);
+    }
+
+    [Fact]
     public void Interrupt_Finished_Throws()
     {
         Assert.Throws<InvalidOperationException>(() => Deploying().ProcessDeploymentStatus(0, null).Interrupt("stopped"));

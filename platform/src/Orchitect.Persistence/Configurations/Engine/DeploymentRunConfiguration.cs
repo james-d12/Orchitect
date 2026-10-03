@@ -42,5 +42,6 @@ internal sealed class DeploymentRunConfiguration : IEntityTypeConfiguration<Depl
         builder.Property(r => r.RunnerId).HasMaxLength(DeploymentRun.RunnerIdMaxLength);
         builder.Property(r => r.LogLocation).HasMaxLength(DeploymentRun.LogLocationMaxLength);
         builder.Property(r => r.TokenHash).HasMaxLength(DeploymentRun.TokenHashMaxLength);
+        builder.Property(r => r.Version).IsRowVersion();
     }
 }

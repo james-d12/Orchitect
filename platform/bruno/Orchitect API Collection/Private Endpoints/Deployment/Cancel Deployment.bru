@@ -1,0 +1,17 @@
+meta {
+  name: Cancel Deployment
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{API_BASE_URL}}/deployments/{{DEPLOYMENT_ID}}/cancel
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}

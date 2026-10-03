@@ -27,14 +27,26 @@ public sealed record ExecutorContext
     public TimeSpan? StopGracePeriod { get; init; }
 
     public TimeSpan? Timeout { get; init; }
+
+    public CancellationToken StopRequested { get; init; }
 }
 
-public sealed record ExecutorResult(long? ExitCode, Exception? Exception = null, string? RunnerId = null);
+public sealed record ExecutorResult(
+    long? ExitCode,
+    Exception? Exception = null,
+    string? RunnerId = null,
+    bool Stopped = false);
 
 public interface IExecutor
 {
     /// <summary>
     /// Runs the runner to completion and returns its exit code, or the exception when it could not be run.
+    /// When <see cref="ExecutorContext.StopRequested"/> fires, the runner is stopped gracefully and the result is marked stopped.
     /// </summary>
     public Task<ExecutorResult> ExecuteAsync(ExecutorContext context, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends SIGTERM to the running runner of a run, wherever it was started from. Returns false when it is not running.
+    /// </summary>
+    public Task<bool> SignalStopAsync(string runId, CancellationToken cancellationToken = default);
 }

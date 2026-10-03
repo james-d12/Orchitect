@@ -18,6 +18,8 @@ public sealed record DeploymentRun
     public string? LogLocation { get; init; }
     public string? TokenHash { get; init; }
     public DateTime? TokenExpiresAt { get; init; }
+    public DateTime? CancelRequestedAt { get; init; }
+    public uint Version { get; init; }
 
     public const int ErrorSummaryMaxLength = 2000;
     public const int RunnerIdMaxLength = 256;
@@ -82,6 +84,28 @@ public sealed record DeploymentRun
         }
 
         return Finish(DeploymentRunStatus.Failed, null, reason);
+    }
+
+    public DeploymentRun RequestCancel(DateTime now)
+    {
+        if (!IsActive)
+        {
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot be asked to cancel while {Status}.");
+        }
+
+        return CancelRequestedAt is null ? this with { CancelRequestedAt = now } : this;
+    }
+
+    public DeploymentRun Cancel(long? exitCode = null, string? runnerId = null)
+    {
+        if (!IsActive)
+        {
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot be cancelled while {Status}.");
+        }
+
+        var run = runnerId is null ? this : this with { RunnerId = runnerId };
+
+        return run.Finish(DeploymentRunStatus.Cancelled, exitCode, null);
     }
 
     public DeploymentRun Complete(long? exitCode, Exception? exception, string? runnerId = null)
