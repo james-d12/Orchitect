@@ -114,6 +114,7 @@ public sealed class RunnerContainerSweepService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var deployments = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
         var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
+        var completer = scope.ServiceProvider.GetRequiredService<IRunCompleter>();
         var completion = scope.ServiceProvider.GetRequiredService<IRunCompletionHandler>();
         var active = await deployments.GetActiveAsync(_startedAt, cancellationToken);
         var unreconciled = new HashSet<string>();
@@ -136,11 +137,18 @@ public sealed class RunnerContainerSweepService : BackgroundService
                     continue;
                 }
 
+                var cancelled = run is { IsActive: true, CancelRequestedAt: not null } && outcome.ExitCode != 0;
                 var result = outcome.ExitCode is { } exitCode
                     ? RunResult.FromExitCode(exitCode, container?.ID)
                     : RunResult.Failure(outcome.Reason!);
 
-                if (run is null)
+                if (cancelled)
+                {
+                    await runs.UpdateAsync(run!.Cancel(outcome.ExitCode, container?.ID), cancellationToken);
+                    await deployments.UpdateAsync(deployment.Cancel(), cancellationToken);
+                    await CompleteCancelledRunAsync(completer, run.Id, cancellationToken);
+                }
+                else if (run is null)
                 {
                     await deployments.UpdateAsync(result.Outcome == RunOutcome.Succeeded
                         ? deployment.Succeed()
@@ -152,8 +160,9 @@ public sealed class RunnerContainerSweepService : BackgroundService
                 }
 
                 _logger.LogInformation(
-                    "Deployment {DeploymentId} was left {PreviousStatus} by an earlier API process and run {RunId} is now {Outcome}.",
-                    deployment.Id.Value, deployment.Status, runId, result.Outcome);
+                    "Deployment {DeploymentId} was left {PreviousStatus} by an earlier API process and run {RunId} was reconciled{Cancelled} from {Outcome}.",
+                    deployment.Id.Value, deployment.Status, runId, cancelled ? " as cancelled" : string.Empty,
+                    result.Outcome);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
@@ -164,6 +173,19 @@ public sealed class RunnerContainerSweepService : BackgroundService
         }
 
         return unreconciled;
+    }
+
+    private async Task CompleteCancelledRunAsync(IRunCompleter completer, DeploymentRunId runId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await completer.CompleteAsync(runId, RunOutcome.Failed, cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(exception, "Could not finish the instances of cancelled run {RunId}.", runId.Value);
+        }
     }
 
     private static async Task<ReconcileOutcome?> ReconcileAsync(

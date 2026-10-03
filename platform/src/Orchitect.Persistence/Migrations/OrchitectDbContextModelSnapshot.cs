@@ -442,6 +442,9 @@ namespace Orchitect.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("CancelRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("DeploymentId")
                         .HasColumnType("uuid");
 
@@ -455,10 +458,6 @@ namespace Orchitect.Persistence.Migrations
                     b.Property<DateTime?>("FinishedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.PrimitiveCollection<Guid[]>("InstanceIds")
-                        .IsRequired()
-                        .HasColumnType("uuid[]");
-
                     b.Property<string>("LogLocation")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
@@ -466,10 +465,6 @@ namespace Orchitect.Persistence.Migrations
                     b.Property<string>("Operation")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<string>("ProjectName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
 
                     b.Property<DateTime>("QueuedAt")
                         .ValueGeneratedOnAdd()
@@ -494,6 +489,12 @@ namespace Orchitect.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TokenHash")
@@ -503,6 +504,29 @@ namespace Orchitect.Persistence.Migrations
                     b.HasIndex("DeploymentId", "QueuedAt");
 
                     b.ToTable("DeploymentRuns", (string)null);
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Engine.Deployment.DeploymentRunPlan", b =>
+                {
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Contents")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("timezone('utc', now())");
+
+                    b.Property<string>("Instances")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("RunId");
+
+                    b.ToTable("DeploymentRunPlans", (string)null);
                 });
 
             modelBuilder.Entity("Orchitect.Domain.Engine.Environment.Environment", b =>
@@ -1346,6 +1370,15 @@ namespace Orchitect.Persistence.Migrations
                     b.HasOne("Orchitect.Domain.Engine.Deployment.Deployment", null)
                         .WithMany()
                         .HasForeignKey("DeploymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Engine.Deployment.DeploymentRunPlan", b =>
+                {
+                    b.HasOne("Orchitect.Domain.Engine.Deployment.DeploymentRun", null)
+                        .WithOne()
+                        .HasForeignKey("Orchitect.Domain.Engine.Deployment.DeploymentRunPlan", "RunId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

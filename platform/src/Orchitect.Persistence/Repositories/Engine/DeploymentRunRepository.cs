@@ -54,6 +54,12 @@ public sealed class DeploymentRunRepository : IDeploymentRunRepository
             .FirstOrDefaultAsync(r => r.TokenHash == tokenHash, cancellationToken);
     }
 
+    public Task LockAsync(DeploymentRunId id, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM \"DeploymentRuns\" WHERE \"Id\" = {id.Value} FOR UPDATE", cancellationToken);
+    }
+
     public async Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default)
     {
         var entry = _dbContext.DeploymentRuns.Update(run);
@@ -62,28 +68,15 @@ public sealed class DeploymentRunRepository : IDeploymentRunRepository
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new DeploymentRunConflictException(run.Id, exception);
+        }
         finally
         {
             entry.State = EntityState.Detached;
         }
 
-        return run;
-    }
-
-    public async Task<bool> TryFinishAsync(DeploymentRun run, CancellationToken cancellationToken = default)
-    {
-        var updated = await _dbContext.DeploymentRuns
-            .Where(r => r.Id == run.Id &&
-                        (r.Status == DeploymentRunStatus.Queued || r.Status == DeploymentRunStatus.Running))
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(r => r.Status, run.Status)
-                .SetProperty(r => r.FinishedAt, run.FinishedAt)
-                .SetProperty(r => r.ExitCode, run.ExitCode)
-                .SetProperty(r => r.ErrorSummary, run.ErrorSummary)
-                .SetProperty(r => r.RunnerId, run.RunnerId)
-                .SetProperty(r => r.TokenHash, run.TokenHash)
-                .SetProperty(r => r.TokenExpiresAt, run.TokenExpiresAt), cancellationToken);
-
-        return updated == 1;
+        return entry.Entity;
     }
 }

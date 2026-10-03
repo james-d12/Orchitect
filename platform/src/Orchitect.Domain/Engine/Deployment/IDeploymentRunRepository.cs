@@ -4,12 +4,10 @@ namespace Orchitect.Domain.Engine.Deployment;
 
 public interface IDeploymentRunRepository : IRepository<DeploymentRun, DeploymentRunId>
 {
-    Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default);
-
     /// <summary>
-    /// Saves a finished run only while the stored run is still queued or running, and returns whether it was saved.
+    /// Saves a run read earlier, throwing <see cref="DeploymentRunConflictException"/> when it changed since then.
     /// </summary>
-    Task<bool> TryFinishAsync(DeploymentRun run, CancellationToken cancellationToken = default);
+    Task<DeploymentRun?> UpdateAsync(DeploymentRun run, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the most recently queued run of a deployment.
@@ -20,4 +18,9 @@ public interface IDeploymentRunRepository : IRepository<DeploymentRun, Deploymen
     /// Gets the run whose token has the given hash, or null when no run holds it.
     /// </summary>
     Task<DeploymentRun?> GetByTokenHashAsync(string tokenHash, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Locks the run's row until the current transaction ends, so concurrent work on the same run takes turns.
+    /// </summary>
+    Task LockAsync(DeploymentRunId id, CancellationToken cancellationToken = default);
 }

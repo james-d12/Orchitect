@@ -229,6 +229,35 @@ public sealed class DeploymentTests
         Assert.Null(destroyed.ErrorSummary);
     }
 
+    [Fact]
+    public void Cancel_Active_BecomesCancelled()
+    {
+        var cancelled = Deploying().Cancel();
+
+        Assert.Equal(DeploymentStatus.Cancelled, NewDeployment().Cancel().Status);
+        Assert.Equal(DeploymentStatus.Cancelled, cancelled.Status);
+        Assert.Equal(DeploymentStatus.Cancelled, Destroying().Cancel().Status);
+        Assert.False(cancelled.IsActive);
+        Assert.NotNull(cancelled.CompletedAt);
+        Assert.Null(cancelled.ErrorSummary);
+    }
+
+    [Fact]
+    public void Cancel_Finished_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => Deploying().Succeed().Cancel());
+        Assert.Throws<InvalidOperationException>(() => Deploying().Cancel().Cancel());
+    }
+
+    [Fact]
+    public void StartDestroy_Cancelled_BecomesDestroying()
+    {
+        var cancelled = Deploying().Cancel();
+
+        Assert.True(cancelled.CanDestroy);
+        Assert.Equal(DeploymentStatus.Destroying, cancelled.StartDestroy().Status);
+    }
+
     private static Deployment NewDeployment() =>
         Deployment.Create(new ApplicationId(), new EnvironmentId(), new CommitId(new string('a', 40)), "test@example.com");
 

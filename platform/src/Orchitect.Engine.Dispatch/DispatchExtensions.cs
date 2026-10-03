@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
+using Orchitect.Engine.Dispatch.Plan;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
 using Orchitect.Engine.Dispatch.Secret.Azure;
@@ -18,7 +19,15 @@ public static class DispatchExtensions
     {
         services.AddExecutorServices(configuration);
         services.AddQueueServices();
-        services.AddScoped<IRunCompletionHandler, RunCompletionHandler>();
+        services.AddRunServices();
+        return services;
+    }
+
+    public static IServiceCollection AddRunServices(this IServiceCollection services)
+    {
+        services.TryAddScoped<IRunPlanner, RunPlanner>();
+        services.TryAddScoped<IRunCompleter, RunCompleter>();
+        services.TryAddScoped<IRunCompletionHandler, RunCompletionHandler>();
         return services;
     }
 
@@ -49,6 +58,7 @@ public static class DispatchExtensions
     {
         services.AddHostedService<QueuedHostedService>();
         services.AddSingleton<IBackgroundTaskQueueProcessor>(_ => new BackgroundTaskQueueProcessor(5));
+        services.AddSingleton<IDeploymentRunCancellation, DeploymentRunCancellation>();
         services.AddScoped<IDeploymentQueue, DeploymentQueue>();
     }
 }

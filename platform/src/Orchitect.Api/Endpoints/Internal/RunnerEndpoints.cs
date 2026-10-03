@@ -14,6 +14,7 @@ public static class RunnerEndpoints
     {
         endpoints.MapRunnerGroup()
             .MapEndpoint<GetRunDescriptorEndpoint>()
+            .MapEndpoint<CreateRunPlanEndpoint>()
             .MapEndpoint<CompleteRunEndpoint>();
     }
 

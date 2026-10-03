@@ -1,5 +1,3 @@
-using Orchitect.Domain.Engine.ResourceInstance;
-
 namespace Orchitect.Domain.Engine.Deployment;
 
 /// <summary>
@@ -20,14 +18,13 @@ public sealed record DeploymentRun
     public string? LogLocation { get; init; }
     public string? TokenHash { get; init; }
     public DateTime? TokenExpiresAt { get; init; }
-    public string? ProjectName { get; init; }
-    public IReadOnlyList<ResourceInstanceId> InstanceIds { get; init; } = [];
+    public DateTime? CancelRequestedAt { get; init; }
+    public uint Version { get; init; }
 
     public const int ErrorSummaryMaxLength = 2000;
     public const int RunnerIdMaxLength = 256;
     public const int LogLocationMaxLength = 2048;
     public const int TokenHashMaxLength = 256;
-    public const int ProjectNameMaxLength = 256;
 
     private DeploymentRun()
     {
@@ -79,21 +76,24 @@ public sealed record DeploymentRun
         };
     }
 
-    public DeploymentRun RecordPlan(string projectName, IReadOnlyList<ResourceInstanceId> instanceIds)
+    public DeploymentRun RequestCancel(DateTime now)
     {
-        if (Status != DeploymentRunStatus.Running)
+        if (!IsActive)
         {
-            throw new InvalidOperationException($"Run '{Id.Value}' cannot record a plan while {Status}.");
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot be asked to cancel while {Status}.");
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(projectName);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(projectName.Length, ProjectNameMaxLength, nameof(projectName));
+        return CancelRequestedAt is null ? this with { CancelRequestedAt = now } : this;
+    }
 
-        return this with
+    public DeploymentRun Cancel(long? exitCode = null, string? runnerId = null)
+    {
+        if (!IsActive)
         {
-            ProjectName = projectName,
-            InstanceIds = instanceIds.Distinct().ToList()
-        };
+            throw new InvalidOperationException($"Run '{Id.Value}' cannot be cancelled while {Status}.");
+        }
+
+        return Finish(DeploymentRunStatus.Cancelled, exitCode, null, runnerId);
     }
 
     public DeploymentRun Succeed(long? exitCode = null, string? runnerId = null)

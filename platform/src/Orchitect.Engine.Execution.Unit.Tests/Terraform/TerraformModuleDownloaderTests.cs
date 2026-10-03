@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Provisioner.Terraform;
 using Orchitect.Engine.Execution.Shared.CommandLine;
 
@@ -109,8 +109,8 @@ public sealed class TerraformModuleDownloaderTests : IDisposable
     private TerraformModuleDownloader CreateDownloader(IGitCommandLine git) =>
         new(NullLogger<TerraformModuleDownloader>.Instance, git, _cacheRoot);
 
-    private static ResourceTemplateVersionSource Source(string url, string tag = "", string folderPath = "") =>
-        new() { BaseUrl = new Uri(url), Tag = tag, FolderPath = folderPath };
+    private static RunInputSource Source(string url, string tag = "", string folderPath = "") =>
+        new(new Uri(url), tag, string.IsNullOrEmpty(folderPath) ? null : folderPath);
 
     internal sealed class FakeGitCommandLine : IGitCommandLine
     {

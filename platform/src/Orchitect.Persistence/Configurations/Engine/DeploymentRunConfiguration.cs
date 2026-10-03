@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Domain.Engine.ResourceInstance;
 
 namespace Orchitect.Persistence.Configurations.Engine;
 
@@ -44,15 +42,6 @@ internal sealed class DeploymentRunConfiguration : IEntityTypeConfiguration<Depl
         builder.Property(r => r.RunnerId).HasMaxLength(DeploymentRun.RunnerIdMaxLength);
         builder.Property(r => r.LogLocation).HasMaxLength(DeploymentRun.LogLocationMaxLength);
         builder.Property(r => r.TokenHash).HasMaxLength(DeploymentRun.TokenHashMaxLength);
-        builder.Property(r => r.ProjectName).HasMaxLength(DeploymentRun.ProjectNameMaxLength);
-
-        builder.PrimitiveCollection(r => r.InstanceIds)
-            .IsRequired()
-            .ElementType()
-            .HasConversion<ResourceInstanceIdConverter>();
+        builder.Property(r => r.Version).IsRowVersion();
     }
-
-    private sealed class ResourceInstanceIdConverter() : ValueConverter<ResourceInstanceId, Guid>(
-        id => id.Value,
-        value => new ResourceInstanceId(value));
 }

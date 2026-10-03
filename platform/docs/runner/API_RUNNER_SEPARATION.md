@@ -3,7 +3,7 @@ title: "API / runner separation (target design)"
 status: active
 workstream: runner
 milestone: "Runner Isolation"
-issues: [102, 103, 105, 106, 107, 110, 202, 203, 204]
+issues: [102, 103, 105, 106, 107, 110, 202, 203, 204, 213, 214, 215]
 superseded_by: null
 last_reviewed: 2026-10-03
 ---
@@ -229,7 +229,7 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
   - Move those instances to `Removing`.
 - **Either:**
   - Return the `RunContext` (project name, application/environment IDs) and one `RunInput` per resource.
-  - Each `RunInput` holds the key, template type, version source URL/tag, and parameters.
+  - Each `RunInput` holds the key, template name and type, provider, version source URL/tag/path, and parameters.
 
 **DTO sketch:**
 
@@ -237,11 +237,24 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
 RunDescriptor   { RunId, Operation, RepositoryUrl, CommitId, ApplicationId, EnvironmentId }
 ScoreSubmission { ScoreFile }                       // parsed score, contract shape
 RunPlan         { Context: { ProjectName, ApplicationId, EnvironmentId }, Inputs: RunInput[] }
-RunInput        { Key, TemplateType, Source: { BaseUrl, Tag, Path? }, Parameters }
+RunInput        { Key, TemplateName, TemplateType, Provider, Source: { BaseUrl, Tag, Path? }, Parameters }
 RunCompletion   { Outcome: Succeeded | Failed, ErrorSummary? }
 ```
 
 The round-trip test (#117) and the shared constants (#118) cover whatever env/arg contract is left (backend config, OTel).
+
+**Status (#204).** Implemented:
+
+- **Planner.** `IRunPlanner` (`Orchitect.Engine.Dispatch/Plan/`) holds the planning logic that was in `EngineOrchestrator`. `PlanAsync` resolves templates and records or finds the instances as above. It checks the score before it writes anything, and it runs in one transaction (`IUnitOfWork`) that first locks the run's row (`IDeploymentRunRepository.LockAsync`). So a rejected score leaves no records, and concurrent calls for one run take turns: the first records, the rest get the stored plan.
+- **Completer.** `IRunCompleter` (`Orchitect.Engine.Dispatch/Completion/`) moves the planned instances to `Active` / `Failed` or `Removed` / `RemovalFailed`, and releases the resources after a successful destroy. It skips instances that have already finished, so it's safe to call twice. It's step 2 of §8's `CompleteRun`; #106 adds the rest.
+- **Stored plan.** The plan is stored in `DeploymentRunPlans`, keyed by run ID, with each planned instance's ID and score key. A repeat `/plan` returns it without recording again, and logs a warning when the submitted score differs. The instance output (`Location` = module repository, `Workspace` = project name) is derived from the stored plan when the run completes, not stored with it. It's a placeholder until the runner reports real outputs.
+- **Endpoint.** `POST /internal/runs/{runId}/plan` (`CreateRunPlanEndpoint`) maps the planner's `RunPlanException` failure: `404` for an unknown run, `409` (`RunNotRunning`) for a run that isn't `Running`, and `400` (`RunPlanInvalid`) for a missing score file, a score with no resources, an unknown resource type, a template with no active version, or a resource recorded (or named twice in the score) with a different template.
+- **Contract.** `RunInput` also carries `TemplateName`, which keeps the Terraform module names (and so the state addresses) unchanged, and `Provider` (`RunInputProvider`), which picks the provisioner. Renaming a template therefore changes its module addresses, and Terraform destroys and recreates its resources.
+- **Runner.** Provisioners, drivers and validators take `RunInput`/`RunContext`, and Execution no longer references any resource repository. `EngineOrchestrator` parses the score, calls `IRunnerApiClient.SubmitScoreAsync`, executes the plan and reports through `CompleteAsync`. Until #105, the runner registers `InProcessRunnerApiClient`, which calls `IRunPlanner` and `IRunCompleter` directly over its database connection. That is why `Orchitect.Runner` references `Orchitect.Engine.Dispatch` for now. #105 removes the reference and the Dockerfile `COPY`, and adds a layering test that the runner doesn't reference Dispatch.
+- **Follow-ups.** These behaviours moved over unchanged and are now the API's to fix:
+  - Destroy resolves each template's latest active version, not the version the instance was provisioned with (`ResourceInstance.TemplateVersionId`). After a version bump, destroy runs a different module, and a template with no active version can't be destroyed (#213).
+  - A resource shared through the score's `id` is moved to `Removing` and `Removed` by one consumer's destroy, even while other applications still consume it (#214).
+  - The API trusts the submitted score. `Metadata.Name` becomes `RunContext.ProjectName`, which fills the backend's `{projectName}` placeholder, and `id` picks resource slugs across the environment. Once the runner is untrusted (#105, H1), the project name should come from the application and `id` claims should be checked (#215).
 
 **Status (#203).** Implemented:
 
@@ -268,18 +281,19 @@ Three callers share that handler:
 | Caller | When | Outcome source |
 |---|---|---|
 | `POST /complete` | The runner reports | The report. The exit code is recorded later but doesn't override it. |
-| `DeploymentQueue` | The executor returns and the run is still `Running` (no report arrived) | Exit code, using today's `ProcessDeploymentStatus` mapping |
+| `DeploymentQueue` | The executor returns and the run is still `Running` (no report arrived) | Exit code, mapped by `RunResult.FromExitCode` |
 | `RunnerContainerSweepService` | The API restarted mid-run | Exit code of the labelled container, or `Failed` when there is none |
 
 So a run whose report never reaches the API (API down, network failure) still ends in a consistent state. The runner retries `/complete` with backoff before it exits.
 
 **Status (#106).** Implemented:
 
-- **Handler.** `IRunCompletionHandler` (Dispatch, `Completion/`) takes a `RunResult`: the outcome, an error summary, and the exit code and container ID when they are known. It claims the run with `IDeploymentRunRepository.TryFinishAsync`, a conditional update that only succeeds while the run is still `Queued` or `Running`. Only the caller that claims the run moves its instances, so a report and the exit-code fallback that race can't both settle them. The handler updates the `Deployment` only while it is still active for this run's operation and this is the deployment's latest run.
+- **Handler.** `IRunCompletionHandler` (Dispatch, `Completion/`) takes a `RunResult`: the outcome, an error summary, and the exit code and container ID when they are known. In one transaction it locks the run's row (`IDeploymentRunRepository.LockAsync`), re-reads the run and the deployment, and finishes the run (which revokes the token). It sets the `Deployment` only while the deployment is still active for this run's operation and this is its latest run. After the commit it calls `IRunCompleter` (#204) with the run's final outcome to move the planned instances and, after a destroy, release the resources.
+- **Stale run writes.** These are gone. The handler always works from the run it re-read under the lock, so a report and the exit-code fallback that race take turns, and the second one only records its exit code. On a `DeploymentRunConflictException` from a writer that doesn't lock, such as a cancel request, it retries once with a fresh read.
 - **Repeat calls.** For a run that has already completed, the handler only fills in a missing exit code and container ID, and returns `false`. A repeat `POST /complete` never reaches the handler, because completion revoked the token: it gets `401`.
-- **Which instances.** Until #204 moves recording into the API, `EngineOrchestrator` in the runner records the run's plan on `DeploymentRun` (`ProjectName` and `InstanceIds`) before it moves the instances to `Provisioning` or `Removing`. The handler settles only those instances that are still in flight. The instance output's workspace comes from `ProjectName`. The runner no longer makes the final transitions or releases resources itself, so a runner that crashes mid-run no longer leaves instances stuck in `Provisioning`.
+- **Cancellation.** It stays outside the handler. When a stopped runner exits non-zero and the run is still active, the queue and the sweep cancel it as before (#210). If the runner already reported, the report wins.
 - **Endpoint.** `POST /internal/runs/{runId}/complete` (`CompleteRunEndpoint`) returns `204`, or `400` with `InvalidRunOutcome` for an outcome outside `Succeeded`/`Failed`.
-- **Runner.** `IRunCompletionReporter` wraps the run, reports `Succeeded`, or `Failed` with the exception message, through `IRunnerApiClient.CompleteAsync` (which retries with backoff), and rethrows so the exit code still matches. A report that can't be delivered is only logged. The runner reports only when `ORCHITECT_API_URL` is set, and nothing sets it until #107. Until then every run ends through the exit-code fallback.
+- **Runner.** `EngineOrchestrator` reports through `IRunnerApiClient.CompleteAsync`. Until #105 that is `InProcessRunnerApiClient`, which calls the handler directly. A runner that crashes before reporting is settled by the exit-code fallback, so its instances no longer stay `Provisioning` or `Removing`.
 
 ---
 

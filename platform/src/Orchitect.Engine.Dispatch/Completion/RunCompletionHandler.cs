@@ -1,9 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Orchitect.Domain.Core;
 using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Domain.Engine.Resource;
-using Orchitect.Domain.Engine.ResourceDependency;
-using Orchitect.Domain.Engine.ResourceInstance;
-using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Engine.Contracts.Runner.Api;
 
 namespace Orchitect.Engine.Dispatch.Completion;
@@ -11,67 +8,89 @@ namespace Orchitect.Engine.Dispatch.Completion;
 public interface IRunCompletionHandler
 {
     /// <summary>
-    /// Completes a run: records its result, settles its resource instances, finishes its deployment and revokes its
-    /// token. Returns false when the run had already completed, in which case only a missing exit code is recorded.
+    /// Completes a run: records its result, finishes its deployment and revokes its token, then settles its planned
+    /// instances. Returns false when the run had already completed, in which case only a missing exit code is
+    /// recorded.
     /// </summary>
     Task<bool> CompleteAsync(DeploymentRunId runId, RunResult result, CancellationToken cancellationToken);
 }
 
 public sealed class RunCompletionHandler : IRunCompletionHandler
 {
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IDeploymentRunRepository _runs;
     private readonly IDeploymentRepository _deployments;
-    private readonly IResourceInstanceRepository _instances;
-    private readonly IResourceRepository _resources;
-    private readonly IResourceTemplateRepository _templates;
-    private readonly IResourceDependencyGraphRepository _graphs;
+    private readonly IRunCompleter _completer;
     private readonly ILogger<RunCompletionHandler> _logger;
 
     public RunCompletionHandler(
+        IUnitOfWork unitOfWork,
         IDeploymentRunRepository runs,
         IDeploymentRepository deployments,
-        IResourceInstanceRepository instances,
-        IResourceRepository resources,
-        IResourceTemplateRepository templates,
-        IResourceDependencyGraphRepository graphs,
+        IRunCompleter completer,
         ILogger<RunCompletionHandler> logger)
     {
+        _unitOfWork = unitOfWork;
         _runs = runs;
         _deployments = deployments;
-        _instances = instances;
-        _resources = resources;
-        _templates = templates;
-        _graphs = graphs;
+        _completer = completer;
         _logger = logger;
     }
 
     public async Task<bool> CompleteAsync(DeploymentRunId runId, RunResult result,
         CancellationToken cancellationToken)
     {
+        FinishedRun finished;
+
+        try
+        {
+            finished = await _unitOfWork.ExecuteAsync(token => FinishAsync(runId, result, token),
+                cancellationToken);
+        }
+        catch (DeploymentRunConflictException)
+        {
+            finished = await _unitOfWork.ExecuteAsync(token => FinishAsync(runId, result, token),
+                cancellationToken);
+        }
+
+        if (finished.Settle)
+        {
+            await _completer.CompleteAsync(runId,
+                finished.Run.Status == DeploymentRunStatus.Succeeded ? RunOutcome.Succeeded : RunOutcome.Failed,
+                cancellationToken);
+        }
+
+        return finished.Completed;
+    }
+
+    private async Task<FinishedRun> FinishAsync(DeploymentRunId runId, RunResult result,
+        CancellationToken cancellationToken)
+    {
+        await _runs.LockAsync(runId, cancellationToken);
+
         var run = await _runs.GetByIdAsync(runId, cancellationToken)
                   ?? throw new InvalidOperationException($"Run '{runId.Value}' was not found.");
         var deployment = await _deployments.GetByIdAsync(run.DeploymentId, cancellationToken);
+        var latest = deployment is null ? null : await _runs.GetLatestAsync(deployment.Id, cancellationToken);
+        var isLatest = latest?.Id == run.Id;
 
         if (run.IsActive)
         {
-            var finished = result.Outcome == RunOutcome.Succeeded
+            var completed = result.Outcome == RunOutcome.Succeeded
                 ? run.Succeed(result.ExitCode, result.RunnerId)
                 : run.Fail(string.IsNullOrWhiteSpace(result.ErrorSummary)
                     ? RunResult.ReportedFailureSummary
                     : result.ErrorSummary, result.ExitCode, result.RunnerId);
+            run = await _runs.UpdateAsync(completed, cancellationToken) ?? completed;
 
-            if (await _runs.TryFinishAsync(finished, cancellationToken))
+            if (isLatest)
             {
-                await FinishDeploymentAsync(finished, deployment, cancellationToken);
-                await SettleInstancesAsync(finished, deployment, cancellationToken);
-
-                _logger.LogInformation("Run {RunId} of deployment {DeploymentId} is {Status}.",
-                    finished.Id.Value, finished.DeploymentId.Value, finished.Status);
-                return true;
+                await FinishDeploymentAsync(run, deployment!, cancellationToken);
             }
 
-            run = await _runs.GetByIdAsync(runId, cancellationToken)
-                  ?? throw new InvalidOperationException($"Run '{runId.Value}' was not found.");
+            _logger.LogInformation("Run {RunId} of deployment {DeploymentId} is {Status}.", run.Id.Value,
+                run.DeploymentId.Value, run.Status);
+            return new FinishedRun(run, true, true);
         }
 
         if (result.ExitCode is { } exitCode)
@@ -84,25 +103,22 @@ public sealed class RunCompletionHandler : IRunCompletionHandler
             }
         }
 
-        await FinishDeploymentAsync(run, deployment, cancellationToken);
-        return false;
+        if (isLatest)
+        {
+            await FinishDeploymentAsync(run, deployment!, cancellationToken);
+        }
+
+        return new FinishedRun(run, false, isLatest && run.Status != DeploymentRunStatus.Cancelled);
     }
 
-    private async Task FinishDeploymentAsync(DeploymentRun run, Deployment? deployment,
+    private async Task FinishDeploymentAsync(DeploymentRun run, Deployment deployment,
         CancellationToken cancellationToken)
     {
         var owned = run.Operation == DeploymentRunOperation.Destroy
-            ? deployment?.Status == DeploymentStatus.Destroying
-            : deployment?.Status is DeploymentStatus.Pending or DeploymentStatus.Deploying;
+            ? deployment.Status == DeploymentStatus.Destroying
+            : deployment.Status is DeploymentStatus.Pending or DeploymentStatus.Deploying;
 
-        if (deployment is null || !owned)
-        {
-            return;
-        }
-
-        var latest = await _runs.GetLatestAsync(deployment.Id, cancellationToken);
-
-        if (latest?.Id != run.Id)
+        if (!owned || run.Status == DeploymentRunStatus.Cancelled)
         {
             return;
         }
@@ -114,93 +130,5 @@ public sealed class RunCompletionHandler : IRunCompletionHandler
         await _deployments.UpdateAsync(finished, cancellationToken);
     }
 
-    private async Task SettleInstancesAsync(DeploymentRun run, Deployment? deployment,
-        CancellationToken cancellationToken)
-    {
-        var succeeded = run.Status == DeploymentRunStatus.Succeeded;
-        var instances = new List<ResourceInstance>();
-
-        foreach (var instanceId in run.InstanceIds)
-        {
-            var instance = await _instances.GetByIdAsync(instanceId, cancellationToken);
-
-            if (instance is null)
-            {
-                continue;
-            }
-
-            instances.Add(instance);
-
-            switch (instance.Status)
-            {
-                case ResourceInstanceStatus.Provisioning when succeeded:
-                    instance.Transition(ResourceInstanceStatus.Active,
-                        await CreateOutputAsync(instance, run, cancellationToken));
-                    break;
-                case ResourceInstanceStatus.Provisioning:
-                    instance.Transition(ResourceInstanceStatus.Failed);
-                    break;
-                case ResourceInstanceStatus.Removing:
-                    instance.Transition(succeeded
-                        ? ResourceInstanceStatus.Removed
-                        : ResourceInstanceStatus.RemovalFailed);
-                    break;
-                default:
-                    continue;
-            }
-
-            await _instances.UpdateAsync(instance, cancellationToken);
-        }
-
-        if (run.Operation == DeploymentRunOperation.Destroy && succeeded && deployment is not null)
-        {
-            await ReleaseResourcesAsync(deployment, instances.Select(i => i.ResourceId).Distinct().ToList(),
-                cancellationToken);
-        }
-    }
-
-    private async Task<ResourceInstanceOutput> CreateOutputAsync(ResourceInstance instance, DeploymentRun run,
-        CancellationToken cancellationToken)
-    {
-        var resource = await _resources.GetByIdAsync(instance.ResourceId, cancellationToken)
-                       ?? throw new InvalidOperationException(
-                           $"Resource '{instance.ResourceId.Value}' of instance '{instance.Id.Value}' was not found.");
-        var template = await _templates.GetByIdAsync(resource.ResourceTemplateId, cancellationToken);
-        var version = template?.Versions.FirstOrDefault(v => v.Id == instance.TemplateVersionId)
-                      ?? throw new InvalidOperationException(
-                          $"Template version '{instance.TemplateVersionId.Value}' of instance '{instance.Id.Value}' was not found.");
-
-        return new ResourceInstanceOutput { Location = version.Source.BaseUrl, Workspace = run.ProjectName };
-    }
-
-    private async Task ReleaseResourcesAsync(Deployment deployment, List<ResourceId> resourceIds,
-        CancellationToken cancellationToken)
-    {
-        foreach (var resourceId in resourceIds)
-        {
-            var resource = await _resources.GetByIdAsync(resourceId, cancellationToken);
-
-            if (resource is null)
-            {
-                continue;
-            }
-
-            resource.RemoveConsumer(deployment.ApplicationId);
-            await _resources.UpdateAsync(resource, cancellationToken);
-        }
-
-        var graph = await _graphs.GetByEnvironmentAsync(deployment.EnvironmentId, cancellationToken);
-
-        if (graph is null)
-        {
-            return;
-        }
-
-        foreach (var resourceId in resourceIds)
-        {
-            graph.RemoveResource(resourceId);
-        }
-
-        await _graphs.UpdateAsync(graph, cancellationToken);
-    }
+    private sealed record FinishedRun(DeploymentRun Run, bool Completed, bool Settle);
 }

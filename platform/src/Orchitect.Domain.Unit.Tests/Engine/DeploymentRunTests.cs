@@ -1,5 +1,4 @@
 using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Domain.Engine.ResourceInstance;
 
 namespace Orchitect.Domain.Unit.Tests.Engine;
 
@@ -148,23 +147,6 @@ public sealed class DeploymentRunTests
     }
 
     [Fact]
-    public void RecordPlan_Running_RecordsProjectAndDistinctInstances()
-    {
-        var instanceId = new ResourceInstanceId();
-
-        var planned = Running().RecordPlan("orders", [instanceId, instanceId]);
-
-        Assert.Equal("orders", planned.ProjectName);
-        Assert.Equal([instanceId], planned.InstanceIds);
-    }
-
-    [Fact]
-    public void RecordPlan_NotRunning_Throws()
-    {
-        Assert.Throws<InvalidOperationException>(() => Queued().RecordPlan("orders", []));
-    }
-
-    [Fact]
     public void IssueToken_Running_StoresHashAndExpiry()
     {
         var expiresAt = DateTime.UtcNow.AddHours(1);
@@ -239,6 +221,75 @@ public sealed class DeploymentRunTests
 
         Assert.Null(failed.TokenHash);
         Assert.Null(failed.TokenExpiresAt);
+    }
+
+    [Fact]
+    public void Cancel_Queued_BecomesCancelled()
+    {
+        var cancelled = Queued().Cancel();
+
+        Assert.Equal(DeploymentRunStatus.Cancelled, cancelled.Status);
+        Assert.False(cancelled.IsActive);
+        Assert.NotNull(cancelled.FinishedAt);
+        Assert.Null(cancelled.ExitCode);
+        Assert.Null(cancelled.ErrorSummary);
+    }
+
+    [Fact]
+    public void Cancel_Running_RecordsExitCodeAndRunnerAndRevokesToken()
+    {
+        var cancelled = Running().IssueToken("hash", DateTime.UtcNow.AddHours(1)).Cancel(143, "container-1");
+
+        Assert.Equal(DeploymentRunStatus.Cancelled, cancelled.Status);
+        Assert.Equal(143, cancelled.ExitCode);
+        Assert.Equal("container-1", cancelled.RunnerId);
+        Assert.Null(cancelled.TokenHash);
+        Assert.Null(cancelled.TokenExpiresAt);
+    }
+
+    [Fact]
+    public void RequestCancel_Active_RecordsWhenAndKeepsStatus()
+    {
+        var now = DateTime.UtcNow;
+
+        var queued = Queued().RequestCancel(now);
+        var running = Running().RequestCancel(now);
+
+        Assert.Equal(now, queued.CancelRequestedAt);
+        Assert.Equal(DeploymentRunStatus.Queued, queued.Status);
+        Assert.Equal(now, running.CancelRequestedAt);
+        Assert.Equal(DeploymentRunStatus.Running, running.Status);
+    }
+
+    [Fact]
+    public void RequestCancel_AlreadyRequested_KeepsFirstRequest()
+    {
+        var first = DateTime.UtcNow;
+        var requested = Running().RequestCancel(first);
+
+        Assert.Same(requested, requested.RequestCancel(first.AddMinutes(1)));
+    }
+
+    [Fact]
+    public void RequestCancel_Finished_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => Running().Succeed(0).RequestCancel(DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void SucceedOrCancel_KeepsCancelRequestedAt()
+    {
+        var now = DateTime.UtcNow;
+        var requested = Running().RequestCancel(now);
+
+        Assert.Equal(now, requested.Succeed(0).CancelRequestedAt);
+        Assert.Equal(now, requested.Cancel(143).CancelRequestedAt);
+    }
+
+    [Fact]
+    public void Cancel_Finished_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => Running().Succeed(0).Cancel());
     }
 
     private static DeploymentRun Queued() => DeploymentRun.Queue(new DeploymentId(), DeploymentRunOperation.Provision);

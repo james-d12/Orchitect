@@ -1,18 +1,18 @@
-using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Runner.Api;
 
 namespace Orchitect.Engine.Execution.Provisioner;
 
 public interface IProvisioner
 {
-    ResourceTemplateProvider Provider { get; }
+    RunInputProvider Provider { get; }
 
     Task ProvisionAsync(
-        List<ProvisionInput> inputs,
-        ProvisionContext context,
+        List<RunInput> inputs,
+        RunContext context,
         CancellationToken cancellationToken = default);
 
     Task DeleteAsync(
-        List<ProvisionInput> inputs,
-        ProvisionContext context,
+        List<RunInput> inputs,
+        RunContext context,
         CancellationToken cancellationToken = default);
 }
