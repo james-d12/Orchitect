@@ -1,110 +1,79 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
-using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Engine.Application;
+using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Domain.Engine.Environment;
-using Orchitect.Domain.Engine.Resource;
-using Orchitect.Domain.Engine.ResourceDependency;
 using Orchitect.Domain.Engine.ResourceInstance;
-using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Engine.Contracts.Runner.Api;
-using Orchitect.Engine.Contracts.Score;
 using Orchitect.Engine.Dispatch.Plan;
+using static Orchitect.Engine.Dispatch.Unit.Tests.Plan.RunTestContext;
 
 namespace Orchitect.Engine.Dispatch.Unit.Tests.Plan;
 
 public sealed class RunPlannerTests
 {
-    private const string StorageType = "azure-storage-account";
-    private const string KeyVaultType = "azure-key-vault";
-    private const string InactiveType = "inactive-template";
-
-    private readonly Dictionary<DeploymentRunId, DeploymentRun> _runs = [];
-    private readonly InMemoryPlanRepository _plans = new();
-    private readonly InMemoryResourceRepository _resources = new();
-    private readonly InMemoryResourceInstanceRepository _instances = new();
-    private readonly InMemoryResourceDependencyGraphRepository _graphs = new();
-    private readonly IDeploymentRunRepository _runRepository = Substitute.For<IDeploymentRunRepository>();
-    private readonly IDeploymentRepository _deploymentRepository = Substitute.For<IDeploymentRepository>();
-    private readonly IApplicationRepository _applicationRepository = Substitute.For<IApplicationRepository>();
-    private readonly IResourceTemplateRepository _templateRepository = Substitute.For<IResourceTemplateRepository>();
-    private readonly Application _application;
-    private readonly Deployment _deployment;
-
-    public RunPlannerTests()
-    {
-        _application = Application.Create("orders", new Repository
-        {
-            Name = "orders",
-            Url = new Uri("https://example.com/orders.git"),
-            Provider = RepositoryProvider.GitHub
-        }, new OrganisationId());
-        _deployment = Deployment.Create(_application.Id, new EnvironmentId(Guid.NewGuid()),
-            new CommitId(new string('a', 40)), "test@example.com");
-
-        _runRepository.GetByIdAsync(Arg.Any<DeploymentRunId>(), Arg.Any<CancellationToken>())
-            .Returns(call => _runs.GetValueOrDefault(call.Arg<DeploymentRunId>()));
-        _deploymentRepository.GetByIdAsync(_deployment.Id, Arg.Any<CancellationToken>()).Returns(_deployment);
-        _applicationRepository.GetByIdAsync(_application.Id, Arg.Any<CancellationToken>()).Returns(_application);
-
-        var templates = new[]
-        {
-            NewTemplate(StorageType, ResourceTemplateVersionState.Active),
-            NewTemplate(KeyVaultType, ResourceTemplateVersionState.Active),
-            NewTemplate(InactiveType, ResourceTemplateVersionState.Inactive)
-        }.ToDictionary(t => t.Type);
-        _templateRepository.GetByTypeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(call => templates.GetValueOrDefault(call.Arg<string>()));
-    }
+    private readonly RunTestContext _context = new();
 
     [Fact]
     public async Task PlanAsync_ResourceTemplateMissing_ThrowsWithoutRecording()
     {
         var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
-            PlanAsync(DeploymentRunOperation.Provision, Score(("storage", "unknown-type", new() { ["name"] = "x" }))));
+            _context.PlanAsync(DeploymentRunOperation.Provision,
+                Score(("storage", "unknown-type", new() { ["name"] = "x" }))));
 
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
         Assert.Contains("unknown-type", exception.Message);
         Assert.Contains("storage", exception.Message);
-        Assert.Empty(_resources.Items);
-        Assert.Empty(_plans.Items);
+        Assert.Empty(_context.Resources.Items);
+        Assert.Empty(_context.Plans.Items);
     }
 
     [Fact]
     public async Task PlanAsync_TemplateHasNoActiveVersion_ThrowsWithoutRecording()
     {
         var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
-            PlanAsync(DeploymentRunOperation.Provision, Score(("storage", InactiveType, null))));
+            _context.PlanAsync(DeploymentRunOperation.Provision, Score(("storage", InactiveType, null))));
 
         Assert.Contains("no active version", exception.Message);
-        Assert.Empty(_resources.Items);
+        Assert.Empty(_context.Resources.Items);
     }
 
     [Fact]
     public async Task PlanAsync_NoResources_Throws()
     {
-        await Assert.ThrowsAsync<RunPlanException>(() => PlanAsync(DeploymentRunOperation.Destroy, Score()));
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Destroy, Score()));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+    }
+
+    [Fact]
+    public async Task PlanAsync_RunNotFound_Throws()
+    {
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.CreatePlanner().PlanAsync(new DeploymentRunId(Guid.NewGuid()),
+                Score(("storage", StorageType, null)), CancellationToken.None));
+
+        Assert.Equal(RunPlanFailure.RunNotFound, exception.Failure);
     }
 
     [Fact]
     public async Task PlanAsync_RunNotRunning_Throws()
     {
-        var run = DeploymentRun.Queue(_deployment.Id, DeploymentRunOperation.Provision);
-        _runs[run.Id] = run;
+        var run = _context.AddRun(DeploymentRun.Queue(_context.Deployment.Id, DeploymentRunOperation.Provision));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            CreatePlanner().PlanAsync(run.Id, Score(("storage", StorageType, null)), CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.CreatePlanner().PlanAsync(run.Id, Score(("storage", StorageType, null)), CancellationToken.None));
 
-        Assert.Empty(_plans.Items);
+        Assert.Equal(RunPlanFailure.RunNotRunning, exception.Failure);
+        Assert.Empty(_context.Plans.Items);
     }
 
     [Fact]
     public async Task PlanAsync_Provision_ReturnsContextAndResolvedInputs()
     {
-        var (_, plan) = await PlanAsync(DeploymentRunOperation.Provision,
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Provision,
             Score(("storage", StorageType, new() { ["sku"] = "LRS" })));
 
-        Assert.Equal(new RunContext("orders", _deployment.ApplicationId.Value, _deployment.EnvironmentId.Value),
+        Assert.Equal(
+            new RunContext("orders", _context.Deployment.ApplicationId.Value, _context.Deployment.EnvironmentId.Value),
             plan.Context);
         var input = Assert.Single(plan.Inputs);
         Assert.Equal("storage", input.Key);
@@ -119,7 +88,8 @@ public sealed class RunPlannerTests
     [Fact]
     public async Task PlanAsync_ParametersMissing_PlansEmptyParameters()
     {
-        var (_, plan) = await PlanAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)));
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Provision,
+            Score(("storage", StorageType, null)));
 
         Assert.Empty(Assert.Single(plan.Inputs).Parameters);
     }
@@ -127,98 +97,72 @@ public sealed class RunPlannerTests
     [Fact]
     public async Task PlanAsync_Provision_RecordsResourceInstanceAndGraphNodeAsProvisioning()
     {
-        await PlanAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, new() { ["sku"] = "LRS" })));
+        await _context.PlanAsync(DeploymentRunOperation.Provision,
+            Score(("storage", StorageType, new() { ["sku"] = "LRS" })));
 
-        var resource = Assert.Single(_resources.Items);
+        var resource = Assert.Single(_context.Resources.Items);
         Assert.Equal("orders-storage", resource.Slug);
-        Assert.Equal(_deployment.EnvironmentId, resource.EnvironmentId);
-        Assert.Equal(_application.Id, resource.ApplicationId);
-        Assert.Equal(_application.OrganisationId, resource.OrganisationId);
-        Assert.Equal([_application.Id], resource.Consumers);
+        Assert.Equal(_context.Deployment.EnvironmentId, resource.EnvironmentId);
+        Assert.Equal(_context.Application.Id, resource.ApplicationId);
+        Assert.Equal(_context.Application.OrganisationId, resource.OrganisationId);
+        Assert.Equal([_context.Application.Id], resource.Consumers);
 
-        var instance = Assert.Single(_instances.Items);
+        var instance = Assert.Single(_context.Instances.Items);
         Assert.Equal(resource.Id, instance.ResourceId);
         Assert.Equal(ResourceInstanceStatus.Provisioning, instance.Status);
         Assert.Equal("LRS", instance.InputParameters["sku"].GetString());
 
-        Assert.True(Assert.Single(_graphs.Items).ContainsResource(resource.Id));
+        Assert.True(Assert.Single(_context.Graphs.Items).ContainsResource(resource.Id));
+        Assert.Equal([new PlannedResourceInstance(instance.Id, "storage")],
+            Assert.Single(_context.Plans.Items).Instances);
     }
 
     [Fact]
-    public async Task PlanAsync_CalledAgainForTheSameRun_ReturnsStoredPlanWithoutRecordingAgain()
+    public async Task PlanAsync_CalledAgainWithTheSameScore_ReturnsStoredPlanWithoutWarning()
     {
-        var (runId, first) = await PlanAsync(DeploymentRunOperation.Provision,
+        var score = Score(("storage", StorageType, new() { ["sku"] = "LRS" }));
+        var (runId, first) = await _context.PlanAsync(DeploymentRunOperation.Provision, score);
+
+        var second = await _context.CreatePlanner().PlanAsync(runId, score, CancellationToken.None);
+
+        Assert.Equal(first.Context, second.Context);
+        Assert.Equal(first.Inputs.Select(i => i.Key), second.Inputs.Select(i => i.Key));
+        Assert.DoesNotContain(_context.PlannerLogger.Entries, e => e.Level == LogLevel.Warning);
+    }
+
+    [Fact]
+    public async Task PlanAsync_CalledAgainWithADifferentScore_ReturnsStoredPlanWithoutRecordingAgain()
+    {
+        var (runId, first) = await _context.PlanAsync(DeploymentRunOperation.Provision,
             Score(("storage", StorageType, new() { ["sku"] = "LRS" })));
-        var instance = Assert.Single(_instances.Items);
+        var instance = Assert.Single(_context.Instances.Items);
         var updatedAt = instance.UpdatedAt;
 
-        var second = await CreatePlanner().PlanAsync(runId,
+        var second = await _context.CreatePlanner().PlanAsync(runId,
             Score(("storage", StorageType, new() { ["sku"] = "GRS" })), CancellationToken.None);
 
         Assert.Equal(first.Context, second.Context);
         Assert.Equal("LRS", Assert.Single(second.Inputs).Parameters["sku"]);
-        Assert.Single(_plans.Items);
-        Assert.Single(_resources.Items);
-        Assert.Equal(updatedAt, Assert.Single(_instances.Items).UpdatedAt);
+        Assert.Single(_context.Plans.Items);
+        Assert.Single(_context.Resources.Items);
+        Assert.Equal(updatedAt, Assert.Single(_context.Instances.Items).UpdatedAt);
         Assert.Equal("LRS", instance.InputParameters["sku"].GetString());
-    }
-
-    [Fact]
-    public async Task FinishAsync_ProvisionSucceeds_MarksInstancesActiveWithOutput()
-    {
-        await RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)), RunOutcome.Succeeded);
-
-        var instance = Assert.Single(_instances.Items);
-        Assert.Equal(ResourceInstanceStatus.Active, instance.Status);
-        Assert.Equal("orders", instance.Output!.Workspace);
-        Assert.Equal(new Uri("https://example.com/modules.git"), instance.Output.Location);
-    }
-
-    [Fact]
-    public async Task FinishAsync_ProvisionFails_MarksInstancesFailed()
-    {
-        await RunAsync(DeploymentRunOperation.Provision,
-            Score(("storage", StorageType, null), ("vault", KeyVaultType, null)), RunOutcome.Failed);
-
-        Assert.Equal(2, _instances.Items.Count);
-        Assert.All(_instances.Items, i => Assert.Equal(ResourceInstanceStatus.Failed, i.Status));
-    }
-
-    [Fact]
-    public async Task FinishAsync_CalledAgain_LeavesFinishedInstancesAlone()
-    {
-        var runId = await RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)),
-            RunOutcome.Succeeded);
-
-        await CreatePlanner().FinishAsync(runId, RunOutcome.Failed, CancellationToken.None);
-
-        Assert.Equal(ResourceInstanceStatus.Active, Assert.Single(_instances.Items).Status);
-    }
-
-    [Fact]
-    public async Task FinishAsync_RunNotPlanned_DoesNothing()
-    {
-        var run = DeploymentRun.Queue(_deployment.Id, DeploymentRunOperation.Provision).Start();
-        _runs[run.Id] = run;
-
-        await CreatePlanner().FinishAsync(run.Id, RunOutcome.Failed, CancellationToken.None);
-
-        Assert.Empty(_instances.Items);
-        Assert.Empty(_resources.Items);
+        Assert.Contains(_context.PlannerLogger.Entries,
+            e => e.Level == LogLevel.Warning && e.Message.Contains("different score file"));
     }
 
     [Fact]
     public async Task PlanAsync_Redeploy_ReusesResourceAndReconfiguresInstance()
     {
-        await RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, new() { ["sku"] = "LRS" })),
-            RunOutcome.Succeeded);
+        await _context.RunAsync(DeploymentRunOperation.Provision,
+            Score(("storage", StorageType, new() { ["sku"] = "LRS" })), RunOutcome.Succeeded);
 
-        await RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, new() { ["sku"] = "GRS" })),
-            RunOutcome.Succeeded);
+        await _context.RunAsync(DeploymentRunOperation.Provision,
+            Score(("storage", StorageType, new() { ["sku"] = "GRS" })), RunOutcome.Succeeded);
 
-        Assert.Single(_resources.Items);
-        Assert.Single(_graphs.Items);
-        var instance = Assert.Single(_instances.Items);
+        Assert.Single(_context.Resources.Items);
+        Assert.Single(_context.Graphs.Items);
+        var instance = Assert.Single(_context.Instances.Items);
         Assert.Equal(ResourceInstanceStatus.Active, instance.Status);
         Assert.Equal("GRS", instance.InputParameters["sku"].GetString());
     }
@@ -227,23 +171,23 @@ public sealed class RunPlannerTests
     public async Task PlanAsync_RetryAfterFailure_ProvisionsSameInstance()
     {
         var score = Score(("storage", StorageType, null));
-        await RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Failed);
+        await _context.RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Failed);
 
-        await RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Succeeded);
+        await _context.RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Succeeded);
 
-        Assert.Equal(ResourceInstanceStatus.Active, Assert.Single(_instances.Items).Status);
+        Assert.Equal(ResourceInstanceStatus.Active, Assert.Single(_context.Instances.Items).Status);
     }
 
     [Fact]
     public async Task PlanAsync_ParameterReferencesResource_AddsDependency()
     {
-        await PlanAsync(DeploymentRunOperation.Provision, Score(
+        await _context.PlanAsync(DeploymentRunOperation.Provision, Score(
             ("vault", KeyVaultType, null),
             ("storage", StorageType, new() { ["key_vault_id"] = "${resources.vault.id}" })));
 
-        var storage = _resources.Items.Single(r => r.Slug == "orders-storage");
-        var vault = _resources.Items.Single(r => r.Slug == "orders-vault");
-        var graph = Assert.Single(_graphs.Items);
+        var storage = _context.Resources.Items.Single(r => r.Slug == "orders-storage");
+        var vault = _context.Resources.Items.Single(r => r.Slug == "orders-vault");
+        var graph = Assert.Single(_context.Graphs.Items);
         Assert.True(graph.HasDependencyPath(storage.Id, vault.Id));
         Assert.False(graph.HasDependencyPath(vault.Id, storage.Id));
     }
@@ -251,16 +195,16 @@ public sealed class RunPlannerTests
     [Fact]
     public async Task PlanAsync_ReferenceRemovedFromScore_RemovesDependency()
     {
-        await RunAsync(DeploymentRunOperation.Provision, Score(
+        await _context.RunAsync(DeploymentRunOperation.Provision, Score(
                 ("vault", KeyVaultType, null),
                 ("storage", StorageType, new() { ["key_vault_id"] = "${resources.vault.id}" })),
             RunOutcome.Succeeded);
 
-        await RunAsync(DeploymentRunOperation.Provision,
+        await _context.RunAsync(DeploymentRunOperation.Provision,
             Score(("vault", KeyVaultType, null), ("storage", StorageType, null)), RunOutcome.Succeeded);
 
-        var storage = _resources.Items.Single(r => r.Slug == "orders-storage");
-        Assert.Equal(0, Assert.Single(_graphs.Items).DependencyCount(storage.Id));
+        var storage = _context.Resources.Items.Single(r => r.Slug == "orders-storage");
+        Assert.Equal(0, Assert.Single(_context.Graphs.Items).DependencyCount(storage.Id));
     }
 
     [Fact]
@@ -269,225 +213,66 @@ public sealed class RunPlannerTests
         var scoreFile = Score(("storage", StorageType, null));
         scoreFile.Resources!["storage"] = scoreFile.Resources["storage"] with { Id = "shared-storage" };
 
-        await PlanAsync(DeploymentRunOperation.Provision, scoreFile);
+        await _context.PlanAsync(DeploymentRunOperation.Provision, scoreFile);
 
-        Assert.Equal("shared-storage", Assert.Single(_resources.Items).Slug);
+        Assert.Equal("shared-storage", Assert.Single(_context.Resources.Items).Slug);
+    }
+
+    [Fact]
+    public async Task PlanAsync_ResourceRecordedWithAnotherTemplate_ThrowsWithoutRecording()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)),
+            RunOutcome.Succeeded);
+        var resource = Assert.Single(_context.Resources.Items);
+        var instance = Assert.Single(_context.Instances.Items);
+
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Provision,
+                Score(("vault", KeyVaultType, null), ("storage", KeyVaultType, null))));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains("different resource template", exception.Message);
+        Assert.Equal([resource], _context.Resources.Items);
+        Assert.Equal(ResourceInstanceStatus.Active, Assert.Single(_context.Instances.Items).Status);
+        Assert.Equal(instance.UpdatedAt, _context.Instances.Items[0].UpdatedAt);
+    }
+
+    [Fact]
+    public async Task PlanAsync_TwoKeysShareAnIdWithDifferentTemplates_ThrowsWithoutRecording()
+    {
+        var scoreFile = Score(("storage", StorageType, null), ("vault", KeyVaultType, null));
+        scoreFile.Resources!["storage"] = scoreFile.Resources["storage"] with { Id = "shared" };
+        scoreFile.Resources["vault"] = scoreFile.Resources["vault"] with { Id = "shared" };
+
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Provision, scoreFile));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Empty(_context.Resources.Items);
+        Assert.Empty(_context.Instances.Items);
     }
 
     [Fact]
     public async Task PlanAsync_Destroy_MovesRecordedInstancesToRemoving()
     {
         var score = Score(("storage", StorageType, null), ("vault", KeyVaultType, null));
-        await RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Succeeded);
+        await _context.RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Succeeded);
 
-        await PlanAsync(DeploymentRunOperation.Destroy, score);
+        await _context.PlanAsync(DeploymentRunOperation.Destroy, score);
 
-        Assert.All(_instances.Items, i => Assert.Equal(ResourceInstanceStatus.Removing, i.Status));
-    }
-
-    [Fact]
-    public async Task FinishAsync_DestroySucceeds_MarksInstancesRemovedAndReleasesResources()
-    {
-        var score = Score(
-            ("vault", KeyVaultType, null),
-            ("storage", StorageType, new() { ["key_vault_id"] = "${resources.vault.id}" }));
-        await RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Succeeded);
-
-        await RunAsync(DeploymentRunOperation.Destroy, score, RunOutcome.Succeeded);
-
-        var graph = Assert.Single(_graphs.Items);
-        Assert.All(_instances.Items, i => Assert.Equal(ResourceInstanceStatus.Removed, i.Status));
-        Assert.Equal(2, _resources.Items.Count);
-        Assert.All(_resources.Items, r => Assert.Empty(r.Consumers));
-        Assert.All(_resources.Items, r => Assert.False(graph.ContainsResource(r.Id)));
-    }
-
-    [Fact]
-    public async Task FinishAsync_DestroyAfterFailedProvision_MarksInstancesRemoved()
-    {
-        var score = Score(("storage", StorageType, null));
-        await RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Failed);
-
-        await RunAsync(DeploymentRunOperation.Destroy, score, RunOutcome.Succeeded);
-
-        Assert.Equal(ResourceInstanceStatus.Removed, Assert.Single(_instances.Items).Status);
-    }
-
-    [Fact]
-    public async Task FinishAsync_DestroyFails_MarksRemovalFailedAndKeepsConsumerAndGraphNode()
-    {
-        var score = Score(("storage", StorageType, null));
-        await RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Succeeded);
-
-        await RunAsync(DeploymentRunOperation.Destroy, score, RunOutcome.Failed);
-
-        var resource = Assert.Single(_resources.Items);
-        Assert.Equal(ResourceInstanceStatus.RemovalFailed, Assert.Single(_instances.Items).Status);
-        Assert.Equal([_application.Id], resource.Consumers);
-        Assert.True(Assert.Single(_graphs.Items).ContainsResource(resource.Id));
+        Assert.All(_context.Instances.Items, i => Assert.Equal(ResourceInstanceStatus.Removing, i.Status));
+        Assert.Equal(["storage", "vault"],
+            _context.Plans.Items[^1].Instances.Select(i => i.Key).Order());
     }
 
     [Fact]
     public async Task PlanAsync_DestroyWithNothingRecorded_PlansInputsWithoutCreatingRecords()
     {
-        var (_, plan) = await PlanAsync(DeploymentRunOperation.Destroy, Score(("storage", StorageType, null)));
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Destroy,
+            Score(("storage", StorageType, null)));
 
         Assert.Single(plan.Inputs);
-        Assert.Empty(_resources.Items);
-        Assert.Empty(_instances.Items);
-    }
-
-    private RunPlanner CreatePlanner() =>
-        new(NullLogger<RunPlanner>.Instance, _runRepository, _plans, _deploymentRepository, _applicationRepository,
-            _templateRepository, _resources, _instances, _graphs);
-
-    private async Task<(DeploymentRunId RunId, RunPlan Plan)> PlanAsync(DeploymentRunOperation operation,
-        ScoreFile scoreFile)
-    {
-        var run = DeploymentRun.Queue(_deployment.Id, operation).Start();
-        _runs[run.Id] = run;
-
-        return (run.Id, await CreatePlanner().PlanAsync(run.Id, scoreFile, CancellationToken.None));
-    }
-
-    private async Task<DeploymentRunId> RunAsync(DeploymentRunOperation operation, ScoreFile scoreFile,
-        RunOutcome outcome)
-    {
-        var (runId, _) = await PlanAsync(operation, scoreFile);
-        await CreatePlanner().FinishAsync(runId, outcome, CancellationToken.None);
-        return runId;
-    }
-
-    private static ScoreFile Score(params (string Key, string Type, Dictionary<string, string>? Parameters)[] resources) =>
-        new()
-        {
-            ApiVersion = "score.dev/v1b1",
-            Metadata = new ScoreMetadata { Name = "orders" },
-            Resources = resources.ToDictionary(r => r.Key,
-                r => new ScoreResource { Type = r.Type, Parameters = r.Parameters })
-        };
-
-    private static ResourceTemplate NewTemplate(string type, ResourceTemplateVersionState state) =>
-        ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest
-        {
-            OrganisationId = new OrganisationId(),
-            Name = $"{type} template",
-            Type = type,
-            Description = $"A {type}.",
-            Provider = ResourceTemplateProvider.Terraform,
-            Version = "1.0.0",
-            Source = new ResourceTemplateVersionSource
-            {
-                BaseUrl = new Uri("https://example.com/modules.git"),
-                FolderPath = type,
-                Tag = "v1.0.0"
-            },
-            Notes = "Initial version.",
-            State = state
-        });
-
-    private sealed class InMemoryPlanRepository : IDeploymentRunPlanRepository
-    {
-        public List<DeploymentRunPlan> Items { get; } = [];
-
-        public Task<DeploymentRunPlan?> GetByRunIdAsync(DeploymentRunId runId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(Items.FirstOrDefault(p => p.RunId == runId));
-
-        public Task<DeploymentRunPlan?> CreateAsync(DeploymentRunPlan plan,
-            CancellationToken cancellationToken = default)
-        {
-            if (Items.Any(p => p.RunId == plan.RunId))
-            {
-                throw new InvalidOperationException($"Run '{plan.RunId.Value}' already has a plan.");
-            }
-
-            Items.Add(plan);
-            return Task.FromResult<DeploymentRunPlan?>(plan);
-        }
-    }
-
-    private sealed class InMemoryResourceRepository : IResourceRepository
-    {
-        public List<Resource> Items { get; } = [];
-
-        public Task<Resource?> CreateAsync(Resource environment, CancellationToken cancellationToken = default)
-        {
-            Items.Add(environment);
-            return Task.FromResult<Resource?>(environment);
-        }
-
-        public IEnumerable<Resource> GetAll() => Items;
-
-        public Task<Resource?> GetByIdAsync(ResourceId id, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
-
-        public Task<Resource?> UpdateAsync(Resource resource, CancellationToken cancellationToken = default) =>
-            Task.FromResult<Resource?>(resource);
-
-        public Task<bool> DeleteAsync(ResourceId id, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Items.RemoveAll(r => r.Id == id) > 0);
-
-        public Task<IReadOnlyList<Resource>> GetByEnvironmentAsync(EnvironmentId environmentId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<Resource>>(Items.Where(r => r.EnvironmentId == environmentId).ToList());
-    }
-
-    private sealed class InMemoryResourceInstanceRepository : IResourceInstanceRepository
-    {
-        public List<ResourceInstance> Items { get; } = [];
-
-        public Task<ResourceInstance?> CreateAsync(ResourceInstance environment,
-            CancellationToken cancellationToken = default)
-        {
-            Items.Add(environment);
-            return Task.FromResult<ResourceInstance?>(environment);
-        }
-
-        public IEnumerable<ResourceInstance> GetAll() => Items;
-
-        public Task<ResourceInstance?> GetByIdAsync(ResourceInstanceId id,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(Items.FirstOrDefault(i => i.Id == id));
-
-        public Task<ResourceInstance?> UpdateAsync(ResourceInstance instance,
-            CancellationToken cancellationToken = default) => Task.FromResult<ResourceInstance?>(instance);
-
-        public Task<bool> DeleteAsync(ResourceInstanceId id, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Items.RemoveAll(i => i.Id == id) > 0);
-
-        public Task<IReadOnlyList<ResourceInstance>> GetByResourceAsync(ResourceId resourceId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ResourceInstance>>(Items.Where(i => i.ResourceId == resourceId).ToList());
-
-        public Task<IReadOnlyList<ResourceInstance>> GetByEnvironmentAsync(EnvironmentId environmentId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ResourceInstance>>(Items.Where(i => i.EnvironmentId == environmentId)
-                .ToList());
-    }
-
-    private sealed class InMemoryResourceDependencyGraphRepository : IResourceDependencyGraphRepository
-    {
-        public List<ResourceDependencyGraph> Items { get; } = [];
-
-        public Task<ResourceDependencyGraph?> CreateAsync(ResourceDependencyGraph environment,
-            CancellationToken cancellationToken = default)
-        {
-            Items.Add(environment);
-            return Task.FromResult<ResourceDependencyGraph?>(environment);
-        }
-
-        public IEnumerable<ResourceDependencyGraph> GetAll() => Items;
-
-        public Task<ResourceDependencyGraph?> GetByIdAsync(ResourceDependencyGraphId id,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(Items.FirstOrDefault(g => g.Id == id));
-
-        public Task<ResourceDependencyGraph?> GetByEnvironmentAsync(EnvironmentId environmentId,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(Items.FirstOrDefault(g => g.EnvironmentId == environmentId));
-
-        public Task<ResourceDependencyGraph?> UpdateAsync(ResourceDependencyGraph graph,
-            CancellationToken cancellationToken = default) => Task.FromResult<ResourceDependencyGraph?>(graph);
+        Assert.Empty(_context.Resources.Items);
+        Assert.Empty(_context.Instances.Items);
     }
 }

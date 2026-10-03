@@ -10,7 +10,7 @@ using Orchitect.Engine.Dispatch.Plan;
 
 namespace Orchitect.Api.Endpoints.Internal;
 
-public sealed class PlanRunEndpoint : IEndpoint
+public sealed class CreateRunPlanEndpoint : IEndpoint
 {
     public const string InvalidErrorCode = "RunPlanInvalid";
     public const string ConflictErrorCode = "RunNotRunning";
@@ -26,36 +26,22 @@ public sealed class PlanRunEndpoint : IEndpoint
             [FromBody]
             ScoreSubmission submission,
             [FromServices]
-            IDeploymentRunRepository runRepository,
-            [FromServices]
             IRunPlanner runPlanner,
             CancellationToken cancellationToken)
     {
-        var run = await runRepository.GetByIdAsync(new DeploymentRunId(runId), cancellationToken);
-
-        if (run is null)
-        {
-            return TypedResults.NotFound();
-        }
-
-        if (run.Status != DeploymentRunStatus.Running)
-        {
-            return TypedResults.Conflict(Errors(ConflictErrorCode,
-                $"Run '{runId}' cannot be planned while {run.Status}."));
-        }
-
-        if (submission.ScoreFile?.Metadata is null)
-        {
-            return TypedResults.BadRequest(Errors(InvalidErrorCode, "The submission has no score file."));
-        }
-
         try
         {
-            return TypedResults.Ok(await runPlanner.PlanAsync(run.Id, submission.ScoreFile, cancellationToken));
+            return TypedResults.Ok(
+                await runPlanner.PlanAsync(new DeploymentRunId(runId), submission.ScoreFile, cancellationToken));
         }
         catch (RunPlanException exception)
         {
-            return TypedResults.BadRequest(Errors(InvalidErrorCode, exception.Message));
+            return exception.Failure switch
+            {
+                RunPlanFailure.RunNotFound => TypedResults.NotFound(),
+                RunPlanFailure.RunNotRunning => TypedResults.Conflict(Errors(ConflictErrorCode, exception.Message)),
+                _ => TypedResults.BadRequest(Errors(InvalidErrorCode, exception.Message))
+            };
         }
     }
 

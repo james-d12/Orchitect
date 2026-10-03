@@ -19,7 +19,7 @@ using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Score;
 using Orchitect.Engine.Dispatch.Auth;
-using Orchitect.Engine.Dispatch.Plan;
+using Orchitect.Engine.Dispatch.Completion;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Api.Integration.Tests;
@@ -170,7 +170,7 @@ public sealed class RunPlanIntegrationTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = Assert.Single(body!.Errors);
-        Assert.Equal(PlanRunEndpoint.InvalidErrorCode, error.Code);
+        Assert.Equal(CreateRunPlanEndpoint.InvalidErrorCode, error.Code);
         Assert.Contains($"unknown-{_suffix}", error.Message);
         var (resources, _, _) = await LoadStateAsync();
         Assert.Empty(resources);
@@ -189,7 +189,75 @@ public sealed class RunPlanIntegrationTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal(PlanRunEndpoint.InvalidErrorCode, Assert.Single(body!.Errors).Code);
+        Assert.Equal(CreateRunPlanEndpoint.InvalidErrorCode, Assert.Single(body!.Errors).Code);
+    }
+
+    [Fact]
+    public async Task Plan_ConcurrentCallsForTheSameRun_RecordOnceAndReturnTheSamePlan()
+    {
+        // Arrange
+        var (run, client) = await StartRunAsync(DeploymentRunOperation.Provision);
+        var route = RunnerRoutes.ForRun(run.Id.Value, RunnerRoutes.Plan);
+
+        // Act
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ =>
+            client.PostAsJsonAsync(route, new ScoreSubmission(MultiResourceScore("Standard_LRS")),
+                RunnerContract.JsonOptions)));
+
+        // Assert
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+        var plans = await Task.WhenAll(responses.Select(r =>
+            r.Content.ReadFromJsonAsync<RunPlan>(RunnerContract.JsonOptions)));
+        Assert.All(plans, p => Assert.Equal(plans[0]!.Context, p!.Context));
+        var (resources, instances, _) = await LoadStateAsync();
+        Assert.Equal(3, resources.Count);
+        Assert.Equal(3, instances.Count);
+        Assert.All(instances, i => Assert.Equal(ResourceInstanceStatus.Provisioning, i.Status));
+    }
+
+    [Fact]
+    public async Task Plan_ResourceRecordedWithAnotherTemplate_Returns400WithoutRecording()
+    {
+        // Arrange
+        await RunAsync(DeploymentRunOperation.Provision, MultiResourceScore("Standard_LRS"), RunOutcome.Succeeded);
+        var (resourcesBefore, instancesBefore, _) = await LoadStateAsync();
+        var (run, client) = await StartRunAsync(DeploymentRunOperation.Provision);
+        var score = MultiResourceScore("Standard_GRS");
+        var database = score.Resources!["database"];
+        score.Resources.Remove("database");
+        score.Resources["cache"] = new ScoreResource { Type = KeyVaultType };
+        score.Resources["database"] = database with { Type = StorageType };
+
+        // Act
+        var response = await client.PostAsJsonAsync(RunnerRoutes.ForRun(run.Id.Value, RunnerRoutes.Plan),
+            new ScoreSubmission(score), RunnerContract.JsonOptions);
+        var body = await response.ReadFromJsonAsync<ErrorResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("different resource template", Assert.Single(body!.Errors).Message);
+        var (resourcesAfter, instancesAfter, _) = await LoadStateAsync();
+        Assert.Equal(resourcesBefore.Select(r => r.Id.Value).Order(), resourcesAfter.Select(r => r.Id.Value).Order());
+        Assert.Equal(instancesBefore.ToDictionary(i => i.Id, i => (i.Status, i.UpdatedAt)),
+            instancesAfter.ToDictionary(i => i.Id, i => (i.Status, i.UpdatedAt)));
+    }
+
+    [Fact]
+    public async Task Plan_RunNotStarted_Returns409()
+    {
+        // Arrange
+        var (run, client) = await StartRunAsync(DeploymentRunOperation.Provision, start: false);
+
+        // Act
+        var response = await client.PostAsJsonAsync(RunnerRoutes.ForRun(run.Id.Value, RunnerRoutes.Plan),
+            new ScoreSubmission(MultiResourceScore("Standard_LRS")), RunnerContract.JsonOptions);
+        var body = await response.ReadFromJsonAsync<ErrorResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(CreateRunPlanEndpoint.ConflictErrorCode, Assert.Single(body!.Errors).Code);
+        var (resources, _, _) = await LoadStateAsync();
+        Assert.Empty(resources);
     }
 
     [Fact]
@@ -297,18 +365,19 @@ public sealed class RunPlanIntegrationTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
 
         using var scope = _factory.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<IRunPlanner>()
-            .FinishAsync(run.Id, outcome, CancellationToken.None);
+        await scope.ServiceProvider.GetRequiredService<IRunCompleter>()
+            .CompleteAsync(run.Id, outcome, CancellationToken.None);
     }
 
-    private async Task<(DeploymentRun Run, HttpClient Client)> StartRunAsync(DeploymentRunOperation operation)
+    private async Task<(DeploymentRun Run, HttpClient Client)> StartRunAsync(DeploymentRunOperation operation,
+        bool start = true)
     {
         var token = RunnerToken.Generate();
+        var queued = DeploymentRun.Queue(_deployment.Id, operation);
 
         using var scope = _factory.Services.CreateScope();
         var run = await scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>().CreateAsync(
-            DeploymentRun.Queue(_deployment.Id, operation).Start()
-                .IssueToken(token.Hash, DateTime.UtcNow.AddHours(1)));
+            (start ? queued.Start() : queued).IssueToken(token.Hash, DateTime.UtcNow.AddHours(1)));
         ArgumentNullException.ThrowIfNull(run);
 
         var client = _factory.CreateClient();

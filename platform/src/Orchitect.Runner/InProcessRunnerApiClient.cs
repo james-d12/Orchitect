@@ -1,5 +1,6 @@
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Engine.Contracts.Runner.Api;
+using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Plan;
 using Orchitect.Engine.Execution.RunnerApi;
 
@@ -8,11 +9,13 @@ namespace Orchitect.Runner;
 internal sealed class InProcessRunnerApiClient : IRunnerApiClient
 {
     private readonly IRunPlanner _runPlanner;
+    private readonly IRunCompleter _runCompleter;
     private readonly DeploymentRunId _runId;
 
-    public InProcessRunnerApiClient(IRunPlanner runPlanner, DeploymentRunId runId)
+    public InProcessRunnerApiClient(IRunPlanner runPlanner, IRunCompleter runCompleter, DeploymentRunId runId)
     {
         _runPlanner = runPlanner;
+        _runCompleter = runCompleter;
         _runId = runId;
     }
 
@@ -23,5 +26,5 @@ internal sealed class InProcessRunnerApiClient : IRunnerApiClient
         _runPlanner.PlanAsync(_runId, submission.ScoreFile, cancellationToken);
 
     public Task CompleteAsync(RunCompletion completion, CancellationToken cancellationToken) =>
-        _runPlanner.FinishAsync(_runId, completion.Outcome, cancellationToken);
+        _runCompleter.CompleteAsync(_runId, completion.Outcome, cancellationToken);
 }

@@ -284,5 +284,8 @@ public sealed class RunnerAuthenticationTests : IAsyncLifetime
 
         public Task<DeploymentRun?> GetLatestAsync(DeploymentId deploymentId,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task LockAsync(DeploymentRunId id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

@@ -39,7 +39,7 @@ internal sealed class DeploymentRunPlanConfiguration : IEntityTypeConfiguration<
         builder.Property(p => p.CreatedAt).IsRequired().HasDefaultValueSql("timezone('utc', now())");
     }
 
-    private sealed record StoredInstance(Guid InstanceId, Uri? Location, string? Workspace);
+    private sealed record StoredInstance(Guid InstanceId, string Key);
 
     private sealed class PlannedInstancesConverter()
         : ValueConverter<IReadOnlyList<PlannedResourceInstance>, string>(
@@ -48,13 +48,12 @@ internal sealed class DeploymentRunPlanConfiguration : IEntityTypeConfiguration<
     {
         private static string Serialize(IReadOnlyList<PlannedResourceInstance> instances) =>
             JsonSerializer.Serialize(instances
-                .Select(i => new StoredInstance(i.InstanceId.Value, i.Output?.Location, i.Output?.Workspace))
+                .Select(i => new StoredInstance(i.InstanceId.Value, i.Key))
                 .ToList());
 
         private static IReadOnlyList<PlannedResourceInstance> Deserialize(string json) =>
             (JsonSerializer.Deserialize<List<StoredInstance>>(json) ?? [])
-            .Select(i => new PlannedResourceInstance(new ResourceInstanceId(i.InstanceId),
-                i.Location is null ? null : new ResourceInstanceOutput { Location = i.Location, Workspace = i.Workspace }))
+            .Select(i => new PlannedResourceInstance(new ResourceInstanceId(i.InstanceId), i.Key))
             .ToList();
     }
 
