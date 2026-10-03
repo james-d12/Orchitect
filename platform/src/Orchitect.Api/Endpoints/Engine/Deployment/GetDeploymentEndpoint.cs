@@ -25,6 +25,17 @@ public sealed class GetDeploymentEndpoint : IEndpoint
         string RequestedBy,
         DateTime? StartedAt,
         DateTime? CompletedAt,
+        string? ErrorSummary,
+        GetDeploymentRunResponse? LatestRun);
+
+    public sealed record GetDeploymentRunResponse(
+        Guid Id,
+        string Operation,
+        string Status,
+        DateTime QueuedAt,
+        DateTime? StartedAt,
+        DateTime? FinishedAt,
+        long? ExitCode,
         string? ErrorSummary);
 
     private static async Task<Results<Ok<GetDeploymentResponse>, NotFound>> HandleAsync(
@@ -32,6 +43,8 @@ public sealed class GetDeploymentEndpoint : IEndpoint
         Guid id,
         [FromServices]
         IDeploymentRepository repository,
+        [FromServices]
+        IDeploymentRunRepository runRepository,
         CancellationToken cancellationToken)
     {
         var deployment = await repository.GetByIdAsync(new DeploymentId(id), cancellationToken);
@@ -40,6 +53,8 @@ public sealed class GetDeploymentEndpoint : IEndpoint
         {
             return TypedResults.NotFound();
         }
+
+        var run = await runRepository.GetLatestAsync(deployment.Id, cancellationToken);
 
         return TypedResults.Ok(new GetDeploymentResponse(
             deployment.Id.Value,
@@ -52,6 +67,17 @@ public sealed class GetDeploymentEndpoint : IEndpoint
             deployment.RequestedBy,
             deployment.StartedAt,
             deployment.CompletedAt,
-            deployment.ErrorSummary));
+            deployment.ErrorSummary,
+            run is null
+                ? null
+                : new GetDeploymentRunResponse(
+                    run.Id.Value,
+                    run.Operation.ToString(),
+                    run.Status.ToString(),
+                    run.QueuedAt,
+                    run.StartedAt,
+                    run.FinishedAt,
+                    run.ExitCode,
+                    run.ErrorSummary)));
     }
 }

@@ -82,9 +82,9 @@ The Runner is a worker attached to exactly one run. Every request goes from the 
 
 # 3. Run identity
 
-The runner API needs a stable run ID (#110). Today `RunId = DeploymentId`, but one deployment can have several runs (provision, destroy, retries), and the token and every endpoint below are scoped to a single run.
+The runner API needs a stable run ID, because one deployment can have several runs (provision, destroy, retries), and the token and every endpoint below are scoped to a single run.
 
-`DeploymentRun` is a prerequisite:
+`DeploymentRun` provides it (#110). Every provision and destroy creates one, and its ID is the container name, the `orchitect.run-id` label and `ORCHITECT_RUN_ID`:
 
 | Field | Purpose |
 |---|---|

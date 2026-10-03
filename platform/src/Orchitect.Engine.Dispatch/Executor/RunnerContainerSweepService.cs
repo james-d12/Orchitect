@@ -13,6 +13,7 @@ public sealed class RunnerContainerSweepService : BackgroundService
     private static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(10);
     private static readonly string[] FinishedStates = ["exited", "created", "dead"];
     private const string ExitedState = "exited";
+    private const string InterruptedRunReason = "The API restarted before the run finished.";
 
     private readonly IServiceProvider _serviceProvider;
     private readonly ExecutorOptions _options;
@@ -110,43 +111,64 @@ public sealed class RunnerContainerSweepService : BackgroundService
         CancellationToken cancellationToken)
     {
         using var scope = _serviceProvider.CreateScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
-        var deployments = await repository.GetActiveAsync(_startedAt, cancellationToken);
+        var deployments = scope.ServiceProvider.GetRequiredService<IDeploymentRepository>();
+        var runs = scope.ServiceProvider.GetRequiredService<IDeploymentRunRepository>();
+        var active = await deployments.GetActiveAsync(_startedAt, cancellationToken);
         var unreconciled = new HashSet<string>();
 
-        foreach (var deployment in deployments)
+        foreach (var deployment in active)
         {
             var runId = deployment.Id.Value.ToString();
-            var container = containers.Where(c => GetRunId(c) == runId).MaxBy(c => c.Created);
 
             try
             {
-                var reconciled = await ReconcileAsync(docker, deployment, container, cancellationToken);
+                var run = await runs.GetLatestAsync(deployment.Id, cancellationToken);
+                runId = run?.Id.Value.ToString() ?? runId;
+                var container = containers.Where(c => GetRunId(c) == runId).MaxBy(c => c.Created);
 
-                if (reconciled is null)
+                var outcome = await ReconcileAsync(docker, deployment, container, cancellationToken);
+
+                if (outcome is null)
                 {
                     unreconciled.Add(runId);
                     continue;
                 }
 
-                await repository.UpdateAsync(reconciled, cancellationToken);
+                var reconciled = outcome.ExitCode is { } exitCode
+                    ? deployment.ProcessDeploymentStatus(exitCode, null)
+                    : deployment.Interrupt(outcome.Reason!);
+
+                await deployments.UpdateAsync(reconciled, cancellationToken);
+
+                var reconciledRun = run switch
+                {
+                    { Status: DeploymentRunStatus.Running } when outcome.ExitCode is { } runExitCode =>
+                        run.Complete(runExitCode, null, container?.ID),
+                    { IsActive: true } => run.Interrupt(reconciled.ErrorSummary ?? InterruptedRunReason),
+                    _ => null
+                };
+
+                if (reconciledRun is not null)
+                {
+                    await runs.UpdateAsync(reconciledRun, cancellationToken);
+                }
 
                 _logger.LogInformation(
                     "Deployment {DeploymentId} was left {PreviousStatus} by an earlier API process and is now {Status}.",
-                    runId, deployment.Status, reconciled.Status);
+                    deployment.Id.Value, deployment.Status, reconciled.Status);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
                 unreconciled.Add(runId);
                 _logger.LogWarning(exception, "Failed to reconcile deployment {DeploymentId} left {Status}.",
-                    runId, deployment.Status);
+                    deployment.Id.Value, deployment.Status);
             }
         }
 
         return unreconciled;
     }
 
-    private static async Task<Deployment?> ReconcileAsync(
+    private static async Task<ReconcileOutcome?> ReconcileAsync(
         IDockerClient docker,
         Deployment deployment,
         ContainerListResponse? container,
@@ -154,12 +176,12 @@ public sealed class RunnerContainerSweepService : BackgroundService
     {
         if (deployment.Status == DeploymentStatus.Pending)
         {
-            return deployment.Interrupt("The API stopped before the deployment started.");
+            return ReconcileOutcome.Interrupted("The API stopped before the deployment started.");
         }
 
         if (container is null)
         {
-            return deployment.Interrupt("The runner container was not found after the API restarted.");
+            return ReconcileOutcome.Interrupted("The runner container was not found after the API restarted.");
         }
 
         if (!FinishedStates.Contains(container.State, StringComparer.OrdinalIgnoreCase))
@@ -169,13 +191,18 @@ public sealed class RunnerContainerSweepService : BackgroundService
 
         if (!string.Equals(container.State, ExitedState, StringComparison.OrdinalIgnoreCase))
         {
-            return deployment.Interrupt($"The runner container was {container.State} after the API restarted.");
+            return ReconcileOutcome.Interrupted($"The runner container was {container.State} after the API restarted.");
         }
 
         var inspect = await docker.Containers.InspectContainerAsync(container.ID, cancellationToken);
         return inspect.State is { } state
-            ? deployment.ProcessDeploymentStatus(state.ExitCode, null)
-            : deployment.Interrupt("The runner container state could not be read after the API restarted.");
+            ? new ReconcileOutcome(state.ExitCode, null)
+            : ReconcileOutcome.Interrupted("The runner container state could not be read after the API restarted.");
+    }
+
+    private sealed record ReconcileOutcome(long? ExitCode, string? Reason)
+    {
+        public static ReconcileOutcome Interrupted(string reason) => new(null, reason);
     }
 
     private static string? GetRunId(ContainerListResponse container) =>

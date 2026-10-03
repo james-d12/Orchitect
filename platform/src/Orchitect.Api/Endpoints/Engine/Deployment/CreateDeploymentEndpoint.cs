@@ -32,6 +32,8 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             [FromServices]
             IEnvironmentRepository environmentRepository,
             [FromServices]
+            IDeploymentRunRepository runRepository,
+            [FromServices]
             IDeploymentQueue deploymentQueue,
             HttpContext httpContext,
             CancellationToken cancellationToken)
@@ -80,15 +82,26 @@ public sealed class CreateDeploymentEndpoint : IEndpoint
             return TypedResults.InternalServerError();
         }
 
-        var deploymentRequest = new DeploymentQueueRequest(application.Id, deploymentResponse.Id);
+        DeploymentRun? run = null;
 
         try
         {
-            await deploymentQueue.QueueDeploymentTaskAsync(deploymentRequest, cancellationToken);
+            run = await runRepository.CreateAsync(
+                DeploymentRun.Queue(deploymentResponse.Id, DeploymentRunOperation.Provision), cancellationToken)
+                ?? throw new InvalidOperationException("The deployment run could not be created.");
+            await deploymentQueue.QueueDeploymentTaskAsync(
+                new DeploymentQueueRequest(run.Id, application.Id, deploymentResponse.Id), cancellationToken);
         }
         catch
         {
-            await repository.UpdateAsync(deploymentResponse.Interrupt("The deployment could not be queued."), CancellationToken.None);
+            const string reason = "The deployment could not be queued.";
+            await repository.UpdateAsync(deploymentResponse.Interrupt(reason), CancellationToken.None);
+
+            if (run is not null)
+            {
+                await runRepository.UpdateAsync(run.Interrupt(reason), CancellationToken.None);
+            }
+
             throw;
         }
 

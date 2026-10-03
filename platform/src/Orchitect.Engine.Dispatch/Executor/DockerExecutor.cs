@@ -63,7 +63,7 @@ public sealed class DockerExecutor : IExecutor
         var network = await ResolveNetworkAsync(context.Network, cancellationToken);
         activity?.SetTag("container.network", network);
 
-        var containerName = $"orchitect-runner-{context.RunId}-{Guid.NewGuid().ToString("N")[..8]}";
+        var containerName = $"orchitect-runner-{context.RunId}";
         CreateContainerResponse container;
         Dictionary<string, string> secrets;
 
@@ -189,7 +189,7 @@ public sealed class DockerExecutor : IExecutor
                 _logger.LogInformation("Run {RunId} completed successfully.", context.RunId);
             }
 
-            return new ExecutorResult(wait.StatusCode);
+            return new ExecutorResult(wait.StatusCode, RunnerId: container.ID);
         }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
