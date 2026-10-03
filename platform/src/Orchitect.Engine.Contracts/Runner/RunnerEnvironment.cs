@@ -9,6 +9,7 @@ public static class RunnerEnvironment
 
     public const string RunId = "ORCHITECT_RUN_ID";
     public const string RunToken = "ORCHITECT_RUN_TOKEN";
+    public const string ApiBaseUrl = "ORCHITECT_API_URL";
     public const string ConnectionString = "ConnectionStrings__orchitect";
     public const string KeyVaultAccessToken = $"{KeyVaultPrefix}{nameof(AzureKeyVaultOptions.AccessToken)}";
     public const string KeyVaultAccessTokenExpiresOn =

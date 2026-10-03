@@ -8,8 +8,8 @@ using Orchitect.Domain.Engine.Resource;
 using Orchitect.Domain.Engine.ResourceDependency;
 using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Domain.Engine.ResourceTemplate;
+using Orchitect.Engine.Contracts.Score;
 using Orchitect.Engine.Execution.Configuration.Score;
-using Orchitect.Engine.Execution.Configuration.Score.Models;
 using Orchitect.Engine.Execution.Provisioner;
 
 namespace Orchitect.Engine.Execution;

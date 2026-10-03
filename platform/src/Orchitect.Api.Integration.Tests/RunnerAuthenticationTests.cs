@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 using Orchitect.Api.Authentication;
 using Orchitect.Api.Endpoints.Internal;
 using Orchitect.Domain.Engine.Deployment;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Dispatch.Auth;
 
 namespace Orchitect.Api.Integration.Tests;
@@ -240,6 +241,7 @@ public sealed class RunnerAuthenticationTests : IAsyncLifetime
     private async Task<HttpResponseMessage> SendAsync(string url, string? bearerToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add(RunnerContract.HeaderName, RunnerContract.Version.ToString());
 
         if (bearerToken is not null)
         {

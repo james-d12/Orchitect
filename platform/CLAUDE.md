@@ -60,7 +60,7 @@ Test projects:
 - `Orchitect.Api.Integration.Tests`: endpoints and repositories against Postgres in Testcontainers (needs Docker)
 - `Orchitect.Domain.Unit.Tests`: domain entity behaviour (e.g. deployment status transitions)
 - `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue, Key Vault and run token minting, plus the API-to-runner contract round-trip and the Engine layering guard tests
-- `Orchitect.Engine.Execution.Unit.Tests`: orchestrator, drivers and runner secret loading
+- `Orchitect.Engine.Execution.Unit.Tests`: orchestrator, drivers, runner secret loading and the runner API client
 - `Orchitect.Infrastructure.Inventory.Unit.Tests`, `Orchitect.Common.Unit.Tests`
 
 Stryker.NET is configured for mutation testing (see stryker-config.json). Bruno API tests are in `bruno/Orchitect API Collection` (the `E2E` folder runs a full deployment flow).
@@ -91,9 +91,9 @@ Each capability is a namespace folder (`Core`, `Engine`, `Inventory`) inside the
 | `Orchitect.Api` | The single ASP.NET API. Minimal-API endpoints in `Endpoints/{Core,Engine,Inventory}/`, plus `Jobs/DiscoveryHostedService` for periodic Inventory discovery |
 | `Orchitect.Domain` | Entities, strongly-typed IDs and repository interfaces, in `Core/`, `Engine/` and `Inventory/` |
 | `Orchitect.Persistence` | `OrchitectDbContext`, EF configurations, repositories and migrations for all contexts |
-| `Orchitect.Engine.Contracts` | What the API and the runner must agree on: runner arguments and environment keys, `RunnerOperation`, `TerraformBackendOptions`, `SecretProviderOptions`, the secrets file. No Orchitect references |
+| `Orchitect.Engine.Contracts` | What the API and the runner must agree on: runner arguments and environment keys, `RunnerOperation`, `TerraformBackendOptions`, `SecretProviderOptions`, the secrets file, the Score models, and the runner API routes, DTOs and contract version (`Runner/Api/`). No Orchitect references |
 | `Orchitect.Engine.Dispatch` | Control plane, used by the API only: `IExecutor`/`DockerExecutor`, deployment queue, runner container sweep, Key Vault token minting |
-| `Orchitect.Engine.Execution` | Data plane, used by the runner and the Playground: `EngineOrchestrator`, Score, Terraform and Helm drivers, secret providers |
+| `Orchitect.Engine.Execution` | Data plane, used by the runner and the Playground: `EngineOrchestrator`, Score, Terraform and Helm drivers, secret providers, the runner API client (`IRunnerApiClient`) |
 | `Orchitect.Infrastructure.Inventory` | Discovery integrations for Azure, Azure DevOps, GitHub and GitLab, one folder per provider plus `Shared` |
 | `Orchitect.Runner` | Console app packaged as the runner image. Runs one provision or destroy for a deployment, then exits |
 | `Orchitect.Common` | Shared helpers (observability, query, extensions) |
@@ -171,5 +171,5 @@ Design docs live in `docs/`, grouped by workstream (`runner/`, `resource/`, `arc
 ## Project Configuration
 
 - **Directory.Build.props**: TreatWarningsAsErrors, nullable enabled, Roslyn analyzers enforced, NuGet audit on all transitive dependencies
-- **Authentication**: JWT Bearer tokens (JwtOptions from appsettings.json) for users, registered by `AddOrchitectAuthentication()`. Only `/users/register` and `/users/login` are public; all other endpoints require auth. The runner API under `/internal/runs/{runId}` (`MapRunnerGroup()`) accepts only the `Runner` scheme: a per-run opaque token whose SHA-256 hash is on `DeploymentRun.TokenHash`, valid while the run is Queued/Running and unexpired, and only for the run in the route
+- **Authentication**: JWT Bearer tokens (JwtOptions from appsettings.json) for users, registered by `AddOrchitectAuthentication()`. Only `/users/register` and `/users/login` are public; all other endpoints require auth. The runner API under `/internal/runs/{runId}` (`MapRunnerGroup()`) accepts only the `Runner` scheme: a per-run opaque token whose SHA-256 hash is on `DeploymentRun.TokenHash`, valid while the run is Queued/Running and unexpired, and only for the run in the route. Every runner API request must also send `Orchitect-Runner-Contract: <RunnerContract.Version>` (`RunnerContractFilter`), or it gets a 400
 - **API docs**: OpenAPI/Swagger on all environments with JWT Bearer security definition
