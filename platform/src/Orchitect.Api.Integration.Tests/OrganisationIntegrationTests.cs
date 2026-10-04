@@ -1,7 +1,11 @@
 using System.Net;
 using AutoFixture;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Orchitect.Api.Endpoints.Core.Organisation;
 using Orchitect.Api.Integration.Tests.Helpers;
+using Orchitect.Domain.Core.Organisation;
+using Orchitect.Persistence;
 
 namespace Orchitect.Api.Integration.Tests;
 
@@ -166,4 +170,25 @@ public sealed class OrganisationIntegrationTests(WebApplicationFactoryWithPostgr
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public void OrganisationUserModel_ShouldMapOrganisationRelationshipOnceOnOrganisationId()
+    {
+        // Arrange
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<OrchitectDbContext>();
+        var entityType = dbContext.Model.FindEntityType(typeof(OrganisationUser));
+        Assert.NotNull(entityType);
+
+        // Act
+        var foreignKeys = entityType.GetForeignKeys()
+            .Where(fk => fk.PrincipalEntityType.ClrType == typeof(Organisation))
+            .ToList();
+
+        // Assert
+        var foreignKey = Assert.Single(foreignKeys);
+        Assert.Equal(nameof(OrganisationUser.OrganisationId), Assert.Single(foreignKey.Properties).Name);
+        Assert.Equal(nameof(Organisation.Users), foreignKey.PrincipalToDependent?.Name);
+        Assert.Equal(DeleteBehavior.Cascade, foreignKey.DeleteBehavior);
+        Assert.Null(entityType.FindProperty("OrganisationId1"));
+    }
 }
