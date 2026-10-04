@@ -25,6 +25,8 @@ public static class DispatchExtensions
 
     public static IServiceCollection AddRunServices(this IServiceCollection services)
     {
+        services.TryAddScoped<RunRepositories>();
+        services.TryAddScoped<ResourceRepositories>();
         services.TryAddScoped<IRunPlanner, RunPlanner>();
         services.TryAddScoped<IRunCompleter, RunCompleter>();
         services.TryAddScoped<IRunCompletionHandler, RunCompletionHandler>();

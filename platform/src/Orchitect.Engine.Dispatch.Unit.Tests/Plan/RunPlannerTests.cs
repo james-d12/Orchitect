@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Orchitect.Domain.Engine.Deployment;
 using Orchitect.Domain.Engine.ResourceInstance;
+using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Dispatch.Plan;
 using static Orchitect.Engine.Dispatch.Unit.Tests.Plan.RunTestContext;
@@ -278,6 +279,59 @@ public sealed class RunPlannerTests
         Assert.All(_context.Instances.Items, i => Assert.Equal(ResourceInstanceStatus.Removing, i.Status));
         Assert.Equal(["storage", "vault"],
             _context.Plans.Items[^1].Instances.Select(i => i.Key).Order());
+    }
+
+    [Fact]
+    public async Task PlanAsync_DestroyAfterVersionBump_PlansRecordedVersion()
+    {
+        var score = Score(("storage", StorageType, null));
+        await _context.RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Succeeded);
+        var template = _context.Template(StorageType);
+        template.AddVersion(new CreateNewResourceTemplateVersionRequest
+        {
+            Version = "2.0.0",
+            Source = new ResourceTemplateVersionSource
+            {
+                BaseUrl = new Uri("https://example.com/modules.git"),
+                FolderPath = StorageType,
+                Tag = "v2.0.0"
+            },
+            Notes = "Second version.",
+            State = ResourceTemplateVersionState.Active
+        });
+
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Destroy, score);
+
+        Assert.Equal("v1.0.0", Assert.Single(plan.Inputs).Source.Tag);
+        Assert.Equal(template.Versions[0].Id, Assert.Single(_context.Instances.Items).TemplateVersionId);
+    }
+
+    [Fact]
+    public async Task PlanAsync_DestroyAfterVersionDeactivated_PlansRecordedVersion()
+    {
+        var score = Score(("storage", StorageType, null));
+        await _context.RunAsync(DeploymentRunOperation.Provision, score, RunOutcome.Succeeded);
+        var template = _context.Template(StorageType);
+        template.DeactivateVersion(template.Versions[0].Id);
+
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Destroy, score);
+
+        Assert.Equal("v1.0.0", Assert.Single(plan.Inputs).Source.Tag);
+        Assert.Equal(ResourceInstanceStatus.Removing, Assert.Single(_context.Instances.Items).Status);
+    }
+
+    [Fact]
+    public async Task PlanAsync_DestroyWithDifferentTemplate_ThrowsWithoutRemoving()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)),
+            RunOutcome.Succeeded);
+
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Destroy, Score(("storage", KeyVaultType, null))));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains("different resource template", exception.Message);
+        Assert.Equal(ResourceInstanceStatus.Active, Assert.Single(_context.Instances.Items).Status);
     }
 
     [Fact]

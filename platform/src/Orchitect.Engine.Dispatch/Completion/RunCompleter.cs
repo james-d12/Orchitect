@@ -32,21 +32,18 @@ public sealed class RunCompleter : IRunCompleter
     private readonly IResourceInstanceRepository _resourceInstanceRepository;
     private readonly IResourceDependencyGraphRepository _resourceDependencyGraphRepository;
 
-    public RunCompleter(ILogger<RunCompleter> logger, IUnitOfWork unitOfWork,
-        IDeploymentRunRepository runRepository, IDeploymentRunPlanRepository planRepository,
-        IDeploymentRepository deploymentRepository, IApplicationRepository applicationRepository,
-        IResourceRepository resourceRepository, IResourceInstanceRepository resourceInstanceRepository,
-        IResourceDependencyGraphRepository resourceDependencyGraphRepository)
+    public RunCompleter(ILogger<RunCompleter> logger, IUnitOfWork unitOfWork, RunRepositories runRepositories,
+        ResourceRepositories resourceRepositories)
     {
         _logger = logger;
         _unitOfWork = unitOfWork;
-        _runRepository = runRepository;
-        _planRepository = planRepository;
-        _deploymentRepository = deploymentRepository;
-        _applicationRepository = applicationRepository;
-        _resourceRepository = resourceRepository;
-        _resourceInstanceRepository = resourceInstanceRepository;
-        _resourceDependencyGraphRepository = resourceDependencyGraphRepository;
+        _runRepository = runRepositories.Runs;
+        _planRepository = runRepositories.Plans;
+        _deploymentRepository = runRepositories.Deployments;
+        _applicationRepository = runRepositories.Applications;
+        _resourceRepository = resourceRepositories.Resources;
+        _resourceInstanceRepository = resourceRepositories.Instances;
+        _resourceDependencyGraphRepository = resourceRepositories.DependencyGraphs;
     }
 
     public async Task CompleteAsync(DeploymentRunId runId, RunOutcome outcome, CancellationToken cancellationToken)
