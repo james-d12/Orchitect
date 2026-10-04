@@ -90,10 +90,17 @@ public sealed record ResourceTemplate : IEntity
 
     public void DeactivateVersion(ResourceTemplateVersionId versionId)
     {
-        var version = _versions.FirstOrDefault(v => v.Id == versionId)
-                      ?? throw new InvalidOperationException($"Version '{versionId.Value}' does not exist.");
+        var index = _versions.FindIndex(v => v.Id == versionId);
+        if (index < 0)
+        {
+            throw new InvalidOperationException($"Version '{versionId.Value}' does not exist.");
+        }
 
-        version.Deactivate();
+        _versions[index] = _versions[index] with
+        {
+            Source = _versions[index].Source with { },
+            State = ResourceTemplateVersionState.Inactive
+        };
         UpdatedAt = DateTime.UtcNow;
     }
 

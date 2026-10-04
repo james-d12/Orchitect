@@ -355,6 +355,32 @@ public sealed class RunPlanIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Plan_DestroyAfterVersionDeactivated_PlansRecordedVersion()
+    {
+        await RunAsync(DeploymentRunOperation.Provision, MultiResourceScore("Standard_LRS"), RunOutcome.Succeeded);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var templates = scope.ServiceProvider.GetRequiredService<IResourceTemplateRepository>();
+            var template = await templates.GetByTypeAsync(StorageType);
+            template!.DeactivateVersion(template.Versions[0].Id);
+            await templates.UpdateAsync(template);
+        }
+
+        var (run, client) = await StartRunAsync(DeploymentRunOperation.Destroy);
+
+        var response = await client.PostAsJsonAsync(RunnerRoutes.ForRun(run.Id.Value, RunnerRoutes.Plan),
+            new ScoreSubmission(MultiResourceScore("Standard_LRS")), RunnerContract.JsonOptions);
+        var plan = await response.Content.ReadFromJsonAsync<RunPlan>(RunnerContract.JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("v1.0.0", plan!.Inputs.Single(i => i.Key == "storage").Source.Tag);
+        using var verifyScope = _factory.Services.CreateScope();
+        var stored = await verifyScope.ServiceProvider.GetRequiredService<IResourceTemplateRepository>()
+            .GetByTypeAsync(StorageType);
+        Assert.Equal(ResourceTemplateVersionState.Inactive, Assert.Single(stored!.Versions).State);
+    }
+
+    [Fact]
     public async Task Finish_DestroyAfterFailedDeploy_PersistsRemovedInstances()
     {
         await RunAsync(DeploymentRunOperation.Provision, MultiResourceScore("Standard_LRS"), RunOutcome.Failed);
