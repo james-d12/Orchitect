@@ -7,7 +7,7 @@ public sealed record ResourceTemplateVersion
     public required string Version { get; init; }
     public required ResourceTemplateVersionSource Source { get; init; }
     public required string Notes { get; init; }
-    public required ResourceTemplateVersionState State { get; init; }
+    public ResourceTemplateVersionState State { get; private set; }
     public required DateTime CreatedAt { get; init; }
 
     private ResourceTemplateVersion()
@@ -26,5 +26,10 @@ public sealed record ResourceTemplateVersion
             State = request.State,
             CreatedAt = request.CreatedAt,
         };
+    }
+
+    internal void Deactivate()
+    {
+        State = ResourceTemplateVersionState.Inactive;
     }
 }

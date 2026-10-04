@@ -18,8 +18,9 @@ public interface IRunPlanner
 {
     /// <summary>
     /// Resolves the score's resource templates and returns what the run should execute. A provision records the
-    /// resources, instances and dependency graph and moves the instances to Provisioning; a destroy moves the
-    /// recorded instances to Removing. The records and the plan are stored in one transaction, so a repeat or
+    /// resources, instances and dependency graph and moves the instances to Provisioning; a destroy plans each
+    /// recorded resource from the template version its instance was provisioned with and moves the recorded
+    /// instances to Removing. The records and the plan are stored in one transaction, so a repeat or
     /// concurrent call returns the stored plan without recording again. Throws <see cref="RunPlanException"/> when
     /// the run or the score can't be planned, including when the run was asked to cancel before it was planned.
     /// </summary>
@@ -109,9 +110,12 @@ public sealed partial class RunPlanner : IRunPlanner
                           ?? throw new InvalidOperationException(
                               $"Application '{deployment.ApplicationId.Value}' of run '{runId.Value}' was not found.");
 
-        var inputs = await ResolveInputsAsync(application, scoreFile, cancellationToken);
         var knownResources =
             (await _resourceRepository.GetByEnvironmentAsync(deployment.EnvironmentId, cancellationToken)).ToList();
+        var recordedVersions = run.Operation == DeploymentRunOperation.Destroy
+            ? await GetRecordedVersionsAsync(application, scoreFile, knownResources, cancellationToken)
+            : [];
+        var inputs = await ResolveInputsAsync(application, scoreFile, recordedVersions, cancellationToken);
 
         var planned = run.Operation switch
         {
@@ -153,8 +157,33 @@ public sealed partial class RunPlanner : IRunPlanner
         return plan;
     }
 
-    private async Task<List<ResolvedInput>> ResolveInputsAsync(Application application, ScoreFile scoreFile,
+    private async Task<Dictionary<string, ResourceTemplateVersionId>> GetRecordedVersionsAsync(
+        Application application, ScoreFile scoreFile, List<Resource> knownResources,
         CancellationToken cancellationToken)
+    {
+        var slugs = scoreFile.Resources!
+            .Select(r => Resource.CreateSlug(ResourceName(application, r.Key, r.Value)))
+            .ToHashSet();
+        var recordedVersions = new Dictionary<string, ResourceTemplateVersionId>();
+
+        foreach (var resource in knownResources.Where(r => slugs.Contains(r.Slug)))
+        {
+            var instances = await _resourceInstanceRepository.GetByResourceAsync(resource.Id, cancellationToken);
+            var current = instances
+                .Where(i => i.Status != ResourceInstanceStatus.Removed)
+                .MaxBy(i => i.CreatedAt);
+
+            if (current is not null)
+            {
+                recordedVersions[resource.Slug] = current.TemplateVersionId;
+            }
+        }
+
+        return recordedVersions;
+    }
+
+    private async Task<List<ResolvedInput>> ResolveInputsAsync(Application application, ScoreFile scoreFile,
+        Dictionary<string, ResourceTemplateVersionId> recordedVersions, CancellationToken cancellationToken)
     {
         var inputs = new List<ResolvedInput>();
 
@@ -163,11 +192,17 @@ public sealed partial class RunPlanner : IRunPlanner
             var type = resource.Type.Trim().ToLower();
             var parameters = resource.Parameters ?? [];
 
+            var name = ResourceName(application, key, resource);
+            var slug = Resource.CreateSlug(name);
+
             var template = await _resourceTemplateRepository.GetByTypeAsync(type, cancellationToken)
                            ?? throw Invalid($"No resource template found for type '{type}' (resource '{key}').");
-            var version = template.GetLatestVersion()
-                          ?? throw Invalid(
-                              $"Resource template '{template.Type}' has no active version (resource '{key}').");
+            var version = recordedVersions.TryGetValue(slug, out var recordedVersionId)
+                ? template.Versions.FirstOrDefault(v => v.Id == recordedVersionId)
+                  ?? throw Invalid(
+                      $"Resource '{slug}' was provisioned with a different resource template (resource '{key}').")
+                : template.GetLatestVersion()
+                  ?? throw Invalid($"Resource template '{template.Type}' has no active version (resource '{key}').");
 
             var input = new RunInput(
                 Key: key,
@@ -178,8 +213,7 @@ public sealed partial class RunPlanner : IRunPlanner
                     string.IsNullOrEmpty(version.Source.FolderPath) ? null : version.Source.FolderPath),
                 Parameters: parameters);
 
-            var name = resource.Id ?? $"{application.Name}-{key}";
-            inputs.Add(new ResolvedInput(input, template, version, resource, name, Resource.CreateSlug(name)));
+            inputs.Add(new ResolvedInput(input, template, version, resource, name, slug));
         }
 
         return inputs;
@@ -386,6 +420,9 @@ public sealed partial class RunPlanner : IRunPlanner
 
         instance.Transition(ResourceInstanceStatus.Removing);
     }
+
+    private static string ResourceName(Application application, string key, ScoreResource resource) =>
+        resource.Id ?? $"{application.Name}-{key}";
 
     private static bool Matches(RunPlan plan, ScoreFile scoreFile) =>
         plan.Inputs.Count == scoreFile.Resources!.Count &&

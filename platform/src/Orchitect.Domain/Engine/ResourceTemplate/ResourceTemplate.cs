@@ -88,6 +88,15 @@ public sealed record ResourceTemplate : IEntity
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void DeactivateVersion(ResourceTemplateVersionId versionId)
+    {
+        var version = _versions.FirstOrDefault(v => v.Id == versionId)
+                      ?? throw new InvalidOperationException($"Version '{versionId.Value}' does not exist.");
+
+        version.Deactivate();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public ResourceTemplateVersion? GetLatestVersion()
     {
         return _versions.LastOrDefault(v => v.State == ResourceTemplateVersionState.Active);
