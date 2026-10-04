@@ -313,7 +313,7 @@ H2 (the Key Vault token covers every secret the API's identity can read) is ther
 
 The runner needs to reach the API, and only the API (#107):
 
-- **`ApiBaseUrl`.** A new `ExecutorOptions:ApiBaseUrl` is the URL as the runner sees it. It's rewritten for `host-gateway` the same way `DockerExecutor.RewriteOtlpEndpoint` handles the OTLP endpoint, and validated at startup.
+- **`ApiBaseUrl`.** A new `ExecutorOptions:ApiBaseUrl` is the URL as the runner sees it. It's rewritten for `host-gateway` the same way `DockerExecutor.RewriteLoopbackUrl` handles the OTLP endpoint, and validated at startup.
 - **No database settings.** `DatabaseHost`, `DatabasePort` and `RewriteConnectionString` are removed. The runner has no route to Postgres.
 - **Optional hardening.** Serve `/internal/runs` on a separate Kestrel listener that only the runner network can reach. This isn't required for the first version.
 
@@ -340,6 +340,8 @@ Steps 1–5 can ship while the runner still uses the database. Step 6 is the swi
 - **Dispatch.** `DeploymentQueue` passes `--run-id` and `ExecutorOptions:ApiBaseUrl`. `DockerExecutor` drops the connection string from `secrets.json` and sets `ORCHITECT_API_URL`, rewriting a loopback host to `host.docker.internal` as it does for the OTLP endpoint (`RewriteLoopbackUrl`). It refuses to start a runner when `ApiBaseUrl` isn't set.
 - **AppHost.** Sets `ExecutorOptions__ApiBaseUrl` to the API's own `http` endpoint and binds that endpoint to `0.0.0.0`. On Linux, `host-gateway` can't reach a listener bound to `127.0.0.1` only, which is where DCP binds endpoints by default. As a side effect, the dev API is reachable from the LAN while the AppHost runs.
 - **Left for #107.** `DatabaseHost`, `DatabasePort` and `RewriteConnectionString` are now unused. Startup validation of `ApiBaseUrl` is also still to do.
+
+**Status (#107).** Done: `DatabaseHost`, `DatabasePort` and `RewriteConnectionString` are removed (and the AppHost no longer sets them), and `ExecutorOptions:ApiBaseUrl` must be an absolute `http` or `https` URL at startup (`ValidateOnStart`). The separation is complete.
 
 ---
 
