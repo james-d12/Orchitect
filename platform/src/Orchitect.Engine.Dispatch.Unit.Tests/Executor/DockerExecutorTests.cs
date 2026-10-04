@@ -542,6 +542,9 @@ public sealed class DockerExecutorTests : IDisposable
     [Theory]
     [InlineData("https://localhost:21132", "https://host.docker.internal:21132")]
     [InlineData("http://127.0.0.1:4318/", "http://host.docker.internal:4318/")]
+    [InlineData("http://0.0.0.0:41005/", "http://host.docker.internal:41005/")]
+    [InlineData("http://[::]:41005", "http://host.docker.internal:41005")]
+    [InlineData("http://[::1]:41005", "http://host.docker.internal:41005")]
     [InlineData("http://otel-collector:4317", "http://otel-collector:4317")]
     public void RewriteLoopbackUrl_LoopbackHost_PointsAtDockerHost(string endpoint, string expected)
     {

@@ -307,7 +307,7 @@ public sealed class DockerExecutor : IExecutor
                 "ExecutorOptions:ApiBaseUrl is not set, so the runner container cannot reach the API.");
         }
 
-        return RewriteLoopbackUrl(apiBaseUrl.ToString());
+        return RewriteLoopbackUrl(apiBaseUrl.AbsoluteUri);
     }
 
     private Dictionary<string, string> BuildTelemetryEnvironment(Activity? activity)
@@ -343,11 +343,11 @@ public sealed class DockerExecutor : IExecutor
     }
 
     /// <summary>
-    /// Points a URL on the API's loopback interface at the Docker host, as seen from inside the runner container.
+    /// Points a URL on the API's loopback or unspecified address at the Docker host, as seen from inside the runner container.
     /// </summary>
     internal static string RewriteLoopbackUrl(string endpoint)
     {
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || !uri.IsLoopback)
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || !(uri.IsLoopback || IsUnspecified(uri)))
         {
             return endpoint;
         }
@@ -355,6 +355,10 @@ public sealed class DockerExecutor : IExecutor
         var rewritten = new UriBuilder(uri) { Host = DockerHost }.Uri.ToString();
         return endpoint.EndsWith('/') ? rewritten : rewritten.TrimEnd('/');
     }
+
+    private static bool IsUnspecified(Uri uri) =>
+        IPAddress.TryParse(uri.Host.Trim('[', ']'), out var address) &&
+        (address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any));
 
     /// <summary>
     /// Points a connection string at the database as seen from inside the runner container.
