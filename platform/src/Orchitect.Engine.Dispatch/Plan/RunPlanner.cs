@@ -40,22 +40,19 @@ public sealed partial class RunPlanner : IRunPlanner
     private readonly IResourceInstanceRepository _resourceInstanceRepository;
     private readonly IResourceDependencyGraphRepository _resourceDependencyGraphRepository;
 
-    public RunPlanner(ILogger<RunPlanner> logger, IUnitOfWork unitOfWork, IDeploymentRunRepository runRepository,
-        IDeploymentRunPlanRepository planRepository, IDeploymentRepository deploymentRepository,
-        IApplicationRepository applicationRepository, IResourceTemplateRepository resourceTemplateRepository,
-        IResourceRepository resourceRepository, IResourceInstanceRepository resourceInstanceRepository,
-        IResourceDependencyGraphRepository resourceDependencyGraphRepository)
+    public RunPlanner(ILogger<RunPlanner> logger, IUnitOfWork unitOfWork, RunRepositories runRepositories,
+        IResourceTemplateRepository resourceTemplateRepository, ResourceRepositories resourceRepositories)
     {
         _logger = logger;
         _unitOfWork = unitOfWork;
-        _runRepository = runRepository;
-        _planRepository = planRepository;
-        _deploymentRepository = deploymentRepository;
-        _applicationRepository = applicationRepository;
+        _runRepository = runRepositories.Runs;
+        _planRepository = runRepositories.Plans;
+        _deploymentRepository = runRepositories.Deployments;
+        _applicationRepository = runRepositories.Applications;
         _resourceTemplateRepository = resourceTemplateRepository;
-        _resourceRepository = resourceRepository;
-        _resourceInstanceRepository = resourceInstanceRepository;
-        _resourceDependencyGraphRepository = resourceDependencyGraphRepository;
+        _resourceRepository = resourceRepositories.Resources;
+        _resourceInstanceRepository = resourceRepositories.Instances;
+        _resourceDependencyGraphRepository = resourceRepositories.DependencyGraphs;
     }
 
     public async Task<RunPlan> PlanAsync(DeploymentRunId runId, ScoreFile scoreFile,

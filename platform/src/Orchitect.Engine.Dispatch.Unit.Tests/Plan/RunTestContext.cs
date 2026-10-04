@@ -66,12 +66,17 @@ internal sealed class RunTestContext
     public ResourceTemplate Template(string type) => _templates[type];
 
     public RunPlanner CreatePlanner() =>
-        new(PlannerLogger, new PassThroughUnitOfWork(), _runRepository, Plans, _deploymentRepository,
-            _applicationRepository, _templateRepository, Resources, Instances, Graphs);
+        new(PlannerLogger, new PassThroughUnitOfWork(), RunRepositories(), _templateRepository,
+            ResourceRepositories());
 
     public RunCompleter CreateCompleter() =>
-        new(new RecordingLogger<RunCompleter>(), new PassThroughUnitOfWork(), _runRepository, Plans,
-            _deploymentRepository, _applicationRepository, Resources, Instances, Graphs);
+        new(new RecordingLogger<RunCompleter>(), new PassThroughUnitOfWork(), RunRepositories(),
+            ResourceRepositories());
+
+    private RunRepositories RunRepositories() =>
+        new(_runRepository, Plans, _deploymentRepository, _applicationRepository);
+
+    private ResourceRepositories ResourceRepositories() => new(Resources, Instances, Graphs);
 
     public DeploymentRun AddRun(DeploymentRun run)
     {
