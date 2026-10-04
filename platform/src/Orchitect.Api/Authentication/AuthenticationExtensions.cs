@@ -32,6 +32,7 @@ public static class AuthenticationExtensions
                     ValidIssuer = jwtOptions.Value.Issuer,
                     ValidAudience = jwtOptions.Value.Audience,
                     ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                    ValidTypes = [AccessTokenDefaults.TokenType],
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Value.Secret)),
                     ClockSkew = TimeSpan.FromSeconds(30)
                 };
@@ -50,6 +51,7 @@ public static class AuthenticationExtensions
         services.AddAuthorizationBuilder()
             .SetDefaultPolicy(new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
                 .RequireAuthenticatedUser()
+                .RequireClaim(AccessTokenDefaults.ScopeClaim, AccessTokenDefaults.Scope)
                 .Build())
             .AddPolicy(RunnerAuthenticationDefaults.PolicyName, policy => policy
                 .AddAuthenticationSchemes(RunnerAuthenticationDefaults.AuthenticationScheme)

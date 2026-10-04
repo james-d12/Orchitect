@@ -224,6 +224,31 @@ public sealed class RunnerAuthenticationTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("JWT")]
+    [InlineData("id+jwt")]
+    public async Task UserApi_WhenUserJwtHasWrongTokenType_ShouldReturn401Unauthorized(string? tokenType)
+    {
+        // Act
+        var response = await SendAsync(UserUrl, CreateUserJwt(tokenType: tokenType));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("openid")]
+    public async Task UserApi_WhenUserJwtHasWrongScope_ShouldReturn403Forbidden(string? scope)
+    {
+        // Act
+        var response = await SendAsync(UserUrl, CreateUserJwt(scope: scope));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private static string RunUrl(DeploymentRunId runId) => $"/internal/runs/{runId.Value}";
 
     private static DeploymentRun Queued() => DeploymentRun.Queue(new DeploymentId(), DeploymentRunOperation.Provision);
@@ -251,15 +276,27 @@ public sealed class RunnerAuthenticationTests : IAsyncLifetime
         return await _client.SendAsync(request);
     }
 
-    private static string CreateUserJwt() => new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+    private static string CreateUserJwt(string? tokenType = AccessTokenDefaults.TokenType,
+        string? scope = AccessTokenDefaults.Scope)
     {
-        Subject = new ClaimsIdentity([new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString())]),
-        Issuer = Issuer,
-        Audience = Audience,
-        Expires = DateTime.UtcNow.AddMinutes(5),
-        SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Secret)),
-            SecurityAlgorithms.HmacSha256)
-    });
+        var claims = new List<Claim> { new(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()) };
+
+        if (scope is not null)
+        {
+            claims.Add(new Claim(AccessTokenDefaults.ScopeClaim, scope));
+        }
+
+        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            TokenType = tokenType,
+            Issuer = Issuer,
+            Audience = Audience,
+            Expires = DateTime.UtcNow.AddMinutes(5),
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Secret)),
+                SecurityAlgorithms.HmacSha256)
+        });
+    }
 
     private sealed class InMemoryDeploymentRunRepository : IDeploymentRunRepository
     {
