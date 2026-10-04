@@ -27,6 +27,7 @@ internal sealed class RunTestContext
     private readonly IDeploymentRepository _deploymentRepository = Substitute.For<IDeploymentRepository>();
     private readonly IApplicationRepository _applicationRepository = Substitute.For<IApplicationRepository>();
     private readonly IResourceTemplateRepository _templateRepository = Substitute.For<IResourceTemplateRepository>();
+    private readonly Dictionary<string, ResourceTemplate> _templates;
 
     public RunTestContext()
     {
@@ -44,14 +45,14 @@ internal sealed class RunTestContext
         _deploymentRepository.GetByIdAsync(Deployment.Id, Arg.Any<CancellationToken>()).Returns(Deployment);
         _applicationRepository.GetByIdAsync(Application.Id, Arg.Any<CancellationToken>()).Returns(Application);
 
-        var templates = new[]
+        _templates = new[]
         {
             NewTemplate(StorageType, ResourceTemplateVersionState.Active),
             NewTemplate(KeyVaultType, ResourceTemplateVersionState.Active),
             NewTemplate(InactiveType, ResourceTemplateVersionState.Inactive)
         }.ToDictionary(t => t.Type);
         _templateRepository.GetByTypeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(call => templates.GetValueOrDefault(call.Arg<string>()));
+            .Returns(call => _templates.GetValueOrDefault(call.Arg<string>()));
     }
 
     public Application Application { get; }
@@ -62,13 +63,20 @@ internal sealed class RunTestContext
     public InMemoryResourceDependencyGraphRepository Graphs { get; } = new();
     public RecordingLogger<RunPlanner> PlannerLogger { get; } = new();
 
+    public ResourceTemplate Template(string type) => _templates[type];
+
     public RunPlanner CreatePlanner() =>
-        new(PlannerLogger, new PassThroughUnitOfWork(), _runRepository, Plans, _deploymentRepository,
-            _applicationRepository, _templateRepository, Resources, Instances, Graphs);
+        new(PlannerLogger, new PassThroughUnitOfWork(), RunRepositories(), _templateRepository,
+            ResourceRepositories());
 
     public RunCompleter CreateCompleter() =>
-        new(new RecordingLogger<RunCompleter>(), new PassThroughUnitOfWork(), _runRepository, Plans,
-            _deploymentRepository, _applicationRepository, Resources, Instances, Graphs);
+        new(new RecordingLogger<RunCompleter>(), new PassThroughUnitOfWork(), RunRepositories(),
+            ResourceRepositories());
+
+    private RunRepositories RunRepositories() =>
+        new(_runRepository, Plans, _deploymentRepository, _applicationRepository);
+
+    private ResourceRepositories ResourceRepositories() => new(Resources, Instances, Graphs);
 
     public DeploymentRun AddRun(DeploymentRun run)
     {

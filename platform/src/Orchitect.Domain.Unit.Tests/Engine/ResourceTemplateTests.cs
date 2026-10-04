@@ -33,6 +33,25 @@ public sealed class ResourceTemplateTests
             ResourceTemplate.CreateWithVersion(NewRequest("https://github.com/acme/storage.git", tag)));
     }
 
+    [Fact]
+    public void DeactivateVersion_OnlyVersion_LeavesNoLatestVersion()
+    {
+        var template = ResourceTemplate.CreateWithVersion(NewRequest("https://github.com/acme/storage.git", "v1"));
+
+        template.DeactivateVersion(template.Versions[0].Id);
+
+        Assert.Equal(ResourceTemplateVersionState.Inactive, template.Versions[0].State);
+        Assert.Null(template.GetLatestVersion());
+    }
+
+    [Fact]
+    public void DeactivateVersion_UnknownVersion_Throws()
+    {
+        var template = ResourceTemplate.CreateWithVersion(NewRequest("https://github.com/acme/storage.git", "v1"));
+
+        Assert.Throws<InvalidOperationException>(() => template.DeactivateVersion(new ResourceTemplateVersionId()));
+    }
+
     private static CreateResourceTemplateWithVersionRequest NewRequest(string url, string tag) => new()
     {
         OrganisationId = new OrganisationId(),
