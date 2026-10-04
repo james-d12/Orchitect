@@ -16,10 +16,6 @@ public sealed record ExecutorContext
 
     public Uri? ApiBaseUrl { get; init; }
 
-    public string? DatabaseHost { get; init; }
-
-    public int? DatabasePort { get; init; }
-
     public long? MemoryBytes { get; init; }
 
     public long? NanoCpus { get; init; }

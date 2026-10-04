@@ -13,8 +13,6 @@ public sealed record ExecutorOptions
     public required string Image { get; init; }
     public string? Network { get; init; }
     public Uri? ApiBaseUrl { get; init; }
-    public string? DatabaseHost { get; init; }
-    public int? DatabasePort { get; init; }
     public LogLevel LogLevel { get; init; } = LogLevel.Information;
     public long? MemoryBytes { get; init; } = 2L * 1024 * 1024 * 1024;
     public long? NanoCpus { get; init; } = 2_000_000_000;

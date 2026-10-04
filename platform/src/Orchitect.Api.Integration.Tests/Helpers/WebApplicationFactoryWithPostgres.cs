@@ -23,7 +23,8 @@ public sealed class WebApplicationFactoryWithPostgres : WebApplicationFactory<Pr
                 ["JwtOptions:Audience"] = "orchitect-integration-tests",
                 ["JwtOptions:ExpirationInMinutes"] = "60",
                 ["JwtOptions:Secret"] = "integration-test-jwt-secret-key-orchitect-platform",
-                ["EncryptionOptions:Key"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                ["EncryptionOptions:Key"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                ["ExecutorOptions:ApiBaseUrl"] = "http://localhost:41005"
             });
         });
 

@@ -32,4 +32,41 @@ public sealed class DispatchExtensionsTests
 
         Assert.All(DispatchServices, type => Assert.Contains(services, d => d.ServiceType == type));
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("/relative")]
+    [InlineData("ftp://localhost:41005")]
+    public void ExecutorOptions_InvalidApiBaseUrl_FailsValidation(string? apiBaseUrl)
+    {
+        var exception = Assert.Throws<OptionsValidationException>(() => ResolveExecutorOptions(apiBaseUrl));
+
+        Assert.Contains(exception.Failures, failure => failure.Contains("ExecutorOptions:ApiBaseUrl"));
+    }
+
+    [Fact]
+    public void ExecutorOptions_AbsoluteApiBaseUrl_PassesValidation()
+    {
+        var options = ResolveExecutorOptions("http://localhost:41005");
+
+        Assert.Equal(new Uri("http://localhost:41005"), options.ApiBaseUrl);
+    }
+
+    private static ExecutorOptions ResolveExecutorOptions(string? apiBaseUrl)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ExecutorOptions:Image"] = "orchitect-runner:test",
+                ["ExecutorOptions:ApiBaseUrl"] = apiBaseUrl
+            })
+            .Build();
+
+        using var provider = new ServiceCollection()
+            .AddEngineDispatchServices(configuration)
+            .BuildServiceProvider();
+
+        return provider.GetRequiredService<IOptions<ExecutorOptions>>().Value;
+    }
 }

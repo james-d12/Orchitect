@@ -246,8 +246,6 @@ public sealed class DeploymentQueue : IDeploymentQueue
                 },
                 Network = _executorOptions.Network,
                 ApiBaseUrl = _executorOptions.ApiBaseUrl,
-                DatabaseHost = _executorOptions.DatabaseHost,
-                DatabasePort = _executorOptions.DatabasePort,
                 MemoryBytes = _executorOptions.MemoryBytes,
                 NanoCpus = _executorOptions.NanoCpus,
                 PidsLimit = _executorOptions.PidsLimit,

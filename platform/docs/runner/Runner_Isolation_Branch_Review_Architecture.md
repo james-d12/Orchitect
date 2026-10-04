@@ -24,7 +24,7 @@ Severity: 🔴 high, 🟡 medium, 🟢 low.
 | A2 | No "Run" concept in the domain | 🔴 | Fixed: `DeploymentRun` added; the run ID names and labels the runner container | #110, #113 |
 | A3 | `Orchitect.Infrastructure.Engine` mixes the control plane and the data plane | 🟡 | Fixed: split into `Orchitect.Engine.Contracts`, `.Dispatch` and `.Execution` | #115, #116 |
 | A4 | The API–runner contract is implicit and untested | 🟡 | Partial: round-trip test added (`db5994b`); argument and env key names moved to `Orchitect.Engine.Contracts` (A3) | #117, #118 |
-| A5 | The executor knows about the database | 🟡 | Open; becomes `ExecutorOptions:ApiBaseUrl` | #107 |
+| A5 | The executor knows about the database | 🟡 | Fixed: DB fields replaced by `ExecutorOptions:ApiBaseUrl` | #107 |
 | A6 | Adding a secret provider means editing switches in separate places | 🟡 | Open | #109 |
 | A7 | Local state mode is the default but broken in this topology | 🟡 | Open | #119 |
 | A8 | Runner observability: no trace propagation, no per-run logs | 🟡 | Open | #120, #121 |
@@ -137,6 +137,8 @@ The whole interface is CLI arguments plus env var names assembled from strings i
 `ExecutorContext` carries `DatabaseHost` and `DatabasePort`, and `DockerExecutor.BuildRunnerConnectionString` rewrites a Postgres connection string. That's a composition concern leaking into what should be a generic "run this image with this config" abstraction. A Kubernetes or ACA executor would have to repeat the same logic.
 
 **Recommendation:** build the runner's configuration in one place (the dispatch layer, currently `DeploymentQueue`) and keep `ExecutorContext` to image, arguments, environment and resource limits. With the A1 decision, the DB fields are replaced by `ExecutorOptions:ApiBaseUrl` (#107).
+
+**Fixed (#107).** `ExecutorOptions` and `ExecutorContext` have no database fields and `RewriteConnectionString` is gone, so `Orchitect.Engine.Dispatch` no longer references Npgsql. The executor only knows the API's URL: `ExecutorOptions:ApiBaseUrl` is validated at startup and passed to the runner as `ORCHITECT_API_URL`, with a loopback host rewritten by `RewriteLoopbackUrl`.
 
 ## A6. 🟡 Adding a secret provider means editing switches in separate places
 

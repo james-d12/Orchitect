@@ -4,7 +4,6 @@ using Docker.DotNet;
 using Docker.DotNet.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using Orchitect.Common.Observability;
 using Orchitect.Engine.Contracts.Runner;
 
@@ -359,30 +358,6 @@ public sealed class DockerExecutor : IExecutor
     private static bool IsUnspecified(Uri uri) =>
         IPAddress.TryParse(uri.Host.Trim('[', ']'), out var address) &&
         (address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any));
-
-    /// <summary>
-    /// Points a connection string at the database as seen from inside the runner container.
-    /// </summary>
-    internal static string RewriteConnectionString(string connectionString, string? databaseHost, int? databasePort)
-    {
-        var builder = new NpgsqlConnectionStringBuilder(connectionString);
-
-        if (!string.IsNullOrWhiteSpace(databaseHost))
-        {
-            builder.Host = databaseHost;
-        }
-        else if (builder.Host is "localhost" or "127.0.0.1" or "::1")
-        {
-            builder.Host = DockerHost;
-        }
-
-        if (databasePort is { } port)
-        {
-            builder.Port = port;
-        }
-
-        return builder.ConnectionString;
-    }
 
     private async Task EnsureImageExistsAsync(
         string image,

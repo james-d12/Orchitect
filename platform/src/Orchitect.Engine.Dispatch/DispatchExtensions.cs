@@ -37,6 +37,8 @@ public static class DispatchExtensions
             .Bind(configuration.GetSection(ExecutorOptions.SectionName))
             .ValidateDataAnnotations()
             .Validate(options => !string.IsNullOrWhiteSpace(options.Image), "ExecutorOptions:Image is required.")
+            .Validate(options => options.ApiBaseUrl is { IsAbsoluteUri: true, Scheme: "http" or "https" },
+                "ExecutorOptions:ApiBaseUrl is required and must be an absolute http or https URL.")
             .Validate(options => options.StopGracePeriod > TimeSpan.Zero,
                 "ExecutorOptions:StopGracePeriod must be greater than zero.")
             .Validate(options => options.Timeout > TimeSpan.Zero,
