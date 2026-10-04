@@ -4,7 +4,7 @@
 #   -t orchitect-runner:terraform .
 #
 # Requires BuildKit (the default builder). The legacy builder builds every stage,
-# including the unsupported iac-opentofu and iac-pulumi stages, which fail on purpose.
+# including the unsupported iac-opentofu stage, which fails on purpose.
 
 ARG ORCHITECT_IAC_PROVIDER=terraform
 
@@ -65,7 +65,27 @@ RUN echo "OpenTofu runner images are not supported yet." && exit 1
 
 FROM alpine:3.24 AS iac-pulumi
 
-RUN echo "Pulumi runner images are not supported yet." && exit 1
+ARG PULUMI_VERSION=3.267.0
+ARG PULUMI_SIGNING_IDENTITY="^https://github\.com/pulumi/pulumi/\.github/workflows/sign\.yml@refs/"
+ARG TARGETARCH
+
+WORKDIR /tmp/pulumi
+
+RUN apk add --no-cache cosign wget
+
+RUN case "${TARGETARCH:-amd64}" in amd64) ARCH=x64 ;; arm64) ARCH=arm64 ;; *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; esac \
+    && FILE="pulumi-v${PULUMI_VERSION}-linux-${ARCH}.tar.gz" \
+    && SUMS="pulumi-${PULUMI_VERSION}-checksums.txt" \
+    && BASE="https://get.pulumi.com/releases/sdk" \
+    && wget --max-redirect=0 -q "${BASE}/${FILE}" "${BASE}/${SUMS}" "${BASE}/${SUMS}.sig" \
+    && cosign verify-blob \
+        --bundle "${SUMS}.sig" \
+        --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+        --certificate-identity-regexp "${PULUMI_SIGNING_IDENTITY}" \
+        "${SUMS}" \
+    && grep " ${FILE}\$" "${SUMS}" | sha256sum -c \
+    && mkdir /out \
+    && tar -xzf "${FILE}" -C /out --strip-components=1
 
 FROM iac-${ORCHITECT_IAC_PROVIDER} AS iac
 
