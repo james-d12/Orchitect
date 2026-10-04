@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using Orchitect.Api.Authentication;
 using Orchitect.Api.Settings;
 using Orchitect.Api.Shared;
 
@@ -54,7 +55,8 @@ public sealed class LoginUserEndpoint : IEndpoint
         var claims = new List<Claim>()
         {
             new(JwtRegisteredClaimNames.Sub, user.Id),
-            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty)
+            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            new(AccessTokenDefaults.ScopeClaim, AccessTokenDefaults.Scope)
         };
 
         claims.AddRange(roleClaims);
@@ -62,6 +64,7 @@ public sealed class LoginUserEndpoint : IEndpoint
         var tokenDescriptor = new SecurityTokenDescriptor()
         {
             Subject = new ClaimsIdentity(claims),
+            TokenType = AccessTokenDefaults.TokenType,
             Expires = DateTime.UtcNow.AddMinutes(options.Value.ExpirationInMinutes),
             SigningCredentials = credentials,
             Issuer = options.Value.Issuer,
