@@ -109,9 +109,11 @@ public sealed partial class RunPlanner : IRunPlanner
 
         var knownResources =
             (await _resourceRepository.GetByEnvironmentAsync(deployment.EnvironmentId, cancellationToken)).ToList();
-        var recordedVersions = run.Operation == DeploymentRunOperation.Destroy
-            ? await GetRecordedVersionsAsync(application, scoreFile, knownResources, cancellationToken)
+        var removableInstances = run.Operation == DeploymentRunOperation.Destroy
+            ? await GetRemovableInstancesAsync(application, scoreFile, knownResources, cancellationToken)
             : [];
+        var recordedVersions = removableInstances.ToDictionary(r => r.Key,
+            r => r.Value.MaxBy(i => i.CreatedAt)!.TemplateVersionId);
         var inputs = await ResolveInputsAsync(application, scoreFile, recordedVersions, cancellationToken);
 
         var planned = run.Operation switch
@@ -119,7 +121,7 @@ public sealed partial class RunPlanner : IRunPlanner
             DeploymentRunOperation.Provision =>
                 await PlanProvisionAsync(application, deployment, scoreFile, inputs, knownResources,
                     cancellationToken),
-            DeploymentRunOperation.Destroy => await PlanDestroyAsync(inputs, knownResources, cancellationToken),
+            DeploymentRunOperation.Destroy => await PlanDestroyAsync(inputs, removableInstances, cancellationToken),
             _ => throw new InvalidOperationException($"Unsupported run operation '{run.Operation}'.")
         };
 
@@ -154,29 +156,28 @@ public sealed partial class RunPlanner : IRunPlanner
         return plan;
     }
 
-    private async Task<Dictionary<string, ResourceTemplateVersionId>> GetRecordedVersionsAsync(
+    private async Task<Dictionary<string, List<ResourceInstance>>> GetRemovableInstancesAsync(
         Application application, ScoreFile scoreFile, List<Resource> knownResources,
         CancellationToken cancellationToken)
     {
         var slugs = scoreFile.Resources!
             .Select(r => Resource.CreateSlug(ResourceName(application, r.Key, r.Value)))
             .ToHashSet();
-        var recordedVersions = new Dictionary<string, ResourceTemplateVersionId>();
+        var removableInstances = new Dictionary<string, List<ResourceInstance>>();
 
         foreach (var resource in knownResources.Where(r => slugs.Contains(r.Slug)))
         {
-            var instances = await _resourceInstanceRepository.GetByResourceAsync(resource.Id, cancellationToken);
-            var current = instances
+            var instances = (await _resourceInstanceRepository.GetByResourceAsync(resource.Id, cancellationToken))
                 .Where(i => i.Status != ResourceInstanceStatus.Removed)
-                .MaxBy(i => i.CreatedAt);
+                .ToList();
 
-            if (current is not null)
+            if (instances.Count > 0)
             {
-                recordedVersions[resource.Slug] = current.TemplateVersionId;
+                removableInstances[resource.Slug] = instances;
             }
         }
 
-        return recordedVersions;
+        return removableInstances;
     }
 
     private async Task<List<ResolvedInput>> ResolveInputsAsync(Application application, ScoreFile scoreFile,
@@ -197,7 +198,7 @@ public sealed partial class RunPlanner : IRunPlanner
             var version = recordedVersions.TryGetValue(slug, out var recordedVersionId)
                 ? template.Versions.FirstOrDefault(v => v.Id == recordedVersionId)
                   ?? throw Invalid(
-                      $"Resource '{slug}' was provisioned with a different resource template (resource '{key}').")
+                      $"Resource '{slug}' already exists with a different resource template (resource '{key}').")
                 : template.GetLatestVersion()
                   ?? throw Invalid($"Resource template '{template.Type}' has no active version (resource '{key}').");
 
@@ -235,20 +236,18 @@ public sealed partial class RunPlanner : IRunPlanner
     }
 
     private async Task<List<PlannedResourceInstance>> PlanDestroyAsync(List<ResolvedInput> inputs,
-        List<Resource> knownResources, CancellationToken cancellationToken)
+        Dictionary<string, List<ResourceInstance>> removableInstances, CancellationToken cancellationToken)
     {
         var keysBySlug = inputs.GroupBy(i => i.Slug).ToDictionary(g => g.Key, g => g.First().Input.Key);
         var planned = new List<PlannedResourceInstance>();
 
-        foreach (var resource in knownResources.Where(r => keysBySlug.ContainsKey(r.Slug)))
+        foreach (var (slug, instances) in removableInstances)
         {
-            var instances = await _resourceInstanceRepository.GetByResourceAsync(resource.Id, cancellationToken);
-
-            foreach (var instance in instances.Where(i => i.Status != ResourceInstanceStatus.Removed))
+            foreach (var instance in instances)
             {
                 BeginRemoval(instance);
                 await _resourceInstanceRepository.UpdateAsync(instance, cancellationToken);
-                planned.Add(new PlannedResourceInstance(instance.Id, keysBySlug[resource.Slug]));
+                planned.Add(new PlannedResourceInstance(instance.Id, keysBySlug[slug]));
             }
         }
 

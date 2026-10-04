@@ -321,6 +321,20 @@ public sealed class RunPlannerTests
     }
 
     [Fact]
+    public async Task PlanAsync_DestroyWithDifferentTemplate_ThrowsWithoutRemoving()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)),
+            RunOutcome.Succeeded);
+
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Destroy, Score(("storage", KeyVaultType, null))));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains("different resource template", exception.Message);
+        Assert.Equal(ResourceInstanceStatus.Active, Assert.Single(_context.Instances.Items).Status);
+    }
+
+    [Fact]
     public async Task PlanAsync_DestroyWithNothingRecorded_PlansInputsWithoutCreatingRecords()
     {
         var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Destroy,
