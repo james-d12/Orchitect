@@ -107,10 +107,7 @@ public sealed class DockerExecutor : IExecutor
 
         try
         {
-            secrets = new Dictionary<string, string>(context.Secrets)
-            {
-                [RunnerEnvironment.ConnectionString] = BuildRunnerConnectionString(context)
-            };
+            secrets = new Dictionary<string, string>(context.Secrets);
 
             if (_configuration[RunnerEnvironment.OtlpHeaders] is { Length: > 0 } otlpHeaders)
             {
@@ -132,6 +129,7 @@ public sealed class DockerExecutor : IExecutor
                     Env =
                     [
                         $"{RunnerEnvironment.RunId}={context.RunId}",
+                        $"{RunnerEnvironment.ApiBaseUrl}={BuildRunnerApiBaseUrl(context)}",
                         ..context.Configuration.Select(x => $"{x.Key}={x.Value}"),
                         ..BuildTelemetryEnvironment(activity).Select(x => $"{x.Key}={x.Value}")
                     ],
@@ -301,17 +299,15 @@ public sealed class DockerExecutor : IExecutor
         };
     }
 
-    private string BuildRunnerConnectionString(ExecutorContext context)
+    private static string BuildRunnerApiBaseUrl(ExecutorContext context)
     {
-        var connectionString = _configuration.GetConnectionString("orchitect");
-
-        if (string.IsNullOrWhiteSpace(connectionString))
+        if (context.ApiBaseUrl is not { IsAbsoluteUri: true } apiBaseUrl)
         {
             throw new InvalidOperationException(
-                "ConnectionStrings:orchitect is not set, so the runner container cannot reach the database.");
+                "ExecutorOptions:ApiBaseUrl is not set, so the runner container cannot reach the API.");
         }
 
-        return RewriteConnectionString(connectionString, context.DatabaseHost, context.DatabasePort);
+        return RewriteLoopbackUrl(apiBaseUrl.AbsoluteUri);
     }
 
     private Dictionary<string, string> BuildTelemetryEnvironment(Activity? activity)
@@ -335,7 +331,7 @@ public sealed class DockerExecutor : IExecutor
             return environment;
         }
 
-        environment[RunnerEnvironment.OtlpEndpoint] = RewriteOtlpEndpoint(endpoint);
+        environment[RunnerEnvironment.OtlpEndpoint] = RewriteLoopbackUrl(endpoint);
         environment[RunnerEnvironment.ServiceName] = RunnerServiceName;
 
         if (_configuration[RunnerEnvironment.OtlpProtocol] is { Length: > 0 } protocol)
@@ -347,11 +343,11 @@ public sealed class DockerExecutor : IExecutor
     }
 
     /// <summary>
-    /// Points an OTLP endpoint on the API's loopback interface at the Docker host, as seen from inside the runner container.
+    /// Points a URL on the API's loopback or unspecified address at the Docker host, as seen from inside the runner container.
     /// </summary>
-    internal static string RewriteOtlpEndpoint(string endpoint)
+    internal static string RewriteLoopbackUrl(string endpoint)
     {
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || !uri.IsLoopback)
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || !(uri.IsLoopback || IsUnspecified(uri)))
         {
             return endpoint;
         }
@@ -359,6 +355,10 @@ public sealed class DockerExecutor : IExecutor
         var rewritten = new UriBuilder(uri) { Host = DockerHost }.Uri.ToString();
         return endpoint.EndsWith('/') ? rewritten : rewritten.TrimEnd('/');
     }
+
+    private static bool IsUnspecified(Uri uri) =>
+        IPAddress.TryParse(uri.Host.Trim('[', ']'), out var address) &&
+        (address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any));
 
     /// <summary>
     /// Points a connection string at the database as seen from inside the runner container.

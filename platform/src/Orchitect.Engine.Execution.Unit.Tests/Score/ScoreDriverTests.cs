@@ -1,11 +1,8 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Engine.Application;
-using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Domain.Engine.Environment;
+using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Execution.Configuration.Score;
 using Orchitect.Engine.Execution.Shared.CommandLine;
-using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Engine.Execution.Unit.Tests.Score;
 
@@ -40,10 +37,9 @@ public sealed class ScoreDriverTests : IDisposable
     {
         _git.ScoreFile = Path.Combine("deploy", "score.yaml");
         _git.ScoreContents = ScoreYaml;
-        var application = NewApplication();
-        var deployment = NewDeployment();
+        var run = NewRun();
 
-        var scoreFile = await CreateDriver().ParseAsync(deployment, application, CancellationToken.None);
+        var scoreFile = await CreateDriver().ParseAsync(run, CancellationToken.None);
 
         Assert.NotNull(scoreFile);
         Assert.Equal("score.dev/v1b1", scoreFile.ApiVersion);
@@ -55,8 +51,8 @@ public sealed class ScoreDriverTests : IDisposable
         Assert.Equal("orders-storage", resource.Value.Id);
         Assert.Equal("payments", resource.Value.Metadata?.Annotations?["team"]);
         Assert.Equal("orders", resource.Value.Parameters?["name"]);
-        Assert.Equal(application.Repository.Url, _git.Source);
-        Assert.Equal(deployment.CommitId.Value, _git.Commit);
+        Assert.Equal(run.RepositoryUrl, _git.Source);
+        Assert.Equal(run.CommitId, _git.Commit);
     }
 
     [Fact]
@@ -64,7 +60,7 @@ public sealed class ScoreDriverTests : IDisposable
     {
         _git.Succeeds = false;
 
-        var scoreFile = await CreateDriver().ParseAsync(NewDeployment(), NewApplication(), CancellationToken.None);
+        var scoreFile = await CreateDriver().ParseAsync(NewRun(), CancellationToken.None);
 
         Assert.Null(scoreFile);
     }
@@ -72,7 +68,7 @@ public sealed class ScoreDriverTests : IDisposable
     [Fact]
     public async Task ParseAsync_NoScoreFile_ReturnsNull()
     {
-        var scoreFile = await CreateDriver().ParseAsync(NewDeployment(), NewApplication(), CancellationToken.None);
+        var scoreFile = await CreateDriver().ParseAsync(NewRun(), CancellationToken.None);
 
         Assert.Null(scoreFile);
         Assert.NotNull(_git.Destination);
@@ -80,16 +76,9 @@ public sealed class ScoreDriverTests : IDisposable
 
     private ScoreDriver CreateDriver() => new(NullLogger<ScoreDriver>.Instance, _git);
 
-    private static Application NewApplication() =>
-        Application.Create($"orders {Guid.NewGuid():N}", new Repository
-        {
-            Name = "orders",
-            Url = new Uri("https://example.com/orders.git"),
-            Provider = RepositoryProvider.GitHub
-        }, new OrganisationId());
-
-    private static Deployment NewDeployment() =>
-        Deployment.Create(new ApplicationId(), new EnvironmentId(Guid.NewGuid()), new CommitId(new string('a', 40)), "test@example.com");
+    private static RunDescriptor NewRun() =>
+        new(Guid.NewGuid(), RunnerOperation.Provision, new Uri("https://example.com/orders.git"),
+            new string('a', 40), Guid.NewGuid(), Guid.NewGuid());
 
     private sealed class ScoreGitCommandLine : IGitCommandLine, IDisposable
     {

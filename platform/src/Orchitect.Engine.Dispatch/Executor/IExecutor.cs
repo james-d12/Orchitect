@@ -14,6 +14,8 @@ public sealed record ExecutorContext
 
     public string? Network { get; init; }
 
+    public Uri? ApiBaseUrl { get; init; }
+
     public string? DatabaseHost { get; init; }
 
     public int? DatabasePort { get; init; }

@@ -5,7 +5,7 @@ workstream: runner
 milestone: "Runner Isolation"
 issues: [102, 104, 105, 108, 111, 114, 123, 124]
 superseded_by: null
-last_reviewed: 2026-09-29
+last_reviewed: 2026-10-04
 ---
 
 # Runner Isolation Branch Review
@@ -51,7 +51,7 @@ Each finding also has a severity: 🔴 high, 🟡 medium, 🟢 low.
 | M8 | Runner registers API-only services (queue, Docker client, executor options) | Medium | 🟢 | Fixed (see fix plan) |
 | M9 | No sweep for leftover `orchitect-runner-*` containers | Medium | 🟢 | Fixed (see fix plan) |
 | M10 | No Terraform provider plugin cache | Medium | 🟢 | Dropped (`624cccd`), #124 |
-| H1 | Runner holds the API's full DB credentials while running untrusted Terraform | Hard | 🔴 | Decided: runner calls an internal API ([design](API_RUNNER_SEPARATION.md)), #105 |
+| H1 | Runner holds the API's full DB credentials while running untrusted Terraform | Hard | 🔴 | Fixed: runner calls an internal API with a per-run token and has no DB access ([design](API_RUNNER_SEPARATION.md)), #105 |
 | H2 | Key Vault token covers all of Key Vault, not just the mapped secrets | Hard | 🔴 | Open; secret injection unchanged by the [design](API_RUNNER_SEPARATION.md) (§9), #108 |
 | H3 | Deployment queue is serial, blocking and in-memory | Hard | 🟡 | Partial (`73c8716`, `f53a43c`), #110, #111 |
 | H4 | Containerised API can't reach Docker; socket access is root-equivalent | Hard | 🟡 | Open, #114 |
@@ -60,7 +60,7 @@ Each finding also has a severity: 🔴 high, 🟡 medium, 🟢 low.
 | N3 | A failed work item or enqueue left its deployment active | Easy | 🟢 | Fixed (`97ce0e5`) |
 | N4 | The setup script gives template code Contributor on the whole subscription and piles up client secrets | Easy | 🟡 | Fixed (`8621e9d`) |
 
-**Suggested order before merge:** E1, E2, E3, E4 and the rest of the Easy list, then M1 and M3. H1 is decided in `API_RUNNER_SEPARATION.md`, with the work tracked in its issues. H2 is still open. Until then, don't point the runner at untrusted template repos or score files.
+**Suggested order before merge:** E1, E2, E3, E4 and the rest of the Easy list, then M1 and M3. H1 is fixed (`API_RUNNER_SEPARATION.md`). H2 is still open. Until then, don't point the runner at untrusted template repos or score files.
 
 ---
 
@@ -287,6 +287,8 @@ The runner receives the API's own `ConnectionStrings__orchitect`. It then clones
 Running Terraform in a container provides little isolation while the container holds the most privileged credential in the system.
 
 **Decision (#102, 2026-10-02):** the runner doesn't connect to the database at all. It calls an internal API on Orchitect.API with a per-run token that is revoked when the run completes. A read-only Postgres role was rejected, because the runner now writes resource records and would still be able to read every organisation's data. A mounted manifest was rejected too: the API can't read the score file, and results have to come back anyway. See [API_RUNNER_SEPARATION.md](API_RUNNER_SEPARATION.md) for the design and the migration order (#110, #202, #203, #204, #106, #105).
+
+**Fixed (#105).** The runner starts with `--run-id` and its run token in `secrets.json`, and does everything through `/internal/runs/{runId}`. `Orchitect.Runner` no longer references `Orchitect.Persistence` or `Orchitect.Engine.Dispatch`, and `DockerExecutor` no longer puts a connection string in the secrets file. The token is revoked when the run completes, so template code that reads it gets nothing useful after the run. The Key Vault token and `ARM_*` credentials are still in the runner's environment (H2).
 
 ### H2. 🔴 Key Vault token covers all of Key Vault
 `Secret/Azure/KeyVaultRunnerTokenProvider.cs:28`
