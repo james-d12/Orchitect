@@ -4,7 +4,7 @@
 #   -t orchitect-runner:terraform .
 #
 # Requires BuildKit (the default builder). The legacy builder builds every stage,
-# including the unsupported iac-opentofu and iac-pulumi stages, which fail on purpose.
+# including the unsupported iac-pulumi stage, which fails on purpose.
 
 ARG ORCHITECT_IAC_PROVIDER=terraform
 
@@ -61,7 +61,30 @@ COPY --from=config-inspect /out/terraform-config-inspect /out/terraform-config-i
 
 FROM alpine:3.24 AS iac-opentofu
 
-RUN echo "OpenTofu runner images are not supported yet." && exit 1
+ARG OPENTOFU_VERSION=1.13.1
+ARG OPENTOFU_PGP_FINGERPRINT=E3E6E43D84CB852EADB0051D0C0AF313E5FD9F80
+ARG TARGETARCH
+
+WORKDIR /tmp/opentofu
+
+RUN apk add --no-cache gnupg wget
+
+RUN ARCH="${TARGETARCH:-amd64}" \
+    && FILE="tofu_${OPENTOFU_VERSION}_linux_${ARCH}.zip" \
+    && SUMS="tofu_${OPENTOFU_VERSION}_SHA256SUMS" \
+    && BASE="https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}" \
+    && wget -q "${BASE}/${FILE}" "${BASE}/${SUMS}" "${BASE}/${SUMS}.gpgsig" \
+    && wget --max-redirect=0 -q -O opentofu.asc "https://get.opentofu.org/opentofu.asc" \
+    && export GNUPGHOME="$(mktemp -d)" \
+    && gpg --batch --quiet --import opentofu.asc \
+    && gpg --batch --with-colons --fingerprint | grep -q "^fpr:::::::::${OPENTOFU_PGP_FINGERPRINT}:" \
+    && gpg --batch --verify "${SUMS}.gpgsig" "${SUMS}" \
+    && grep " ${FILE}\$" "${SUMS}" | sha256sum -c \
+    && mkdir /out \
+    && unzip -q "${FILE}" tofu -d /out \
+    && ln -s tofu /out/terraform
+
+COPY --from=config-inspect /out/terraform-config-inspect /out/terraform-config-inspect
 
 FROM alpine:3.24 AS iac-pulumi
 

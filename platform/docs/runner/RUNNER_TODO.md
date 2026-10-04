@@ -33,9 +33,11 @@ docker build -f src/Orchitect.Runner/Dockerfile \
   --build-arg ORCHITECT_IAC_PROVIDER=terraform \
   -t orchitect-runner:terraform .
 ```
-BuildKit is required (it is the default builder). The legacy builder builds every stage, and the unsupported `iac-opentofu`/`iac-pulumi` stages fail on purpose.
+Use `ORCHITECT_IAC_PROVIDER=opentofu` for an OpenTofu image. It links `terraform` to `tofu`, so the runner runs OpenTofu unchanged.
 
-The image pins Terraform, Helm, `terraform-config-inspect` and its base images. Terraform's `SHA256SUMS` is verified against HashiCorp's PGP key (fingerprint pinned in the Dockerfile) before the checksum check.
+BuildKit is required (it is the default builder). The legacy builder builds every stage, and the unsupported `iac-pulumi` stage fails on purpose.
+
+The image pins Terraform, OpenTofu, Helm, `terraform-config-inspect` and its base images. Terraform's `SHA256SUMS` is verified against HashiCorp's PGP key, and OpenTofu's against the OpenTofu PGP key (both fingerprints pinned in the Dockerfile), before the checksum check.
 
 ## Runner configuration
 
@@ -140,8 +142,9 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
 
 ### 7. Image (optional)
 - [x] Build `terraform-config-inspect` in a separate Go stage and copy the binary across.
-- [x] Pin tool versions (Terraform, Helm, `terraform-config-inspect`) and base images, with checksum and signature verification.
-- [ ] Fill in the `iac-opentofu` and `iac-pulumi` stages in the Dockerfile. They are stubs that fail the build when selected. (#130, #131)
+- [x] Pin tool versions (Terraform, OpenTofu, Helm, `terraform-config-inspect`) and base images, with checksum and signature verification.
+- [x] Fill in the `iac-opentofu` stage in the Dockerfile. (#130)
+- [ ] Fill in the `iac-pulumi` stage in the Dockerfile. It is a stub that fails the build when selected. (#131)
 - [ ] Image selection is a single `ExecutorOptions:Image`. When more cloud/IaC combinations are needed, derive the tag from the environment/templates. (#132)
 
 ### 8. Design issues (Hard, from `Runner_Isolation_Branch_Review.md`)
