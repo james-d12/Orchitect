@@ -45,5 +45,4 @@ Branch `feature/organisation_membership_check`, PR #195. The first version (`868
 - `PipelineRepository.BulkUpsertAsync` inserts an existing owner again (`PK_Owners`). When fixed, add the pipeline case back to `InventoryApi_WhenNotAMember_ShouldReturn404NotFound` (#197)
 - Stray `OrganisationId1` column on `OrganisationUsers` from the relationship being configured twice (#198)
 - There's no API to add or remove organisation members, and no backfill for organisations created before this change (#199)
-- ~~`GetAll` filtering for applications, environments and resource templates loads every row before filtering; move it into repository queries (#200)~~ Done on this branch: `GetByOrganisationIdsAsync`
 - `Shared/ClaimsPrincipalExtensions.GetOrganisationIdValue` and `Extensions/ClaimsPrincipalExtensions.GetOrganisationId` are unused, and they fall back to the user id as an organisation id. Remove them (#201)
