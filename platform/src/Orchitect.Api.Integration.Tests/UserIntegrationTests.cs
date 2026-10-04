@@ -1,5 +1,7 @@
 using System.Net;
 using AutoFixture;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Orchitect.Api.Authentication;
 using Orchitect.Api.Endpoints.Core.User;
 using Orchitect.Api.Integration.Tests.Helpers;
 
@@ -50,6 +52,10 @@ public sealed class UserIntegrationTests(WebApplicationFactoryWithPostgres facto
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
         Assert.NotNull(body);
         Assert.NotEmpty(body.AccessToken);
+
+        var token = new JsonWebToken(body.AccessToken);
+        Assert.Equal(AccessTokenDefaults.TokenType, token.Typ);
+        Assert.Equal(AccessTokenDefaults.Scope, token.GetClaim(AccessTokenDefaults.ScopeClaim).Value);
     }
 
     [Fact]
