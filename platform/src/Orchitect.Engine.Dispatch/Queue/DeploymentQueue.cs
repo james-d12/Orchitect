@@ -238,18 +238,14 @@ public sealed class DeploymentQueue : IDeploymentQueue
             {
                 Image = _executorOptions.Image,
                 RunId = run.Id.Value.ToString(),
-                Arguments =
-                [
-                    RunnerArguments.ApplicationId, request.ApplicationId.Value.ToString(),
-                    RunnerArguments.DeploymentId, request.DeploymentId.Value.ToString(),
-                    RunnerArguments.Operation, ToRunnerOperation(run.Operation).ToString()
-                ],
+                Arguments = [RunnerArguments.RunId, run.Id.Value.ToString()],
                 Configuration = _executorOptions.ToEnvironment(),
                 Secrets = new Dictionary<string, string>(_executorOptions.Configuration.Concat(tokenEnvironment))
                 {
                     [RunnerEnvironment.RunToken] = token.Value
                 },
                 Network = _executorOptions.Network,
+                ApiBaseUrl = _executorOptions.ApiBaseUrl,
                 DatabaseHost = _executorOptions.DatabaseHost,
                 DatabasePort = _executorOptions.DatabasePort,
                 MemoryBytes = _executorOptions.MemoryBytes,
@@ -267,11 +263,4 @@ public sealed class DeploymentQueue : IDeploymentQueue
             return new ExecutorResult(null, exception);
         }
     }
-
-    private static RunnerOperation ToRunnerOperation(DeploymentRunOperation operation) => operation switch
-    {
-        DeploymentRunOperation.Provision => RunnerOperation.Provision,
-        DeploymentRunOperation.Destroy => RunnerOperation.Destroy,
-        _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null)
-    };
 }

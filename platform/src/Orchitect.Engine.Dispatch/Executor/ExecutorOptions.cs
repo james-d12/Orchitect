@@ -12,6 +12,7 @@ public sealed record ExecutorOptions
     [Required]
     public required string Image { get; init; }
     public string? Network { get; init; }
+    public Uri? ApiBaseUrl { get; init; }
     public string? DatabaseHost { get; init; }
     public int? DatabasePort { get; init; }
     public LogLevel LogLevel { get; init; } = LogLevel.Information;

@@ -8,6 +8,7 @@ var keyVaultUri = builder.AddParameter("keyvault-uri");
 var api = builder.AddProject<Projects.Orchitect_Api>("orchitect-api")
     .WithOtlpExporter()
     .WithHttpEndpoint(port: 41005)
+    .WithEndpoint("http", endpoint => endpoint.TargetHost = "0.0.0.0")
     .WithUrlForEndpoint("http", url =>
     {
         url.DisplayText = "Swagger";
@@ -28,6 +29,8 @@ var api = builder.AddProject<Projects.Orchitect_Api>("orchitect-api")
     .WithReference(orchitectDb)
     .WithExternalHttpEndpoints()
     .WaitFor(orchitectDb);
+
+api.WithEnvironment("ExecutorOptions__ApiBaseUrl", api.GetEndpoint("http"));
 
 builder.AddProject<Projects.Orchitect_Playground>("orchitect-playground")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")

@@ -9,6 +9,7 @@ public sealed class EngineLayeringTests
     private static readonly Assembly Contracts = typeof(RunnerOperation).Assembly;
     private static readonly Assembly Dispatch = typeof(DispatchExtensions).Assembly;
     private static readonly Assembly Execution = typeof(ExecutionExtensions).Assembly;
+    private static readonly Assembly Runner = Assembly.Load("Orchitect.Runner");
 
     [Fact]
     public void Contracts_DoesNotReferenceAnyOrchitectAssembly()
@@ -29,6 +30,21 @@ public sealed class EngineLayeringTests
     {
         Assert.Contains(Contracts.GetName().Name, ReferencedNames(Execution));
         Assert.DoesNotContain(Dispatch.GetName().Name, ReferencedNames(Execution));
+    }
+
+    [Fact]
+    public void Runner_DoesNotReferenceDispatch()
+    {
+        Assert.Contains(Execution.GetName().Name, ReferencedNames(Runner));
+        Assert.DoesNotContain(Dispatch.GetName().Name, ReferencedNames(Runner));
+    }
+
+    [Fact]
+    public void Runner_DoesNotReferencePersistenceOrDomain()
+    {
+        Assert.DoesNotContain(ReferencedNames(Runner),
+            name => name is "Orchitect.Persistence" or "Orchitect.Domain");
+        Assert.DoesNotContain("Orchitect.Domain", ReferencedNames(Execution));
     }
 
     private static IEnumerable<string?> ReferencedNames(Assembly assembly) =>

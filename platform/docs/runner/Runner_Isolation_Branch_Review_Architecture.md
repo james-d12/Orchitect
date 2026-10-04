@@ -5,7 +5,7 @@ workstream: runner
 milestone: "Runner Isolation"
 issues: [102, 107, 109, 110, 113, 115, 116, 117, 118, 119, 120, 121, 122, 180]
 superseded_by: null
-last_reviewed: 2026-10-03
+last_reviewed: 2026-10-04
 ---
 
 # Runner Isolation Branch Review: Architecture
@@ -20,7 +20,7 @@ Severity: 🔴 high, 🟡 medium, 🟢 low.
 
 | # | Finding | Severity | Status | Issues |
 |---|---|---|---|---|
-| A1 | The branch works against the target architecture in `API_RUNNER_SEPARATION.md` (runner has DB access) | 🔴 | Decided: runner calls an internal API, no DB access | #102, #105 |
+| A1 | The branch works against the target architecture in `API_RUNNER_SEPARATION.md` (runner has DB access) | 🔴 | Fixed: runner calls an internal API, no DB access | #102, #105 |
 | A2 | No "Run" concept in the domain | 🔴 | Fixed: `DeploymentRun` added; the run ID names and labels the runner container | #110, #113 |
 | A3 | `Orchitect.Infrastructure.Engine` mixes the control plane and the data plane | 🟡 | Fixed: split into `Orchitect.Engine.Contracts`, `.Dispatch` and `.Execution` | #115, #116 |
 | A4 | The API–runner contract is implicit and untested | 🟡 | Partial: round-trip test added (`db5994b`); argument and env key names moved to `Orchitect.Engine.Contracts` (A3) | #117, #118 |
@@ -56,6 +56,8 @@ The consequences go beyond security (see H1):
 **Decision (#102, 2026-10-02):** the current DB access is an intermediate step. The target is a thin runner that calls an internal API on Orchitect.API: it submits the parsed score file, and the API resolves templates and records resources. The design, contract and migration order are in [API_RUNNER_SEPARATION.md](API_RUNNER_SEPARATION.md).
 
 The contract-version header (§7 there) catches image/API skew. Tying the runner image tag to the API build version is still worthwhile.
+
+**Fixed (#105).** `Orchitect.Runner` references only `Orchitect.Engine.Execution` and `Orchitect.ServiceDefaults`, so the image carries no EF model, and the API decides what runs: the runner fetches its run descriptor, submits the parsed score and executes the returned plan. `EngineLayeringTests` checks that the runner doesn't reference `Orchitect.Engine.Dispatch`, `Orchitect.Persistence` or `Orchitect.Domain`.
 
 ## A2. 🔴 There's no "Run" in the domain
 

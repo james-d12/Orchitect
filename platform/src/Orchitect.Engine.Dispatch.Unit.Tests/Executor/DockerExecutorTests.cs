@@ -15,6 +15,7 @@ namespace Orchitect.Engine.Dispatch.Unit.Tests.Executor;
 public sealed class DockerExecutorTests : IDisposable
 {
     private const string ContainerId = "0123456789abcdef";
+    private static readonly Uri ApiBaseUrl = new("http://localhost:41005");
 
     private readonly IDockerClient _docker = Substitute.For<IDockerClient>();
     private readonly IContainerOperations _containers = Substitute.For<IContainerOperations>();
@@ -80,6 +81,35 @@ public sealed class DockerExecutorTests : IDisposable
     }
 
     [Fact]
+    public async Task ExecuteAsync_PassesApiBaseUrlAsSeenFromTheContainer()
+    {
+        CreateContainerParameters? created = null;
+        _ = _containers.CreateContainerAsync(Arg.Do<CreateContainerParameters>(p => created = p),
+            Arg.Any<CancellationToken>());
+        SetWait(_ => Task.FromResult(new ContainerWaitResponse { StatusCode = 0 }));
+
+        await ExecuteAsync();
+
+        Assert.Contains($"{RunnerEnvironment.ApiBaseUrl}=http://host.docker.internal:41005/", created!.Env);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoApiBaseUrl_FailsWithoutCreatingContainer()
+    {
+        var result = await _executor.ExecuteAsync(new ExecutorContext
+        {
+            Image = "orchitect-runner:test",
+            RunId = "run-1",
+            Arguments = [],
+            Configuration = new Dictionary<string, string>()
+        }, _cancellation.Token);
+
+        Assert.IsType<InvalidOperationException>(result.Exception);
+        await _containers.DidNotReceive().CreateContainerAsync(Arg.Any<CreateContainerParameters>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ExecuteAsync_CopiesSecretsBeforeStartAndKeepsThemOutOfEnv()
     {
         CreateContainerParameters? created = null;
@@ -96,6 +126,7 @@ public sealed class DockerExecutorTests : IDisposable
             Image = "orchitect-runner:test",
             RunId = "run-1",
             Arguments = [],
+            ApiBaseUrl = ApiBaseUrl,
             Configuration = new Dictionary<string, string> { ["Logging__LogLevel__Default"] = "Information" },
             Secrets = new Dictionary<string, string> { ["ARM_CLIENT_SECRET"] = "s3cr3t" }
         }, _cancellation.Token);
@@ -107,8 +138,7 @@ public sealed class DockerExecutorTests : IDisposable
             _containers.StartContainerAsync(ContainerId, Arg.Any<ContainerStartParameters>(),
                 Arg.Any<CancellationToken>());
         });
-        Assert.Equal("s3cr3t", copied!["ARM_CLIENT_SECRET"]);
-        Assert.Contains("host.docker.internal", copied["ConnectionStrings__orchitect"]);
+        Assert.Equal("s3cr3t", Assert.Single(copied!).Value);
         Assert.Contains("Logging__LogLevel__Default=Information", created!.Env);
         Assert.DoesNotContain(created.Env, e => e.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
         Assert.DoesNotContain(created.Env, e => e.Contains("s3cr3t", StringComparison.Ordinal));
@@ -138,6 +168,7 @@ public sealed class DockerExecutorTests : IDisposable
             Image = "orchitect-runner:test",
             RunId = "run-1",
             Arguments = [],
+            ApiBaseUrl = ApiBaseUrl,
             Configuration = new Dictionary<string, string>()
         }, _cancellation.Token);
 
@@ -394,6 +425,7 @@ public sealed class DockerExecutorTests : IDisposable
             Image = "orchitect-runner:test",
             RunId = "run-1",
             Arguments = [],
+            ApiBaseUrl = ApiBaseUrl,
             Configuration = new Dictionary<string, string>(),
             Timeout = timeout,
             StopGracePeriod = stopGracePeriod,
@@ -403,10 +435,6 @@ public sealed class DockerExecutorTests : IDisposable
     private DockerExecutor CreateExecutor(Dictionary<string, string?>? settings = null)
     {
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:orchitect"] = "Host=localhost;Port=41031;Database=orchitect"
-            })
             .AddInMemoryCollection(settings ?? [])
             .Build();
 
@@ -515,8 +543,8 @@ public sealed class DockerExecutorTests : IDisposable
     [InlineData("https://localhost:21132", "https://host.docker.internal:21132")]
     [InlineData("http://127.0.0.1:4318/", "http://host.docker.internal:4318/")]
     [InlineData("http://otel-collector:4317", "http://otel-collector:4317")]
-    public void RewriteOtlpEndpoint_LoopbackHost_PointsAtDockerHost(string endpoint, string expected)
+    public void RewriteLoopbackUrl_LoopbackHost_PointsAtDockerHost(string endpoint, string expected)
     {
-        Assert.Equal(expected, DockerExecutor.RewriteOtlpEndpoint(endpoint));
+        Assert.Equal(expected, DockerExecutor.RewriteLoopbackUrl(endpoint));
     }
 }

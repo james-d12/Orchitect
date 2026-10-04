@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Orchitect.Domain.Engine.Application;
-using Orchitect.Domain.Engine.Deployment;
+using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Score;
 using Orchitect.Engine.Execution.Configuration.Score.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
@@ -11,7 +10,7 @@ namespace Orchitect.Engine.Execution.Configuration.Score;
 
 public interface IScoreDriver
 {
-    Task<ScoreFile?> ParseAsync(Deployment deployment, Application application, CancellationToken cancellationToken);
+    Task<ScoreFile?> ParseAsync(RunDescriptor run, CancellationToken cancellationToken);
 }
 
 public sealed class ScoreDriver : IScoreDriver
@@ -25,16 +24,14 @@ public sealed class ScoreDriver : IScoreDriver
         _gitCommandLine = gitCommandLine;
     }
 
-    public async Task<ScoreFile?> ParseAsync(Deployment deployment, Application application,
-        CancellationToken cancellationToken)
+    public async Task<ScoreFile?> ParseAsync(RunDescriptor run, CancellationToken cancellationToken)
     {
-        ScoreValidationResult scoreValidationResult =
-            await ValidateAsync(deployment, application);
+        ScoreValidationResult scoreValidationResult = await ValidateAsync(run);
 
         if (scoreValidationResult.State != ScoreValidationResultState.Valid)
         {
-            _logger.LogError("Score Validation for {Application} failed due to: {State}",
-                application.Name, scoreValidationResult.State);
+            _logger.LogError("Score Validation for {RepositoryUrl} failed due to: {State}",
+                run.RepositoryUrl, scoreValidationResult.State);
             return null;
         }
 
@@ -51,21 +48,19 @@ public sealed class ScoreDriver : IScoreDriver
         return scoreFile;
     }
 
-    private async Task<ScoreValidationResult> ValidateAsync(Deployment deployment, Application application)
+    private async Task<ScoreValidationResult> ValidateAsync(RunDescriptor run)
     {
-        _logger.LogInformation("Validating Score File for Application: {Application}", application.Name);
+        _logger.LogInformation("Validating Score File for {RepositoryUrl} at {Commit}", run.RepositoryUrl,
+            run.CommitId);
 
-        var commit = deployment.CommitId.Value;
-        var safeDirectoryName = string.Join("_", application.Name.Replace(" ", "_").Trim(),
-            deployment.CommitId.Value.Take(6), DateTime.UtcNow);
-        var destination = Path.Combine(Path.GetTempPath(), "orchitect", "score", safeDirectoryName);
+        var destination = Path.Combine(Path.GetTempPath(), "orchitect", "score", run.RunId.ToString("N"));
 
-        var result = await _gitCommandLine.CloneCommitAsync(application.Repository.Url, commit, destination);
+        var result = await _gitCommandLine.CloneCommitAsync(run.RepositoryUrl, run.CommitId, destination);
 
         if (!result)
         {
             _logger.LogError("Could not clone repository: {RepositoryUrl} for commit: {Commit}",
-                application.Repository.Url, commit);
+                run.RepositoryUrl, run.CommitId);
             return ScoreValidationResult.CloneFailed();
         }
 

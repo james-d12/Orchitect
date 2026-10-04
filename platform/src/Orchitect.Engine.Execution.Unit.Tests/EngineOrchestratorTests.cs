@@ -1,15 +1,12 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Orchitect.Domain.Core.Organisation;
-using Orchitect.Domain.Engine.Application;
-using Orchitect.Domain.Engine.Deployment;
-using Orchitect.Domain.Engine.Environment;
+using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Score;
 using Orchitect.Engine.Execution.Configuration.Score;
 using Orchitect.Engine.Execution.Provisioner;
 using Orchitect.Engine.Execution.RunnerApi;
+using Orchitect.Engine.Execution.Secret;
 using Orchitect.Engine.Execution.Unit.Tests.Terraform;
-using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Engine.Execution.Unit.Tests;
 
@@ -17,17 +14,19 @@ public sealed class EngineOrchestratorTests
 {
     private readonly RecordingProvisioner _provisioner = new();
     private readonly FakeRunnerApiClient _runnerApi = new();
-    private readonly Application _application = NewApplication();
-    private readonly Deployment _deployment = NewDeployment();
+    private readonly RecordingSecretEnvironmentLoader _secrets = new();
+    private FixedScoreDriver? _scoreDriver;
 
     [Fact]
-    public async Task StartAsync_PlanReturned_SubmitsScoreProvisionsPlanAndReportsSuccess()
+    public async Task RunAsync_ProvisionRun_SubmitsScoreProvisionsPlanAndReportsSuccess()
     {
         var scoreFile = Score();
 
-        await CreateOrchestrator(scoreFile).StartAsync(_application, _deployment, CancellationToken.None);
+        await CreateOrchestrator(scoreFile).RunAsync(CancellationToken.None);
 
+        Assert.Same(_runnerApi.Run, _scoreDriver?.Run);
         Assert.Same(scoreFile, _runnerApi.Submission?.ScoreFile);
+        Assert.True(_secrets.Loaded);
         Assert.Equal(_runnerApi.Plan.Inputs, _provisioner.Provisioned);
         Assert.Same(_runnerApi.Plan.Context, _provisioner.Context);
         Assert.Null(_provisioner.Deleted);
@@ -35,9 +34,11 @@ public sealed class EngineOrchestratorTests
     }
 
     [Fact]
-    public async Task DestroyAsync_PlanReturned_DeletesPlanAndReportsSuccess()
+    public async Task RunAsync_DestroyRun_DeletesPlanAndReportsSuccess()
     {
-        await CreateOrchestrator(Score()).DestroyAsync(_application, _deployment, CancellationToken.None);
+        _runnerApi.Run = _runnerApi.Run with { Operation = RunnerOperation.Destroy };
+
+        await CreateOrchestrator(Score()).RunAsync(CancellationToken.None);
 
         Assert.Equal(_runnerApi.Plan.Inputs, _provisioner.Deleted);
         Assert.Null(_provisioner.Provisioned);
@@ -45,12 +46,12 @@ public sealed class EngineOrchestratorTests
     }
 
     [Fact]
-    public async Task StartAsync_ProvisionFails_ReportsFailureAndRethrows()
+    public async Task RunAsync_ProvisionFails_ReportsFailureAndRethrows()
     {
         _provisioner.Failure = new InvalidOperationException("terraform apply failed");
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            CreateOrchestrator(Score()).StartAsync(_application, _deployment, CancellationToken.None));
+            CreateOrchestrator(Score()).RunAsync(CancellationToken.None));
 
         Assert.Same(_provisioner.Failure, exception);
         Assert.Equal(new RunCompletion(RunOutcome.Failed, "terraform apply failed"),
@@ -58,21 +59,22 @@ public sealed class EngineOrchestratorTests
     }
 
     [Fact]
-    public async Task DestroyAsync_DeleteFails_ReportsFailure()
+    public async Task RunAsync_DeleteFails_ReportsFailure()
     {
+        _runnerApi.Run = _runnerApi.Run with { Operation = RunnerOperation.Destroy };
         _provisioner.Failure = new InvalidOperationException("terraform destroy failed");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            CreateOrchestrator(Score()).DestroyAsync(_application, _deployment, CancellationToken.None));
+            CreateOrchestrator(Score()).RunAsync(CancellationToken.None));
 
         Assert.Equal(RunOutcome.Failed, Assert.Single(_runnerApi.Completions).Outcome);
     }
 
     [Fact]
-    public async Task StartAsync_ScoreFileMissing_ReportsFailureWithoutPlanning()
+    public async Task RunAsync_ScoreFileMissing_ReportsFailureWithoutPlanning()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            CreateOrchestrator(null).StartAsync(_application, _deployment, CancellationToken.None));
+            CreateOrchestrator(null).RunAsync(CancellationToken.None));
 
         Assert.Null(_runnerApi.Submission);
         Assert.Null(_provisioner.Provisioned);
@@ -80,31 +82,63 @@ public sealed class EngineOrchestratorTests
     }
 
     [Fact]
-    public async Task StartAsync_PlanRejected_ReportsFailureWithoutProvisioning()
+    public async Task RunAsync_RunNotFetched_ReportsFailureWithoutParsing()
+    {
+        _runnerApi.RunFailure = new HttpRequestException("503 Service Unavailable");
+
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            CreateOrchestrator(Score()).RunAsync(CancellationToken.None));
+
+        Assert.Null(_scoreDriver?.Run);
+        Assert.Null(_runnerApi.Submission);
+        Assert.Equal(new RunCompletion(RunOutcome.Failed, "503 Service Unavailable"),
+            Assert.Single(_runnerApi.Completions));
+    }
+
+    [Fact]
+    public async Task RunAsync_SecretsNotLoaded_ReportsFailureWithoutProvisioning()
+    {
+        _secrets.Failure = new InvalidOperationException("Key Vault unavailable");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            CreateOrchestrator(Score()).RunAsync(CancellationToken.None));
+
+        Assert.Null(_provisioner.Provisioned);
+        Assert.Equal(new RunCompletion(RunOutcome.Failed, "Key Vault unavailable"),
+            Assert.Single(_runnerApi.Completions));
+    }
+
+    [Fact]
+    public async Task RunAsync_PlanRejected_ReportsFailureWithoutLoadingSecretsOrProvisioning()
     {
         _runnerApi.PlanFailure = new HttpRequestException("400 Bad Request");
 
         await Assert.ThrowsAsync<HttpRequestException>(() =>
-            CreateOrchestrator(Score()).StartAsync(_application, _deployment, CancellationToken.None));
+            CreateOrchestrator(Score()).RunAsync(CancellationToken.None));
 
+        Assert.False(_secrets.Loaded);
         Assert.Null(_provisioner.Provisioned);
         Assert.Equal(new RunCompletion(RunOutcome.Failed, "400 Bad Request"), Assert.Single(_runnerApi.Completions));
     }
 
     [Fact]
-    public async Task StartAsync_FailureReportFails_RethrowsTheOriginalFailure()
+    public async Task RunAsync_FailureReportFails_RethrowsTheOriginalFailure()
     {
         _provisioner.Failure = new InvalidOperationException("terraform apply failed");
         _runnerApi.CompleteFailure = new HttpRequestException("API unavailable");
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            CreateOrchestrator(Score()).StartAsync(_application, _deployment, CancellationToken.None));
+            CreateOrchestrator(Score()).RunAsync(CancellationToken.None));
 
         Assert.Same(_provisioner.Failure, exception);
     }
 
-    private EngineOrchestrator CreateOrchestrator(ScoreFile? scoreFile) =>
-        new(NullLogger<EngineOrchestrator>.Instance, new FixedScoreDriver(scoreFile), _runnerApi, _provisioner);
+    private EngineOrchestrator CreateOrchestrator(ScoreFile? scoreFile)
+    {
+        _scoreDriver = new FixedScoreDriver(scoreFile);
+        return new EngineOrchestrator(NullLogger<EngineOrchestrator>.Instance, _scoreDriver, _runnerApi, _secrets,
+            _provisioner);
+    }
 
     private static ScoreFile Score() => new()
     {
@@ -116,34 +150,42 @@ public sealed class EngineOrchestratorTests
         }
     };
 
-    private static Application NewApplication() =>
-        Application.Create("orders", new Repository
-        {
-            Name = "orders",
-            Url = new Uri("https://example.com/orders.git"),
-            Provider = RepositoryProvider.GitHub
-        }, new OrganisationId());
-
-    private static Deployment NewDeployment() =>
-        Deployment.Create(new ApplicationId(), new EnvironmentId(Guid.NewGuid()), new CommitId(new string('a', 40)),
-            "test@example.com");
-
     private sealed class FixedScoreDriver(ScoreFile? scoreFile) : IScoreDriver
     {
-        public Task<ScoreFile?> ParseAsync(Deployment deployment, Application application,
-            CancellationToken cancellationToken) => Task.FromResult(scoreFile);
+        public RunDescriptor? Run { get; private set; }
+
+        public Task<ScoreFile?> ParseAsync(RunDescriptor run, CancellationToken cancellationToken)
+        {
+            Run = run;
+            return Task.FromResult(scoreFile);
+        }
+    }
+
+    private sealed class RecordingSecretEnvironmentLoader : ISecretEnvironmentLoader
+    {
+        public bool Loaded { get; private set; }
+        public Exception? Failure { get; set; }
+
+        public Task LoadAsync(CancellationToken cancellationToken = default)
+        {
+            Loaded = Failure is null;
+            return Failure is null ? Task.CompletedTask : Task.FromException(Failure);
+        }
     }
 
     private sealed class FakeRunnerApiClient : IRunnerApiClient
     {
+        public RunDescriptor Run { get; set; } = new(Guid.NewGuid(), RunnerOperation.Provision,
+            new Uri("https://example.com/orders.git"), new string('a', 40), Guid.NewGuid(), Guid.NewGuid());
         public RunPlan Plan { get; } = new(TerraformTestData.NewContext(), [TerraformTestData.PlanInput()]);
         public ScoreSubmission? Submission { get; private set; }
         public List<RunCompletion> Completions { get; } = [];
+        public Exception? RunFailure { get; set; }
         public Exception? PlanFailure { get; set; }
         public Exception? CompleteFailure { get; set; }
 
         public Task<RunDescriptor> GetRunAsync(CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            RunFailure is null ? Task.FromResult(Run) : Task.FromException<RunDescriptor>(RunFailure);
 
         public Task<RunPlan> SubmitScoreAsync(ScoreSubmission submission, CancellationToken cancellationToken)
         {

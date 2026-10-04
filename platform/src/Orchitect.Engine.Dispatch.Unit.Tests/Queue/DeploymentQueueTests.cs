@@ -54,15 +54,18 @@ public sealed class DeploymentQueueTests
     }
 
     [Fact]
-    public async Task WorkItem_Provision_PassesProvisionOperation()
+    public async Task WorkItem_PassesOnlyTheRunIdAndApiBaseUrl()
     {
         var (deployment, _, services) = Setup();
         var executor = new FakeExecutor();
-        var workItem = await QueueAsync(deployment, executor);
+        var apiBaseUrl = new Uri("http://localhost:41005");
+        var workItem = await QueueAsync(deployment, executor,
+            new ExecutorOptions { Image = "runner:test", ApiBaseUrl = apiBaseUrl });
 
         await workItem(services, CancellationToken.None);
 
-        Assert.Equal(["--operation", "Provision"], executor.Context!.Arguments.TakeLast(2));
+        Assert.Equal(["--run-id", _runs.Run!.Id.Value.ToString()], executor.Context!.Arguments);
+        Assert.Equal(apiBaseUrl, executor.Context.ApiBaseUrl);
     }
 
     [Theory]
@@ -79,7 +82,7 @@ public sealed class DeploymentQueueTests
 
         Assert.Equal([expected], repository.Statuses);
         Assert.Equal([DeploymentRunStatus.Running, expectedRun], _runs.Statuses);
-        Assert.Equal(["--operation", "Destroy"], executor.Context!.Arguments.TakeLast(2));
+        Assert.Equal(["--run-id", _runs.Run!.Id.Value.ToString()], executor.Context!.Arguments);
     }
 
     [Fact]
