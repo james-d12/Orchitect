@@ -27,11 +27,6 @@ internal sealed class OrganisationUserConfiguration : IEntityTypeConfiguration<O
                 value => new OrganisationId(value)
             );
 
-        builder.HasOne<Organisation>()
-            .WithMany()
-            .HasForeignKey(x => x.OrganisationId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.HasOne<IdentityUser>()
             .WithMany()
             .HasForeignKey(x => x.IdentityUserId)
