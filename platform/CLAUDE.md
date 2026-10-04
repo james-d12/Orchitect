@@ -59,7 +59,7 @@ Test projects:
 - `Orchitect.AppHost.E2E.Tests`: boots the real Aspire AppHost and checks every resource becomes healthy (needs Docker, Node.js and pnpm)
 - `Orchitect.Api.Integration.Tests`: endpoints and repositories against Postgres in Testcontainers (needs Docker)
 - `Orchitect.Domain.Unit.Tests`: domain entity behaviour (e.g. deployment status transitions)
-- `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue, Key Vault and run token minting, the run planner, completer and completion handler, plus the API-to-runner contract round-trip and the Engine layering guard tests
+- `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue, Key Vault and run token minting, the run planner, completer and completion handler, plus the API-to-runner contract round-trip, the runner's command line without configuration and the Engine layering guard tests
 - `Orchitect.Engine.Execution.Unit.Tests`: orchestrator, drivers, runner secret loading and the runner API client
 - `Orchitect.Infrastructure.Inventory.Unit.Tests`, `Orchitect.Common.Unit.Tests`
 
