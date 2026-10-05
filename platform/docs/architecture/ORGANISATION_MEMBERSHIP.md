@@ -46,21 +46,11 @@ Branch `feature/organisation_membership_check`, PR #195. The first version (`868
 - Each endpoint opts in explicitly, and the coverage test enforces it. There is no catch-all filter that guesses where the id is.
 - The entity filter and the handler both load the entity, so a request does two primary-key lookups. This keeps the handlers free of authorization code.
 - A deployment's organisation comes from its application. If the application is deleted, its deployments return 404 to everyone.
-- No data migration. Organisations created before this change have no members, because the creator was never stored, and a migration can't know who should own them. `scripts/backfill-organisation-members.sh` fixes them once (see below).
+- No backfill. Organisations created before this change have no members, because the creator was never stored. There is no live system yet, so they are left unreachable rather than migrated.
 - Every member can add and remove members. There are no roles yet.
 - Members are added by email rather than user id, because users can't look up each other's ids.
-
-## Backfilling organisations without members
-Run once per environment, from `platform/`, after the user has registered:
-
-```bash
-scripts/backfill-organisation-members.sh "<connection-string>" admin@example.com --dry-run
-scripts/backfill-organisation-members.sh "<connection-string>" admin@example.com
-```
-
-It adds the user to every organisation that has no members and prints those organisations. It is safe to run again: an organisation with a member is skipped. That user can then add the right members through the API. Set `PSQL="docker exec -i <postgres-container> psql"` when `psql` isn't installed locally (the Aspire database listens on port 41031).
 
 ## Outstanding
 - `PipelineRepository.BulkUpsertAsync` inserts an existing owner again (`PK_Owners`). When fixed, add the pipeline case back to `InventoryApi_WhenNotAMember_ShouldReturn404NotFound` (#197)
 - Stray `OrganisationId1` column on `OrganisationUsers` from the relationship being configured twice (#198)
-- ~~There's no API to add or remove organisation members, and no backfill for organisations created before this change (#199)~~
+- ~~There's no API to add or remove organisation members (#199)~~

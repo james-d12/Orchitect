@@ -148,7 +148,7 @@ public static IServiceCollection AddPersistenceServices(this IServiceCollection 
 
 **Endpoint groups**: `MapPrivateGroup()` for authenticated endpoints, `MapPublicGroup()` for anonymous.
 
-**Organisation membership**: every authorised endpoint declares how it is scoped in its `Map`. Use `.RequireOrganisationMember()` for a `Guid organisationId` parameter, `.RequireOrganisationMember<TRequest>(r => r.OrganisationId)` for an id in a request (both 403), `.RequireOrganisationAccess<TEntity, TId>(...)` for an entity loaded by `id` (404), or `.HandlesOrganisationScope()` when the handler filters to `IOrganisationAccess.GetOrganisationIdsAsync()` itself (see `Shared/Authorization`). `OrganisationScopeCoverageTests` fails for an endpoint that declares none. Creating an organisation makes the caller a member; members add and remove others under `/organisations/{id}/members`, and `scripts/backfill-organisation-members.sh` gives organisations without members one.
+**Organisation membership**: every authorised endpoint declares how it is scoped in its `Map`. Use `.RequireOrganisationMember()` for a `Guid organisationId` parameter, `.RequireOrganisationMember<TRequest>(r => r.OrganisationId)` for an id in a request (both 403), `.RequireOrganisationAccess<TEntity, TId>(...)` for an entity loaded by `id` (404), or `.HandlesOrganisationScope()` when the handler filters to `IOrganisationAccess.GetOrganisationIdsAsync()` itself (see `Shared/Authorization`). `OrganisationScopeCoverageTests` fails for an endpoint that declares none. Creating an organisation makes the caller a member; members add and remove others under `/organisations/{id}/members`.
 
 ## Documentation
 
