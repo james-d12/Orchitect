@@ -60,6 +60,11 @@ public sealed record Organisation
 
     public Organisation RemoveUser(OrganisationUserId userId)
     {
+        if (Users.Count == 1 && Users[0].Id == userId)
+        {
+            throw new InvalidOperationException("The last member of an organisation can't be removed.");
+        }
+
         var updatedUsers = Users.Where(u => u.Id != userId).ToList();
         var updatedTeams = Teams.Select(t => t.RemoveUser(userId)).ToList();
 

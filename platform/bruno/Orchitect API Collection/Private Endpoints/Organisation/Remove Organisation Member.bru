@@ -1,0 +1,16 @@
+meta {
+  name: Remove Organisation Member
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{API_BASE_URL}}/organisations/{{ORGANISATION_ID}}/members/{{ORGANISATION_MEMBER_ID}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

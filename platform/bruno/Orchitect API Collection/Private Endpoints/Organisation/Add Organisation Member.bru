@@ -1,0 +1,28 @@
+meta {
+  name: Add Organisation Member
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{API_BASE_URL}}/organisations/{{ORGANISATION_ID}}/members
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "TestMember@gmail.com"
+  }
+}
+
+script:post-response {
+  var id = res.body.id
+  console.log("Organisation Member Id: ", id)
+  bru.setEnvVar("ORGANISATION_MEMBER_ID", id, {})
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

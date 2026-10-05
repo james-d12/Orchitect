@@ -1,0 +1,16 @@
+meta {
+  name: Get Organisation Members
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{API_BASE_URL}}/organisations/{{ORGANISATION_ID}}/members
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

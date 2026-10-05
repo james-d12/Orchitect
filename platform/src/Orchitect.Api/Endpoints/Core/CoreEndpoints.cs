@@ -37,7 +37,10 @@ public static class CoreEndpoints
             .MapEndpoint<GetAllOrganisationsEndpoint>()
             .MapEndpoint<GetOrganisationEndpoint>()
             .MapEndpoint<UpdateOrganisationEndpoint>()
-            .MapEndpoint<DeleteOrganisationEndpoint>();
+            .MapEndpoint<DeleteOrganisationEndpoint>()
+            .MapEndpoint<GetOrganisationMembersEndpoint>()
+            .MapEndpoint<AddOrganisationMemberEndpoint>()
+            .MapEndpoint<RemoveOrganisationMemberEndpoint>();
     }
 
     private static void MapCredentialEndpoints(this IEndpointRouteBuilder endpoints)
