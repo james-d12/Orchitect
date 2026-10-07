@@ -62,12 +62,14 @@ public sealed class PipelineRepository : IPipelineRepository
     {
         foreach (var pipeline in pipelines)
         {
+            var trackedOwner = await _context.TrackOwnerAsync(pipeline.User, cancellationToken);
+
             var existing = await _context.Pipelines
                 .FirstOrDefaultAsync(p => p.Url == pipeline.Url, cancellationToken);
 
             if (existing is null)
             {
-                await _context.Pipelines.AddAsync(pipeline, cancellationToken);
+                await _context.Pipelines.AddAsync(pipeline with { User = trackedOwner }, cancellationToken);
             }
             else
             {
