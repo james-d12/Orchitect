@@ -330,6 +330,7 @@ public sealed class OrganisationMembershipIntegrationTests(WebApplicationFactory
         var cloudResource = await factory.SeedCloudResourceAsync(id);
         var cloudSecret = await factory.SeedCloudSecretAsync(id);
         var issue = await factory.SeedIssueAsync(id);
+        var pipeline = await factory.SeedPipelineAsync(id);
         var repository = await factory.SeedRepositoryAsync(id);
         var pullRequest = await factory.SeedPullRequestAsync(id);
 
@@ -338,6 +339,7 @@ public sealed class OrganisationMembershipIntegrationTests(WebApplicationFactory
             await outsider.GetAsync($"/cloud/resources/{cloudResource.Id.Value}"),
             await outsider.GetAsync($"/cloud/secrets/{cloudSecret.Id.Value}"),
             await outsider.GetAsync($"/issues/{issue.Id.Value}"),
+            await outsider.GetAsync($"/pipelines/{pipeline.Id.Value}"),
             await outsider.GetAsync($"/repositories/{repository.Id.Value}"),
             await outsider.GetAsync($"/pull-requests/{pullRequest.Id.Value}")
         };

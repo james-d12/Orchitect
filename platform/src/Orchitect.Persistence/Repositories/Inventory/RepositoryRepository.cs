@@ -63,49 +63,13 @@ public sealed class RepositoryRepository : IRepositoryRepository
     {
         foreach (var repository in repositories)
         {
-            // Handle owner first to avoid tracking conflicts
-            var owner = repository.User;
+            var trackedOwner = await _context.TrackOwnerAsync(repository.User, cancellationToken);
 
-            // Check if owner is already tracked in the local context
-            var trackedOwner = _context.Owners.Local.FirstOrDefault(
-                o => o.OrganisationId == owner.OrganisationId &&
-                     o.Name == owner.Name &&
-                     o.Platform == owner.Platform);
-
-            if (trackedOwner == null)
-            {
-                // Not tracked locally, check database
-                trackedOwner = await _context.Owners.FirstOrDefaultAsync(
-                    o => o.OrganisationId == owner.OrganisationId &&
-                         o.Name == owner.Name &&
-                         o.Platform == owner.Platform,
-                    cancellationToken);
-
-                if (trackedOwner == null)
-                {
-                    // New owner, add to context
-                    _context.Owners.Add(owner);
-                    trackedOwner = owner;
-                }
-                else
-                {
-                    // Existing owner in DB, update and track it
-                    _context.Entry(trackedOwner).CurrentValues.SetValues(owner);
-                }
-            }
-            else if (trackedOwner != owner)
-            {
-                // Already tracked, just update its values
-                _context.Entry(trackedOwner).CurrentValues.SetValues(owner);
-            }
-
-            // Now handle repository with the properly tracked owner
             var existing = await _context.Repositories
                 .FirstOrDefaultAsync(r => r.Url == repository.Url, cancellationToken);
 
             if (existing is null)
             {
-                // Create new repository with tracked owner reference
                 var newRepo = repository with { User = trackedOwner };
                 await _context.Repositories.AddAsync(newRepo, cancellationToken);
             }
