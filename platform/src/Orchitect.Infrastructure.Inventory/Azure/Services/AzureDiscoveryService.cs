@@ -30,7 +30,7 @@ public sealed class AzureDiscoveryService : DiscoveryService
 
     public override DiscoveryPlatform Platform => DiscoveryPlatform.Azure;
 
-    protected override async Task StartAsync(
+    protected override async Task<DiscoveryCounts> StartAsync(
         DiscoveryConfiguration configuration,
         Credential credential,
         CancellationToken cancellationToken)
@@ -93,5 +93,11 @@ public sealed class AzureDiscoveryService : DiscoveryService
             configuration.OrganisationId.Value,
             azureCloudResources.Count,
             cloudSecrets.Count);
+
+        return new DiscoveryCounts
+        {
+            CloudResources = azureCloudResources.Count,
+            CloudSecrets = cloudSecrets.Count
+        };
     }
 }

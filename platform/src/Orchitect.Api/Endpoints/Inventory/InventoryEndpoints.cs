@@ -29,6 +29,9 @@ public static class InventoryEndpoints
 
         discoveryGroup.MapEndpoint<CreateDiscoveryConfigurationEndpoint>();
         discoveryGroup.MapEndpoint<ListDiscoveryConfigurationsEndpoint>();
+        discoveryGroup.MapEndpoint<GetDiscoveryConfigurationEndpoint>();
+        discoveryGroup.MapEndpoint<GetDiscoveryStatusEndpoint>();
+        discoveryGroup.MapEndpoint<ListDiscoveryRunsEndpoint>();
         discoveryGroup.MapEndpoint<UpdateDiscoveryConfigurationEndpoint>();
         discoveryGroup.MapEndpoint<DeleteDiscoveryConfigurationEndpoint>();
         discoveryGroup.MapEndpoint<TriggerDiscoveryEndpoint>();
