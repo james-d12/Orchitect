@@ -1,17 +1,20 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orchitect.Engine.Dispatch.Executor;
+using Orchitect.Persistence;
 using Testcontainers.PostgreSql;
 
 namespace Orchitect.Api.Integration.Tests.Helpers;
 
 public sealed class WebApplicationFactoryWithPostgres : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:15.1").Build();
+    private static readonly PostgreSqlContainer Postgres = new PostgreSqlBuilder("postgres:15.1").Build();
+    private static readonly Lazy<Task> SharedDatabase = new(StartDatabaseAsync);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -36,15 +39,19 @@ public sealed class WebApplicationFactoryWithPostgres : WebApplicationFactory<Pr
         });
     }
 
-    public async Task InitializeAsync()
-    {
-        await _postgres.StartAsync();
-        Environment.SetEnvironmentVariable("ConnectionStrings__orchitect", _postgres.GetConnectionString());
-    }
+    public Task InitializeAsync() => SharedDatabase.Value;
 
-    public new async Task DisposeAsync()
+    public new Task DisposeAsync() => base.DisposeAsync().AsTask();
+
+    private static async Task StartDatabaseAsync()
     {
-        Environment.SetEnvironmentVariable("ConnectionStrings__orchitect", null);
-        await _postgres.DisposeAsync();
+        await Postgres.StartAsync();
+        var connectionString = Postgres.GetConnectionString();
+
+        var options = new DbContextOptionsBuilder<OrchitectDbContext>().UseNpgsql(connectionString).Options;
+        await using var dbContext = new OrchitectDbContext(options);
+        await dbContext.Database.MigrateAsync();
+
+        Environment.SetEnvironmentVariable("ConnectionStrings__orchitect", connectionString);
     }
 }

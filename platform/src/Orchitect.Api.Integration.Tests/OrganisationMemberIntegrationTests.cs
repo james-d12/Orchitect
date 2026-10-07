@@ -5,8 +5,7 @@ using Orchitect.Api.Shared;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class OrganisationMemberIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class OrganisationMemberIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private static string MembersUrl(Guid organisationId) => $"/organisations/{organisationId}/members";
 

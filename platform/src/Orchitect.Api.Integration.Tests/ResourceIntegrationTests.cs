@@ -15,8 +15,7 @@ using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class ResourceIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class ResourceIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string ResourcesUrl = "/resources";
     private readonly Fixture _fixture = new();

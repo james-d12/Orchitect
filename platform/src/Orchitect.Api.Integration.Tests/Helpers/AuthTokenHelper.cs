@@ -12,6 +12,7 @@ namespace Orchitect.Api.Integration.Tests.Helpers;
 public static class AuthTokenHelper
 {
     private const string UsersUrl = "/users";
+    private static readonly SemaphoreSlim AccessTokenLock = new(1, 1);
     private static string _accessToken = string.Empty;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -36,14 +37,20 @@ public static class AuthTokenHelper
 
     private static async Task<string> GetAccessTokenAsync(HttpClient client)
     {
-        if (!string.IsNullOrEmpty(_accessToken))
+        await AccessTokenLock.WaitAsync();
+        try
         {
+            if (string.IsNullOrEmpty(_accessToken))
+            {
+                _accessToken = await RegisterAndLoginAsync(client, "test@example.com");
+            }
+
             return _accessToken;
         }
-
-        var accessToken = await RegisterAndLoginAsync(client, "test@example.com");
-        _accessToken = accessToken;
-        return accessToken;
+        finally
+        {
+            AccessTokenLock.Release();
+        }
     }
 
     private static async Task<string> RegisterAndLoginAsync(HttpClient client, string email)

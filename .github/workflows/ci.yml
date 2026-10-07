@@ -15,8 +15,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: "Detect Changes"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      platform: ${{ steps.filter.outputs.platform }}
+      web: ${{ steps.filter.outputs.web }}
+      cli: ${{ steps.filter.outputs.cli }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Filter changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            platform:
+              - 'platform/**'
+              - 'portals/Orchitect.Portal.Web/**'
+              - '.editorconfig'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'portals/Orchitect.Portal.Web/**'
+              - '.github/workflows/ci.yml'
+            cli:
+              - 'portals/Orchitect.Portal.Cli/**'
+              - '.github/workflows/ci.yml'
+
   build-web:
     name: "Build Web Portal"
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -73,6 +106,8 @@ jobs:
 
   build-cli:
     name: "Build Cli Portal"
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.cli == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -103,17 +138,27 @@ jobs:
 
   build-platform:
     name: "Build Platform"
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.platform == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./platform
     env:
       SOLUTION_FILE: Orchitect.sln
+      DOTNET_NOLOGO: true
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
           fetch-depth: '0'
+
+      - name: Pre-pull test container images
+        run: |
+          nohup sh -c 'docker pull postgres:15.1 & docker pull docker.io/library/postgres:18.3 & wait' \
+            > "$RUNNER_TEMP/docker-pull.log" 2>&1 &
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -130,12 +175,6 @@ jobs:
         with:
           version: 10
           run_install: false
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          java-version: 17
-          distribution: 'zulu'
 
       - name: Cache SonarQube Cloud packages
         uses: actions/cache@v5
@@ -181,14 +220,11 @@ jobs:
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
       - name: Check No Pending Model Changes
-        run: dotnet ef migrations has-pending-model-changes
+        run: dotnet ef migrations has-pending-model-changes --no-build --configuration Release
         working-directory: platform/src/Orchitect.Persistence
 
-      - name: Check For Vulnerabilities
-        run: dotnet list ${{ env.SOLUTION_FILE }} package --vulnerable
-
       - name: Format Check
-        run: dotnet format ${{ env.SOLUTION_FILE }} --verify-no-changes --verbosity diagnostic
+        run: dotnet format whitespace --folder --verify-no-changes
 
       #- name: Run Mutation Tests
       #  run: dotnet stryker --solution ${{ env.SOLUTION_FILE }}

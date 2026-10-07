@@ -7,8 +7,7 @@ using Orchitect.Api.Integration.Tests.Helpers;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class UserIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class UserIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string UsersUrl = "/users";
     private readonly Fixture _fixture = new();

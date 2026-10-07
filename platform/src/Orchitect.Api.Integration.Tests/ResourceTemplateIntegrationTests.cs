@@ -7,8 +7,7 @@ using Orchitect.Domain.Engine.ResourceTemplate;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class ResourceTemplateIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class ResourceTemplateIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string ResourceTemplatesUrl = "/resource-templates";
     private readonly Fixture _fixture = new();

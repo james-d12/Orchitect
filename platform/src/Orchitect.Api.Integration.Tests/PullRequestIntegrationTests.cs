@@ -7,8 +7,7 @@ using Orchitect.Domain.Inventory.SourceControl;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class PullRequestIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class PullRequestIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string PullRequestsUrl = "/pull-requests";
     private readonly Fixture _fixture = new();

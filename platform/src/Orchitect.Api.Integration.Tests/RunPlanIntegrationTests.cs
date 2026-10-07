@@ -24,8 +24,7 @@ using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class RunPlanIntegrationTests : IAsyncLifetime
+public sealed class RunPlanIntegrationTests : IClassFixture<WebApplicationFactoryWithPostgres>, IAsyncLifetime
 {
     private readonly Fixture _fixture = new();
     private readonly WebApplicationFactoryWithPostgres _factory;

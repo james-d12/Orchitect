@@ -7,8 +7,7 @@ using Orchitect.Domain.Inventory.SourceControl;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class RepositoryIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class RepositoryIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string RepositoriesUrl = "/repositories";
     private readonly Fixture _fixture = new();

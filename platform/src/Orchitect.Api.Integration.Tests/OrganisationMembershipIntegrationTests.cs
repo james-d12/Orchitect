@@ -20,8 +20,7 @@ using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class OrganisationMembershipIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class OrganisationMembershipIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private readonly Fixture _fixture = new();
 

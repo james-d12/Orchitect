@@ -8,8 +8,7 @@ using Orchitect.Domain.Engine.Application;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class ApplicationIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class ApplicationIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string ApplicationsUrl = "/applications";
     private readonly Fixture _fixture = new();

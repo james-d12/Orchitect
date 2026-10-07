@@ -7,8 +7,7 @@ using Orchitect.Domain.Inventory.Cloud;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class CloudSecretIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class CloudSecretIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string CloudSecretsUrl = "/cloud/secrets";
     private readonly Fixture _fixture = new();

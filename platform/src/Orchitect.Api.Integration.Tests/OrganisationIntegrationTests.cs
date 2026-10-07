@@ -9,8 +9,7 @@ using Orchitect.Persistence;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class OrganisationIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class OrganisationIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string OrganisationsUrl = "/organisations";
     private readonly Fixture _fixture = new();

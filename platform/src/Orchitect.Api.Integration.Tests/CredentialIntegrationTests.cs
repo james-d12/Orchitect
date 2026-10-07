@@ -7,8 +7,7 @@ using Orchitect.Domain.Core.Credential;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class CredentialIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class CredentialIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string CredentialsUrl = "/credentials";
     private readonly Fixture _fixture = new();

@@ -11,8 +11,7 @@ using Orchitect.Domain.Inventory.Discovery.Services;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string DiscoveryUrl = "/discovery";
     private const string CredentialsUrl = "/credentials";

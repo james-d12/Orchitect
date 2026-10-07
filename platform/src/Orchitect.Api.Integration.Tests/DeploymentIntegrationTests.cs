@@ -19,24 +19,21 @@ using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class DeploymentIntegrationTests
+public sealed class DeploymentIntegrationTests : IClassFixture<DeploymentIntegrationTests.DeploymentHostFixture>
 {
     private const string DeploymentsUrl = "/deployments";
     private readonly Fixture _fixture = new();
-    private readonly CapturingDeploymentQueue _queue = new();
-    private readonly SignallingExecutor _executor = new();
+    private readonly CapturingDeploymentQueue _queue;
+    private readonly SignallingExecutor _executor;
     private readonly WebApplicationFactory<Program> _factory;
 
-    public DeploymentIntegrationTests(WebApplicationFactoryWithPostgres factory)
+    public DeploymentIntegrationTests(DeploymentHostFixture host)
     {
-        _factory = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-        {
-            services.RemoveAll<IDeploymentQueue>();
-            services.AddSingleton<IDeploymentQueue>(_queue);
-            services.RemoveAll<IExecutor>();
-            services.AddSingleton<IExecutor>(_executor);
-        }));
+        _factory = host.Factory;
+        _queue = host.Queue;
+        _executor = host.Executor;
+        _queue.Reset();
+        _executor.Signalled.Clear();
     }
 
     [Fact]
@@ -869,7 +866,34 @@ public sealed class DeploymentIntegrationTests
         return deployment;
     }
 
-    private sealed class SignallingExecutor : IExecutor
+    public sealed class DeploymentHostFixture : IAsyncLifetime
+    {
+        private readonly WebApplicationFactoryWithPostgres _host = new();
+
+        public CapturingDeploymentQueue Queue { get; } = new();
+        public SignallingExecutor Executor { get; } = new();
+        public WebApplicationFactory<Program> Factory { get; private set; } = null!;
+
+        public async Task InitializeAsync()
+        {
+            await _host.InitializeAsync();
+            Factory = _host.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IDeploymentQueue>();
+                services.AddSingleton<IDeploymentQueue>(Queue);
+                services.RemoveAll<IExecutor>();
+                services.AddSingleton<IExecutor>(Executor);
+            }));
+        }
+
+        public async Task DisposeAsync()
+        {
+            await Factory.DisposeAsync();
+            await _host.DisposeAsync();
+        }
+    }
+
+    public sealed class SignallingExecutor : IExecutor
     {
         public List<string> Signalled { get; } = [];
 
@@ -916,10 +940,16 @@ public sealed class DeploymentIntegrationTests
             inner.LockAsync(id, cancellationToken);
     }
 
-    private sealed class CapturingDeploymentQueue : IDeploymentQueue
+    public sealed class CapturingDeploymentQueue : IDeploymentQueue
     {
         public List<DeploymentQueueRequest> Requests { get; } = [];
         public bool Fail { get; set; }
+
+        public void Reset()
+        {
+            Requests.Clear();
+            Fail = false;
+        }
 
         public Task QueueDeploymentTaskAsync(DeploymentQueueRequest request, CancellationToken token = default)
         {

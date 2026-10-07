@@ -126,8 +126,8 @@ using Orchitect.Domain.{Context}.{Domain};
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
 public sealed class {Entity}IntegrationTests(WebApplicationFactoryWithPostgres factory)
+    : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string {Entities}Url = "/{route}";
     private readonly Fixture _fixture = new();
@@ -158,7 +158,7 @@ public sealed class {Entity}IntegrationTests(WebApplicationFactoryWithPostgres f
 
 **Key rules:**
 - Class is `sealed`, constructor-injected with `WebApplicationFactoryWithPostgres factory`
-- `[Collection("Integration")]` on the class
+- `IClassFixture<WebApplicationFactoryWithPostgres>` on the class, not a `[Collection]`: test classes run in parallel against one shared database, so scope every assertion to data the test created (its own organisation)
 - `_fixture` is `new Fixture()` (AutoFixture) — use for random string/enum values and non-existent IDs
 - Always `await factory.CreateClient().AddAuthorisationHeader()` — all endpoints require auth
 - Always call `CreateOrganisationAsync()` when the entity requires an `OrganisationId`

@@ -6,8 +6,7 @@ using Orchitect.Domain.Core.Organisation;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class IssueIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class IssueIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string IssuesUrl = "/issues";
     private readonly Fixture _fixture = new();

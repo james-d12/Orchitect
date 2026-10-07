@@ -6,8 +6,7 @@ using Orchitect.Api.Shared.Authorization;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class OrganisationScopeCoverageTests(WebApplicationFactoryWithPostgres factory)
+public sealed class OrganisationScopeCoverageTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     [Fact]
     public void AuthorisedEndpoints_ShouldDeclareHowTheyScopeOrganisations()

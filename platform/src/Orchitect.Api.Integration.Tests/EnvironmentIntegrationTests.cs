@@ -7,8 +7,7 @@ using Orchitect.Domain.Engine.Environment;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class EnvironmentIntegrationTests(WebApplicationFactoryWithPostgres factory)
+public sealed class EnvironmentIntegrationTests(WebApplicationFactoryWithPostgres factory) : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private const string EnvironmentsUrl = "/environments";
     private readonly Fixture _fixture = new();

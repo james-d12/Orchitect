@@ -18,8 +18,7 @@ using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Api.Integration.Tests;
 
-[Collection("Integration")]
-public sealed class RunnerApiIntegrationTests
+public sealed class RunnerApiIntegrationTests : IClassFixture<WebApplicationFactoryWithPostgres>
 {
     private readonly Fixture _fixture = new();
     private readonly WebApplicationFactoryWithPostgres _factory;
