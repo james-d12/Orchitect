@@ -21,7 +21,7 @@ public sealed record StorageKey
         return new StorageKey(value);
     }
 
-    public StorageKey Combine(params string[] segments) => Create(string.Join(Separator, [Value, ..segments]));
+    public StorageKey Combine(params string[] segments) => Create(string.Join(Separator, [Value, .. segments]));
 
     public override string ToString() => Value;
 
