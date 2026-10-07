@@ -5,7 +5,7 @@ workstream: runner
 milestone: "Runner Isolation"
 issues: [100, 104, 108, 111, 114, 125, 126, 127, 128, 129, 130, 131, 132]
 superseded_by: null
-last_reviewed: 2026-10-04
+last_reviewed: 2026-10-07
 ---
 
 # Runner – Outstanding Work
@@ -41,9 +41,9 @@ The image pins Terraform, Helm, `terraform-config-inspect` and its base images. 
 
 All of it lives under `ExecutorOptions` in the API. Keep real values in user-secrets or env vars, never in `appsettings.json`. `appsettings.json` only sets safe defaults: `TerraformBackend:Mode = Local` and `SecretProvider:Type = Environment`.
 
-The API flattens the typed sections into container env (`TerraformBackend__*`, `SecretProvider__*`). `Configuration`, the Key Vault token and the run token go in the secrets file instead, so `docker inspect` doesn't show them.
+The API flattens the typed sections into container env (`TerraformBackend__*`, `SecretProvider__*`, `Storage__*`). `Configuration`, the Key Vault and Blob storage tokens and the run token go in the secrets file instead, so `docker inspect` doesn't show them.
 
-The API validates `ApiBaseUrl`, `TerraformBackend` and `SecretProvider` at startup (`ValidateOnStart`), so invalid config stops the API from booting instead of failing inside a container. `Configuration` is opaque and not validated, so a typo in a key (e.g. `AZURE_CLIENTID`) only shows up when the Runner runs.
+The API validates `ApiBaseUrl`, `TerraformBackend`, `SecretProvider`, `Storage` and `StorageHostPath` at startup (`ValidateOnStart`), so invalid config stops the API from booting instead of failing inside a container. `Configuration` is opaque and not validated, so a typo in a key (e.g. `AZURE_CLIENTID`) only shows up when the Runner runs.
 
 **Never log, serialize or put `ExecutorOptions.Configuration` values in exception messages.** It holds credentials.
 
@@ -56,6 +56,8 @@ The API validates `ApiBaseUrl`, `TerraformBackend` and `SecretProvider` at start
 | `MemoryBytes`, `NanoCpus`, `PidsLimit` | Container limits (defaults 2 GiB, 2 CPUs, 512 PIDs). Set to null to remove a limit. |
 | `TerraformBackend` | Where state lives. `Mode` is `Local` (default, lost with the container) or `Remote`. For `Remote`, `Type` is any Terraform backend (`azurerm`, `s3`, `gcs`, ...) and `Config` is backend-specific. It's written to an owner-only `backend.tfbackend` file and passed with `terraform init -backend-config=<file>`, so values never appear in process arguments. Orchitect only substitutes `{applicationId}`, `{environmentId}` and `{projectName}`. Setting `Type`/`Config` with `Mode = Local` is rejected. |
 | `SecretProvider` | Where the Runner reads extra secrets from. `Type` is `Environment` (default) or `AzureKeyVault`, and each provider has its own typed section (`AzureKeyVault:VaultUri`). `Mappings` maps env var name to secret name. They are loaded into the Runner's env before any terraform command. `Environment` reads the secret from another env var, which lets one credential set both `AZURE_*` and `ARM_*` (e.g. `Mappings:ARM_CLIENT_SECRET = AZURE_CLIENT_SECRET`). With no mappings it does nothing. |
+| `Storage` | Where the Runner keeps its artifacts: Terraform command logs, the plan file and its `terraform show -json` rendering, under `runs/{runId}/{log,plan}/`. `Type` is `None` (default, nothing is kept), `FileSystem` (`FileSystem:RootPath`, an absolute path inside the container) or `AzureBlob` (`AzureBlob:ContainerUri`, without a SAS query string). For `AzureBlob` the API mints a `https://storage.azure.com/.default` token with its own identity, which needs *Storage Blob Data Contributor* on the container. The container must already exist. Plan files can hold secrets, so restrict access to the container or directory and set retention there (e.g. a Blob lifecycle policy). Saving is best effort: a failed upload is logged and does not fail the run. See `RUNNER_ARTIFACT_STORAGE.md`. |
+| `StorageHostPath` | Optional, for `Storage:Type = FileSystem` only. An absolute host directory bind-mounted over `Storage:FileSystem:RootPath`, so artifacts outlive the container. The runner runs as UID 1654, so that user must be able to write to the directory. |
 | `Configuration` | Opaque env vars, e.g. cloud credentials. Delivered through the secrets file, not container env. |
 
 Example (Azure):
@@ -135,7 +137,7 @@ Setup is described in [Runner configuration](#runner-configuration). A real run 
 
 ### 6. Unused abstractions (decide: wire up or delete)
 - [x] `ISecretProvider` / `AzureKeyVaultSecretProvider`: registered in the Runner only, through `AddRunnerServices`, and selected by `SecretProvider:Type`. Adding a provider means a new `SecretProviderType` value, its options section and a `case` in `AddRunnerServices`.
-- [ ] `IStorageProvider` / `FileSystemStorageProvider` (deferred): the plan is a stream-based `IStorageProvider` with a Blob implementation for plan artifacts. It is not needed for state, because Terraform's backend owns that. Plan files can contain secrets, so decide on retention and access first. `GetAsync<TOut>` still returns `Task`, not `Task<TOut>`. (#129)
+- [x] Artifact and log storage: the old `IStorageProvider<T>` is replaced by a stream-based `IStorageProvider` in `Orchitect.Storage`, with FileSystem and Azure Blob implementations. `TerraformDriver` saves each command's log, the plan file and its JSON through `IRunArtifactStore`. It does not cover state, which stays with the Terraform backend, or the Orchitect run plan, which `DeploymentRunPlan` already stores. Storage is off by default (`Storage:Type = None`), writes are best effort, and retention/access are left to the provider. Design in `RUNNER_ARTIFACT_STORAGE.md`. (#129)
 - [ ] Helm driver/validator/parser are registered, but there is no Helm `IProvisioner`. (#100)
 
 ### 7. Image (optional)

@@ -12,6 +12,8 @@ public sealed record ExecutorContext
 
     public IReadOnlyDictionary<string, string> Secrets { get; init; } = new Dictionary<string, string>();
 
+    public IReadOnlyList<string> Binds { get; init; } = [];
+
     public string? Network { get; init; }
 
     public Uri? ApiBaseUrl { get; init; }

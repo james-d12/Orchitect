@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orchitect.Engine.Contracts.Runner.Api;
+using Orchitect.Engine.Execution.Artifact;
 using Orchitect.Engine.Execution.Provisioner.Terraform;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
@@ -163,14 +164,73 @@ public sealed class TerraformDriverTests
         Assert.Contains("sku", planResult.Message);
     }
 
+    [Fact]
+    public async Task ApplyAsync_ArtifactsEnabled_SavesEachCommandLogAndThePlan()
+    {
+        var commandLine = new RecordingTerraformCommandLine();
+        var artifacts = new RecordingRunArtifactStore();
+        var driver = CreateDriver(commandLine, artifactStore: artifacts);
+
+        var planResult = await driver.PlanAsync([TerraformTestData.PlanInput()], TerraformTestData.NewContext());
+        await driver.ApplyAsync(planResult);
+
+        Assert.Equal(["terraform-init.log", "terraform-validate.log", "terraform-plan.log", "terraform-apply.log"],
+            artifacts.Texts.Where(t => t.Kind == RunArtifactKind.Log).Select(t => t.Name));
+        Assert.Contains("apply error", artifacts.Texts.Single(t => t.Name == "terraform-apply.log").Content);
+
+        var planName = Path.GetFileName(planResult.PlanFilePath);
+        Assert.Equal(planResult.PlanFilePath, commandLine.ShowPlanFile);
+        Assert.Equal([(RunArtifactKind.Plan, planName, planResult.PlanFilePath)], artifacts.Files);
+        var planJson = artifacts.Texts.Single(t => t.Kind == RunArtifactKind.Plan);
+        Assert.Equal(Path.ChangeExtension(planName, ".json"), planJson.Name);
+        Assert.Equal(commandLine.PlanJson, planJson.Content);
+    }
+
+    [Fact]
+    public async Task PlanAsync_ArtifactsDisabled_DoesNotRenderThePlan()
+    {
+        var commandLine = new RecordingTerraformCommandLine();
+        var driver = CreateDriver(commandLine);
+
+        await driver.PlanAsync([TerraformTestData.PlanInput()], TerraformTestData.NewContext());
+
+        Assert.Null(commandLine.ShowPlanFile);
+    }
+
+    [Fact]
+    public async Task PlanAsync_ShowFails_KeepsThePlanWithoutItsJson()
+    {
+        var artifacts = new RecordingRunArtifactStore();
+        var driver = CreateDriver(new RecordingTerraformCommandLine { ShowExitCode = 1 }, artifactStore: artifacts);
+
+        var planResult = await driver.PlanAsync([TerraformTestData.PlanInput()], TerraformTestData.NewContext());
+
+        Assert.Equal(TerraformPlanResultState.Success, planResult.State);
+        Assert.Single(artifacts.Files);
+        Assert.DoesNotContain(artifacts.Texts, t => t.Kind == RunArtifactKind.Plan);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ApplyExitsNonZero_SavesTheApplyLogBeforeThrowing()
+    {
+        var artifacts = new RecordingRunArtifactStore();
+        var driver = CreateDriver(new RecordingTerraformCommandLine { ApplyExitCode = 1 }, artifactStore: artifacts);
+        var planResult = await driver.PlanAsync([TerraformTestData.PlanInput()], TerraformTestData.NewContext());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => driver.ApplyAsync(planResult));
+
+        Assert.StartsWith("exit code: 1", artifacts.Texts.Single(t => t.Name == "terraform-apply.log").Content);
+    }
+
     private static TerraformDriver CreateDriver(ITerraformCommandLine commandLine,
-        ITerraformValidator? validator = null)
+        ITerraformValidator? validator = null, IRunArtifactStore? artifactStore = null)
     {
         var projectBuilder = new TerraformProjectBuilder(NullLogger<TerraformProjectBuilder>.Instance,
             new TerraformRenderer(), Options.Create(TerraformTestData.AzureBackend()));
 
         return new TerraformDriver(NullLogger<TerraformDriver>.Instance,
-            validator ?? new FixedTerraformValidator(TerraformTestData.ValidResult()), commandLine, projectBuilder);
+            validator ?? new FixedTerraformValidator(TerraformTestData.ValidResult()), commandLine, projectBuilder,
+            artifactStore ?? NullRunArtifactStore.Instance);
     }
 
     private sealed class FixedTerraformValidator(TerraformValidationResult result) : ITerraformValidator
@@ -187,6 +247,9 @@ public sealed class TerraformDriverTests
         public int InitExitCode { get; init; }
         public int PlanExitCode { get; init; } = (int)TerraformPlanResultExitCode.ChangesNeeded;
         public int ApplyExitCode { get; init; }
+        public int ShowExitCode { get; init; }
+        public string PlanJson { get; init; } = "{\"format_version\":\"1.2\"}";
+        public string? ShowPlanFile { get; private set; }
 
         public List<string?> InitBackendConfigs { get; } = [];
         public string? PlanDestroyOutput { get; private set; }
@@ -233,6 +296,36 @@ public sealed class TerraformDriverTests
             ApplyPlanFile = planFile;
             Tokens.Add(cancellationToken);
             return Task.FromResult(new CommandLineResult(string.Empty, "apply error", ApplyExitCode));
+        }
+
+        public Task<CommandLineResult> RunShowJsonAsync(string executeDirectory, string planFile,
+            CancellationToken cancellationToken)
+        {
+            ShowPlanFile = planFile;
+            Tokens.Add(cancellationToken);
+            return Task.FromResult(new CommandLineResult(PlanJson, "show error", ShowExitCode));
+        }
+    }
+
+    private sealed class RecordingRunArtifactStore : IRunArtifactStore
+    {
+        public List<(RunArtifactKind Kind, string Name, string Content)> Texts { get; } = [];
+        public List<(RunArtifactKind Kind, string Name, string Path)> Files { get; } = [];
+
+        public bool IsEnabled => true;
+
+        public Task SaveTextAsync(RunArtifactKind kind, string name, string content,
+            CancellationToken cancellationToken = default)
+        {
+            Texts.Add((kind, name, content));
+            return Task.CompletedTask;
+        }
+
+        public Task SaveFileAsync(RunArtifactKind kind, string name, string path,
+            CancellationToken cancellationToken = default)
+        {
+            Files.Add((kind, name, path));
+            return Task.CompletedTask;
         }
     }
 }

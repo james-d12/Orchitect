@@ -7,6 +7,7 @@ using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
+using Orchitect.Engine.Dispatch.Storage;
 
 namespace Orchitect.Engine.Dispatch.Unit.Tests;
 
@@ -20,6 +21,7 @@ public sealed class DispatchExtensionsTests
         typeof(IRunCompletionHandler),
         typeof(IBackgroundTaskQueueProcessor),
         typeof(IRunnerSecretTokenProvider),
+        typeof(IRunnerStorageTokenProvider),
         typeof(IHostedService),
         typeof(IConfigureOptions<ExecutorOptions>)
     ];
@@ -53,7 +55,41 @@ public sealed class DispatchExtensionsTests
         Assert.Equal(new Uri("http://localhost:41005"), options.ApiBaseUrl);
     }
 
-    private static ExecutorOptions ResolveExecutorOptions(string? apiBaseUrl)
+    [Theory]
+    [InlineData("FileSystem", null, null, "Storage")]
+    [InlineData("FileSystem", "relative/artifacts", null, "Storage")]
+    [InlineData("AzureBlob", null, null, "Storage")]
+    [InlineData("None", null, "/srv/artifacts", "StorageHostPath")]
+    [InlineData("FileSystem", "/var/orchitect/artifacts", "relative", "StorageHostPath")]
+    public void ExecutorOptions_InvalidStorage_FailsValidation(string type, string? rootPath, string? hostPath,
+        string expected)
+    {
+        var exception = Assert.Throws<OptionsValidationException>(() => ResolveExecutorOptions(
+            "http://localhost:41005", new()
+            {
+                ["ExecutorOptions:Storage:Type"] = type,
+                ["ExecutorOptions:Storage:FileSystem:RootPath"] = rootPath,
+                ["ExecutorOptions:StorageHostPath"] = hostPath
+            }));
+
+        Assert.Contains(exception.Failures, failure => failure.Contains($"ExecutorOptions:{expected}"));
+    }
+
+    [Fact]
+    public void ExecutorOptions_FileSystemStorageWithHostPath_PassesValidation()
+    {
+        var options = ResolveExecutorOptions("http://localhost:41005", new()
+        {
+            ["ExecutorOptions:Storage:Type"] = "FileSystem",
+            ["ExecutorOptions:Storage:FileSystem:RootPath"] = "/var/orchitect/artifacts",
+            ["ExecutorOptions:StorageHostPath"] = "/srv/orchitect/artifacts"
+        });
+
+        Assert.Equal("/srv/orchitect/artifacts", options.StorageHostPath);
+    }
+
+    private static ExecutorOptions ResolveExecutorOptions(string? apiBaseUrl,
+        Dictionary<string, string?>? settings = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -61,6 +97,7 @@ public sealed class DispatchExtensionsTests
                 ["ExecutorOptions:Image"] = "orchitect-runner:test",
                 ["ExecutorOptions:ApiBaseUrl"] = apiBaseUrl
             })
+            .AddInMemoryCollection(settings ?? [])
             .Build();
 
         using var provider = new ServiceCollection()

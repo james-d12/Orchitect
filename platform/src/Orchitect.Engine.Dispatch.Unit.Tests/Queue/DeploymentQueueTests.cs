@@ -14,6 +14,9 @@ using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
+using Orchitect.Engine.Dispatch.Storage;
+using Orchitect.Storage;
+using Orchitect.Storage.FileSystem;
 using ApplicationId = Orchitect.Domain.Engine.Application.ApplicationId;
 
 namespace Orchitect.Engine.Dispatch.Unit.Tests.Queue;
@@ -202,6 +205,43 @@ public sealed class DeploymentQueueTests
         Assert.Equal("t0ken", executor.Context.Secrets["TOKEN"]);
         Assert.DoesNotContain("ARM_CLIENT_SECRET", executor.Context.Configuration.Keys);
         Assert.DoesNotContain("TOKEN", executor.Context.Configuration.Keys);
+    }
+
+    [Fact]
+    public async Task WorkItem_PassesStorageTokenAsSecret()
+    {
+        var (deployment, _, services) = Setup();
+        var executor = new FakeExecutor();
+        var storageTokenProvider =
+            new StaticStorageTokenProvider(new Dictionary<string, string> { ["STORAGE_TOKEN"] = "st0rage" });
+        var workItem = await QueueAsync(deployment, executor, storageTokenProvider: storageTokenProvider);
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal("st0rage", executor.Context!.Secrets["STORAGE_TOKEN"]);
+        Assert.DoesNotContain("STORAGE_TOKEN", executor.Context.Configuration.Keys);
+    }
+
+    [Fact]
+    public async Task WorkItem_FileSystemStorageWithHostPath_BindsItOverTheRoot()
+    {
+        var (deployment, _, services) = Setup();
+        var executor = new FakeExecutor();
+        var options = new ExecutorOptions
+        {
+            Image = "runner:test",
+            Storage = new StorageOptions
+            {
+                Type = StorageProviderType.FileSystem,
+                FileSystem = new FileSystemStorageOptions { RootPath = "/var/orchitect/artifacts" }
+            },
+            StorageHostPath = "/srv/orchitect/artifacts"
+        };
+        var workItem = await QueueAsync(deployment, executor, options);
+
+        await workItem(services, CancellationToken.None);
+
+        Assert.Equal(["/srv/orchitect/artifacts:/var/orchitect/artifacts"], executor.Context!.Binds);
     }
 
     [Fact]
@@ -546,12 +586,13 @@ public sealed class DeploymentQueueTests
 
     private async Task<Func<IServiceProvider, CancellationToken, ValueTask>> QueueAsync(
         Deployment deployment, IExecutor executor, ExecutorOptions? options = null,
-        IRunnerSecretTokenProvider? tokenProvider = null)
+        IRunnerSecretTokenProvider? tokenProvider = null, IRunnerStorageTokenProvider? storageTokenProvider = null)
     {
         var processor = new CapturingQueueProcessor();
         var queue = new DeploymentQueue(processor, executor,
             Options.Create(options ?? new ExecutorOptions { Image = "runner:test" }),
             tokenProvider ?? new StaticTokenProvider(new Dictionary<string, string>()),
+            storageTokenProvider ?? new StaticStorageTokenProvider(new Dictionary<string, string>()),
             _cancellation,
             NullLogger<DeploymentQueue>.Instance);
 
@@ -631,6 +672,13 @@ public sealed class DeploymentQueueTests
         : IRunnerSecretTokenProvider
     {
         public Task<IReadOnlyDictionary<string, string>> GetEnvironmentAsync(SecretProviderOptions options,
+            CancellationToken cancellationToken = default) => Task.FromResult(environment);
+    }
+
+    private sealed class StaticStorageTokenProvider(IReadOnlyDictionary<string, string> environment)
+        : IRunnerStorageTokenProvider
+    {
+        public Task<IReadOnlyDictionary<string, string>> GetEnvironmentAsync(StorageOptions options,
             CancellationToken cancellationToken = default) => Task.FromResult(environment);
     }
 

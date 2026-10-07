@@ -24,6 +24,7 @@ GitHub issues hold the work; these docs hold the design and the reasoning behind
 |---|---|---|---|
 | [runner/RUNNER_TODO.md](runner/RUNNER_TODO.md) | active | runner | Runner operator guide (config, build) plus the remaining checklist |
 | [runner/API_RUNNER_SEPARATION.md](runner/API_RUNNER_SEPARATION.md) | active | runner | Target design: thin runner that calls an internal run API (auth, contract, status, secrets, migration order) |
+| [runner/RUNNER_ARTIFACT_STORAGE.md](runner/RUNNER_ARTIFACT_STORAGE.md) | active | runner | Storage for runner artifacts and logs: `Orchitect.Storage` (FileSystem, Azure Blob), `IRunArtifactStore`, and the decisions behind them |
 | [runner/Runner_Isolation_Branch_Review.md](runner/Runner_Isolation_Branch_Review.md) | active | runner | Code review E1–E15, M1–M10, H1–H4 (E/M done, H open) |
 | [runner/Runner_Isolation_Branch_Review_Architecture.md](runner/Runner_Isolation_Branch_Review_Architecture.md) | active | runner | Architecture review A1–A10 |
 | [resource/RESOURCE_DOMAIN_REFACTOR_PLAN_PHASE_2.md](resource/RESOURCE_DOMAIN_REFACTOR_PLAN_PHASE_2.md) | active | resource | Requirements, bindings, deltas and snapshots (not started; Step 3 needs a rethink) |

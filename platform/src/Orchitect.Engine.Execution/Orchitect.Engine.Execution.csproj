@@ -16,6 +16,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Orchitect.Common\Orchitect.Common.csproj" />
       <ProjectReference Include="..\Orchitect.Engine.Contracts\Orchitect.Engine.Contracts.csproj" />
+      <ProjectReference Include="..\Orchitect.Storage\Orchitect.Storage.csproj" />
     </ItemGroup>
     
 </Project>

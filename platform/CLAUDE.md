@@ -60,7 +60,9 @@ Test projects:
 - `Orchitect.Api.Integration.Tests`: endpoints and repositories against Postgres in Testcontainers (needs Docker)
 - `Orchitect.Domain.Unit.Tests`: domain entity behaviour (e.g. deployment status transitions)
 - `Orchitect.Engine.Dispatch.Unit.Tests`: executor, queue, Key Vault and run token minting, the run planner, completer and completion handler, plus the API-to-runner contract round-trip, the runner's command line without configuration and the Engine layering guard tests
-- `Orchitect.Engine.Execution.Unit.Tests`: orchestrator, drivers, runner secret loading and the runner API client
+- `Orchitect.Engine.Execution.Unit.Tests`: orchestrator, drivers, runner secret loading, run artifacts and the runner API client
+- `Orchitect.Storage.Unit.Tests`: storage keys, options and the file system provider
+- `Orchitect.Storage.Integration.Tests`: the Azure Blob provider against Azurite in Testcontainers (needs Docker)
 - `Orchitect.Infrastructure.Inventory.Unit.Tests`, `Orchitect.Common.Unit.Tests`
 
 Stryker.NET is configured for mutation testing (see stryker-config.json). Bruno API tests are in `bruno/Orchitect API Collection` (the `E2E` folder runs a full deployment flow).
@@ -93,7 +95,8 @@ Each capability is a namespace folder (`Core`, `Engine`, `Inventory`) inside the
 | `Orchitect.Persistence` | `OrchitectDbContext`, EF configurations, repositories and migrations for all contexts |
 | `Orchitect.Engine.Contracts` | What the API and the runner must agree on: runner arguments and environment keys, `RunnerOperation`, `TerraformBackendOptions`, `SecretProviderOptions`, the secrets file, the Score models, and the runner API routes, DTOs and contract version (`Runner/Api/`). No Orchitect references |
 | `Orchitect.Engine.Dispatch` | Control plane, used by the API: `IExecutor`/`DockerExecutor`, deployment queue, runner container sweep, Key Vault token minting, `IRunPlanner` (template resolution and resource recording for a run), `IRunCompleter` (moving a run's instances to their final status) and `IRunCompletionHandler` (finishing a run). The runner must not reference it (`EngineLayeringTests`) |
-| `Orchitect.Engine.Execution` | Data plane, used by the runner and the Playground: `EngineOrchestrator`, Score, Terraform and Helm drivers, secret providers, the runner API client (`IRunnerApiClient`) |
+| `Orchitect.Engine.Execution` | Data plane, used by the runner and the Playground: `EngineOrchestrator`, Score, Terraform and Helm drivers, secret providers, run artifacts (`IRunArtifactStore`), the runner API client (`IRunnerApiClient`) |
+| `Orchitect.Storage` | Stream-based `IStorageProvider` with FileSystem and Azure Blob implementations, selected by `Storage:Type` through `AddStorage(configuration)`. No Orchitect references |
 | `Orchitect.Infrastructure.Inventory` | Discovery integrations for Azure, Azure DevOps, GitHub and GitLab, one folder per provider plus `Shared` |
 | `Orchitect.Runner` | Console app packaged as the runner image. Takes `--run-id`, runs that provision or destroy through the runner API, then exits. No database access: it references only Execution and ServiceDefaults |
 | `Orchitect.Common` | Shared helpers (observability, query, extensions) |

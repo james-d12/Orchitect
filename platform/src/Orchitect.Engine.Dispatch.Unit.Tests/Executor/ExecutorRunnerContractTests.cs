@@ -10,6 +10,10 @@ using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Execution;
 using Orchitect.Engine.Execution.Secret;
 using Orchitect.Engine.Execution.Secret.Azure;
+using Orchitect.Engine.Execution.Artifact;
+using Orchitect.Storage;
+using Orchitect.Storage.Azure;
+using Orchitect.Storage.FileSystem;
 
 namespace Orchitect.Engine.Dispatch.Unit.Tests.Executor;
 
@@ -75,6 +79,61 @@ public sealed class ExecutorRunnerContractTests
         Assert.Equal(new TerraformBackendOptions().Mode,
             provider.GetRequiredService<IOptions<TerraformBackendOptions>>().Value.Mode);
         Assert.IsType<EnvironmentSecretProvider>(provider.GetRequiredService<ISecretProvider>());
+        Assert.Same(NullRunArtifactStore.Instance, provider.GetRequiredService<IRunArtifactStore>());
+    }
+
+    [Fact]
+    public void ToEnvironment_AzureBlobStorage_BindsBackIntoRunnerOptions()
+    {
+        var options = new ExecutorOptions
+        {
+            Image = "runner:test",
+            Storage = new StorageOptions
+            {
+                Type = StorageProviderType.AzureBlob,
+                AzureBlob = new AzureBlobStorageOptions
+                {
+                    ContainerUri = new Uri("https://orchitect.blob.core.windows.net/artifacts")
+                }
+            }
+        };
+        var expiresOn = new DateTimeOffset(2026, 10, 7, 12, 0, 0, TimeSpan.Zero);
+        var tokenEnvironment = new Dictionary<string, string>
+        {
+            [AzureBlobStorageOptions.AccessTokenEnvironmentKey] = "blob-token",
+            [AzureBlobStorageOptions.AccessTokenExpiresOnEnvironmentKey] = expiresOn.ToString("O"),
+            [RunnerEnvironment.RunId] = Guid.NewGuid().ToString()
+        };
+
+        using var provider = BuildRunner(options.ToEnvironment().Concat(tokenEnvironment));
+
+        var storage = provider.GetRequiredService<IOptions<StorageOptions>>().Value;
+        Assert.Equal(StorageProviderType.AzureBlob, storage.Type);
+        Assert.Equal(options.Storage.AzureBlob.ContainerUri, storage.AzureBlob.ContainerUri);
+        Assert.Equal("blob-token", storage.AzureBlob.AccessToken);
+        Assert.Equal(expiresOn, storage.AzureBlob.AccessTokenExpiresOn);
+        Assert.IsType<AzureBlobStorageProvider>(provider.GetRequiredService<IStorageProvider>());
+        Assert.IsType<RunArtifactStore>(provider.GetRequiredService<IRunArtifactStore>());
+    }
+
+    [Fact]
+    public void ToEnvironment_FileSystemStorage_BindsBackIntoRunnerOptions()
+    {
+        var options = new ExecutorOptions
+        {
+            Image = "runner:test",
+            Storage = new StorageOptions
+            {
+                Type = StorageProviderType.FileSystem,
+                FileSystem = new FileSystemStorageOptions { RootPath = "/var/orchitect/artifacts" }
+            }
+        };
+
+        using var provider = BuildRunner(options.ToEnvironment());
+
+        Assert.Equal("/var/orchitect/artifacts",
+            provider.GetRequiredService<IOptions<StorageOptions>>().Value.FileSystem.RootPath);
+        Assert.IsType<FileSystemStorageProvider>(provider.GetRequiredService<IStorageProvider>());
     }
 
     private static ServiceProvider BuildRunner(IEnumerable<KeyValuePair<string, string>> environment)

@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Logging;
 using Orchitect.Engine.Contracts.Secret;
 using Orchitect.Engine.Contracts.Terraform;
+using Orchitect.Storage;
 
 namespace Orchitect.Engine.Dispatch.Executor;
 
@@ -21,6 +22,8 @@ public sealed record ExecutorOptions
     public TimeSpan Timeout { get; init; } = TimeSpan.FromHours(1);
     public TerraformBackendOptions TerraformBackend { get; init; } = new();
     public SecretProviderOptions SecretProvider { get; init; } = new();
+    public StorageOptions Storage { get; init; } = new();
+    public string? StorageHostPath { get; init; }
 
     public Dictionary<string, string> Configuration { get; init; } = [];
 
@@ -55,6 +58,34 @@ public sealed record ExecutorOptions
             environment[$"{SecretProviderOptions.SectionName}__Mappings__{key}"] = value;
         }
 
+        environment[$"{StorageOptions.SectionName}__Type"] = Storage.Type.ToString();
+
+        switch (Storage.Type)
+        {
+            case StorageProviderType.FileSystem:
+                environment[$"{StorageOptions.SectionName}__FileSystem__RootPath"] = Storage.FileSystem.RootPath!;
+                break;
+            case StorageProviderType.AzureBlob:
+                environment[$"{StorageOptions.SectionName}__AzureBlob__ContainerUri"] =
+                    Storage.AzureBlob.ContainerUri!.ToString();
+                break;
+        }
+
         return environment;
     }
+
+    public IReadOnlyList<string> ToBinds() => StorageHostPath is { Length: > 0 } hostPath
+        ? [$"{hostPath}:{Storage.FileSystem.RootPath}"]
+        : [];
+
+    public string? GetStorageHostPathValidationError() => StorageHostPath switch
+    {
+        null => null,
+        _ when Storage.Type != StorageProviderType.FileSystem =>
+            $"{SectionName}:StorageHostPath is only used when {SectionName}:Storage:Type is " +
+            $"{StorageProviderType.FileSystem}.",
+        _ when !Path.IsPathFullyQualified(StorageHostPath) =>
+            $"{SectionName}:StorageHostPath '{StorageHostPath}' must be an absolute path.",
+        _ => null
+    };
 }

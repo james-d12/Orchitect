@@ -10,6 +10,7 @@ using Orchitect.Engine.Dispatch.Auth;
 using Orchitect.Engine.Dispatch.Completion;
 using Orchitect.Engine.Dispatch.Executor;
 using Orchitect.Engine.Dispatch.Secret;
+using Orchitect.Engine.Dispatch.Storage;
 
 namespace Orchitect.Engine.Dispatch.Queue;
 
@@ -19,6 +20,7 @@ public sealed class DeploymentQueue : IDeploymentQueue
     private readonly IExecutor _executor;
     private readonly ExecutorOptions _executorOptions;
     private readonly IRunnerSecretTokenProvider _tokenProvider;
+    private readonly IRunnerStorageTokenProvider _storageTokenProvider;
     private readonly IDeploymentRunCancellation _cancellation;
     private readonly ILogger<DeploymentQueue> _logger;
 
@@ -27,12 +29,14 @@ public sealed class DeploymentQueue : IDeploymentQueue
         IExecutor executor,
         IOptions<ExecutorOptions> executorOptions,
         IRunnerSecretTokenProvider tokenProvider,
+        IRunnerStorageTokenProvider storageTokenProvider,
         IDeploymentRunCancellation cancellation,
         ILogger<DeploymentQueue> logger)
     {
         _backgroundTaskQueueProcessor = backgroundTaskQueueProcessor;
         _executor = executor;
         _tokenProvider = tokenProvider;
+        _storageTokenProvider = storageTokenProvider;
         _cancellation = cancellation;
         _logger = logger;
         _executorOptions = executorOptions.Value;
@@ -233,6 +237,8 @@ public sealed class DeploymentQueue : IDeploymentQueue
         try
         {
             var tokenEnvironment = await _tokenProvider.GetEnvironmentAsync(_executorOptions.SecretProvider, ct);
+            var storageTokenEnvironment =
+                await _storageTokenProvider.GetEnvironmentAsync(_executorOptions.Storage, ct);
 
             return await _executor.ExecuteAsync(new ExecutorContext
             {
@@ -240,10 +246,13 @@ public sealed class DeploymentQueue : IDeploymentQueue
                 RunId = run.Id.Value.ToString(),
                 Arguments = [RunnerArguments.RunId, run.Id.Value.ToString()],
                 Configuration = _executorOptions.ToEnvironment(),
-                Secrets = new Dictionary<string, string>(_executorOptions.Configuration.Concat(tokenEnvironment))
+                Secrets = new Dictionary<string, string>(_executorOptions.Configuration
+                    .Concat(tokenEnvironment)
+                    .Concat(storageTokenEnvironment))
                 {
                     [RunnerEnvironment.RunToken] = token.Value
                 },
+                Binds = _executorOptions.ToBinds(),
                 Network = _executorOptions.Network,
                 ApiBaseUrl = _executorOptions.ApiBaseUrl,
                 MemoryBytes = _executorOptions.MemoryBytes,

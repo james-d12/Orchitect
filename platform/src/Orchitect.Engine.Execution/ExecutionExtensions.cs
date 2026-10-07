@@ -5,11 +5,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orchitect.Engine.Contracts.Runner;
 using Orchitect.Engine.Contracts.Runner.Api;
 using Orchitect.Engine.Contracts.Secret;
 using Orchitect.Engine.Contracts.Terraform;
+using Orchitect.Engine.Execution.Artifact;
 using Orchitect.Engine.Execution.Configuration.Score;
 using Orchitect.Engine.Execution.Provisioner;
 using Orchitect.Engine.Execution.Provisioner.Helm;
@@ -18,6 +20,7 @@ using Orchitect.Engine.Execution.RunnerApi;
 using Orchitect.Engine.Execution.Secret;
 using Orchitect.Engine.Execution.Secret.Azure;
 using Orchitect.Engine.Execution.Shared.CommandLine;
+using Orchitect.Storage;
 using Polly;
 
 namespace Orchitect.Engine.Execution;
@@ -38,6 +41,7 @@ public static class ExecutionExtensions
         services.TryAddSingleton<IGitCommandLine, GitCommandLine>();
         services.TryAddSingleton<IEngineProvisioner, EngineProvisioner>();
         services.TryAddScoped<IEngineOrchestrator, EngineOrchestrator>();
+        services.TryAddSingleton<IRunArtifactStore>(NullRunArtifactStore.Instance);
     }
 
     private static void AddScoreServices(this IServiceCollection services)
@@ -95,7 +99,29 @@ public static class ExecutionExtensions
                     $"{SecretProviderOptions.SectionName}:Type '{options.Type}' is not supported.");
         }
 
+        services.AddRunArtifactStorage(configuration);
+
         return services;
+    }
+
+    private static void AddRunArtifactStorage(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddStorage(configuration);
+
+        var storageOptions = configuration.GetSection(StorageOptions.SectionName).Get<StorageOptions>();
+
+        if (storageOptions?.IsEnabled != true)
+        {
+            return;
+        }
+
+        services.Replace(ServiceDescriptor.Singleton<IRunArtifactStore>(provider => new RunArtifactStore(
+            provider.GetRequiredService<IStorageProvider>(),
+            provider.GetRequiredService<ILogger<RunArtifactStore>>(),
+            Guid.TryParse(configuration[RunnerEnvironment.RunId], out var runId)
+                ? runId
+                : throw new InvalidOperationException(
+                    $"{RunnerEnvironment.RunId} is required when {StorageOptions.SectionName}:Type is set."))));
     }
 
     public static IServiceCollection AddRunnerApiClient(this IServiceCollection services,

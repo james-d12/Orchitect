@@ -15,6 +15,11 @@ public interface ITerraformCommandLine
     /// Applies a saved plan file. Also used to apply destroy plans.
     /// </summary>
     Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Renders a saved plan file as JSON without printing it to the console.
+    /// </summary>
+    Task<CommandLineResult> RunShowJsonAsync(string executeDirectory, string planFile, CancellationToken cancellationToken = default);
 }
 
 public sealed class TerraformCommandLine : ITerraformCommandLine
@@ -70,4 +75,10 @@ public sealed class TerraformCommandLine : ITerraformCommandLine
             .WithArguments(["apply", "-auto-approve", NoInput, NoColor, LockTimeout, planFile])
             .WithWorkingDirectory(executeDirectory)
             .ExecuteStreamAsync(cancellationToken);
+
+    public async Task<CommandLineResult> RunShowJsonAsync(string executeDirectory, string planFile, CancellationToken cancellationToken = default) =>
+        await new CommandLineBuilder(TerraformCommand)
+            .WithArguments(["show", "-json", NoColor, planFile])
+            .WithWorkingDirectory(executeDirectory)
+            .ExecuteAsync(cancellationToken);
 }

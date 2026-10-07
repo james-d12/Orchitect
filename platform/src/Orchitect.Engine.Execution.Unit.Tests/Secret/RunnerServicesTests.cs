@@ -1,8 +1,12 @@
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orchitect.Engine.Contracts.Runner;
+using Orchitect.Engine.Execution.Artifact;
 using Orchitect.Engine.Execution.Secret;
 using Orchitect.Engine.Execution.Secret.Azure;
+using Orchitect.Storage;
+using Orchitect.Storage.FileSystem;
 
 namespace Orchitect.Engine.Execution.Unit.Tests.Secret;
 
@@ -80,5 +84,60 @@ public sealed class RunnerServicesTests
         var client = provider.GetRequiredService<SecretClient>();
 
         Assert.Equal(new Uri(VaultUri), client.VaultUri);
+    }
+
+    [Fact]
+    public void AddRunnerServices_NoStorage_UsesNullArtifactStore()
+    {
+        using var provider = new ServiceCollection().AddLogging().AddEngineProvisioningServices()
+            .AddRunnerServices(Configuration(new())).BuildServiceProvider();
+
+        Assert.Same(NullRunArtifactStore.Instance, provider.GetRequiredService<IRunArtifactStore>());
+        Assert.Null(provider.GetService<IStorageProvider>());
+    }
+
+    [Fact]
+    public void AddRunnerServices_FileSystemStorage_UsesRunArtifactStore()
+    {
+        var configuration = Configuration(new()
+        {
+            ["Storage:Type"] = "FileSystem",
+            ["Storage:FileSystem:RootPath"] = Path.GetTempPath(),
+            [RunnerEnvironment.RunId] = Guid.NewGuid().ToString()
+        });
+
+        using var provider = new ServiceCollection().AddLogging().AddEngineProvisioningServices()
+            .AddRunnerServices(configuration).BuildServiceProvider();
+
+        Assert.IsType<RunArtifactStore>(provider.GetRequiredService<IRunArtifactStore>());
+        Assert.IsType<FileSystemStorageProvider>(provider.GetRequiredService<IStorageProvider>());
+    }
+
+    [Fact]
+    public void AddRunnerServices_StorageWithoutRunId_ThrowsWhenResolved()
+    {
+        var configuration = Configuration(new()
+        {
+            ["Storage:Type"] = "FileSystem",
+            ["Storage:FileSystem:RootPath"] = Path.GetTempPath()
+        });
+
+        using var provider = new ServiceCollection().AddLogging().AddEngineProvisioningServices()
+            .AddRunnerServices(configuration).BuildServiceProvider();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            provider.GetRequiredService<IRunArtifactStore>());
+        Assert.Contains(RunnerEnvironment.RunId, exception.Message);
+    }
+
+    [Fact]
+    public void AddRunnerServices_InvalidStorage_Throws()
+    {
+        var configuration = Configuration(new() { ["Storage:Type"] = "FileSystem" });
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddRunnerServices(configuration));
+
+        Assert.Contains("RootPath", exception.Message);
     }
 }

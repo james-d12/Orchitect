@@ -141,7 +141,8 @@ public sealed class DockerExecutor : IExecutor
                         Init = true,
                         Memory = context.MemoryBytes ?? 0,
                         NanoCPUs = context.NanoCpus ?? 0,
-                        PidsLimit = context.PidsLimit
+                        PidsLimit = context.PidsLimit,
+                        Binds = [..context.Binds]
                     }
                 },
                 cancellationToken);

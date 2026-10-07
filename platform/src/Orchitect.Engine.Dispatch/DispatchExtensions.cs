@@ -9,6 +9,8 @@ using Orchitect.Engine.Dispatch.Plan;
 using Orchitect.Engine.Dispatch.Queue;
 using Orchitect.Engine.Dispatch.Secret;
 using Orchitect.Engine.Dispatch.Secret.Azure;
+using Orchitect.Engine.Dispatch.Storage;
+using Orchitect.Engine.Dispatch.Storage.Azure;
 
 namespace Orchitect.Engine.Dispatch;
 
@@ -49,6 +51,10 @@ public static class DispatchExtensions
                 "ExecutorOptions:TerraformBackend is invalid. Mode Remote needs Type and Config; Mode Local must not set them.")
             .Validate(options => options.SecretProvider.GetValidationError() is null,
                 "ExecutorOptions:SecretProvider is invalid. AzureKeyVault needs an absolute AzureKeyVault:VaultUri.")
+            .Validate(options => options.Storage.GetValidationError() is null,
+                "ExecutorOptions:Storage is invalid. FileSystem needs an absolute FileSystem:RootPath; AzureBlob needs an absolute AzureBlob:ContainerUri without a query string.")
+            .Validate(options => options.GetStorageHostPathValidationError() is null,
+                "ExecutorOptions:StorageHostPath must be an absolute path and needs Storage:Type FileSystem.")
             .ValidateOnStart();
 
         services.TryAddSingleton<IDockerClient>(_ => new DockerClientBuilder().Build());
@@ -56,6 +62,8 @@ public static class DispatchExtensions
         services.AddHostedService<RunnerContainerSweepService>();
         services.TryAddSingleton<IRunnerSecretTokenProvider>(_ =>
             new KeyVaultRunnerTokenProvider(new DefaultAzureCredential()));
+        services.TryAddSingleton<IRunnerStorageTokenProvider>(_ =>
+            new AzureBlobRunnerTokenProvider(new DefaultAzureCredential()));
     }
 
     private static void AddQueueServices(this IServiceCollection services)

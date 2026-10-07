@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 using Orchitect.Engine.Contracts.Runner.Api;
+using Orchitect.Engine.Execution.Artifact;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
 
@@ -21,14 +22,16 @@ public sealed class TerraformDriver : ITerraformDriver
     private readonly ITerraformValidator _validator;
     private readonly ITerraformCommandLine _commandLine;
     private readonly ITerraformProjectBuilder _projectBuilder;
+    private readonly IRunArtifactStore _artifactStore;
 
     public TerraformDriver(ILogger<TerraformDriver> logger, ITerraformValidator validator,
-        ITerraformCommandLine commandLine, ITerraformProjectBuilder projectBuilder)
+        ITerraformCommandLine commandLine, ITerraformProjectBuilder projectBuilder, IRunArtifactStore artifactStore)
     {
         _logger = logger;
         _validator = validator;
         _commandLine = commandLine;
         _projectBuilder = projectBuilder;
+        _artifactStore = artifactStore;
     }
 
     public async Task<TerraformPlanResult> PlanAsync(List<RunInput> terraformPlanInputs,
@@ -69,6 +72,8 @@ public sealed class TerraformDriver : ITerraformDriver
             await _commandLine.RunInitAsync(builderResult.WorkingDirectory, builderResult.BackendConfigFile,
                 cancellationToken);
 
+        await SaveLogAsync("init", initResult, cancellationToken);
+
         if (initResult.ExitCode != 0)
         {
             _logger.LogError("Terraform Init Failed: {ExitCode} with {Output}", initResult.ExitCode,
@@ -81,6 +86,8 @@ public sealed class TerraformDriver : ITerraformDriver
 
         CommandLineResult validateResult = await _commandLine.RunValidateAsync(builderResult.WorkingDirectory,
             cancellationToken);
+
+        await SaveLogAsync("validate", validateResult, cancellationToken);
 
         if (validateResult.ExitCode != 0)
         {
@@ -99,13 +106,17 @@ public sealed class TerraformDriver : ITerraformDriver
             ? await _commandLine.RunPlanDestroyAsync(builderResult.WorkingDirectory, planFileName, cancellationToken)
             : await _commandLine.RunPlanAsync(builderResult.WorkingDirectory, planFileName, cancellationToken);
 
+        await SaveLogAsync("plan", planResult, cancellationToken);
+
         switch (planResult.ExitCode)
         {
             case (int)TerraformPlanResultExitCode.ChangesNeeded:
                 _logger.LogInformation("Successfully run plan for {ProjectName}", context.ProjectName);
+                await SavePlanAsync(builderResult.WorkingDirectory, planFileName, cancellationToken);
                 return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName,
                     TerraformPlanResultState.Success, planResult);
             case (int)TerraformPlanResultExitCode.NoChanges:
+                await SavePlanAsync(builderResult.WorkingDirectory, planFileName, cancellationToken);
                 return new TerraformPlanResult(builderResult.WorkingDirectory, planFileName,
                     TerraformPlanResultState.NoChanges, planResult);
             case (int)TerraformPlanResultExitCode.Errored:
@@ -121,15 +132,15 @@ public sealed class TerraformDriver : ITerraformDriver
     public Task ApplyAsync(TerraformPlanResult planResult, CancellationToken cancellationToken = default) =>
         ExecutePlanAsync(planResult, "Apply",
             () => _commandLine.RunApplyAsync(planResult.WorkingDirectory, planResult.PlanFilePath,
-                cancellationToken));
+                cancellationToken), cancellationToken);
 
     public Task DestroyAsync(TerraformPlanResult planResult, CancellationToken cancellationToken = default) =>
         ExecutePlanAsync(planResult, "Destroy",
             () => _commandLine.RunApplyAsync(planResult.WorkingDirectory, planResult.PlanFilePath,
-                cancellationToken));
+                cancellationToken), cancellationToken);
 
     private async Task ExecutePlanAsync(TerraformPlanResult planResult, string operation,
-        Func<Task<CommandLineResult>> execute)
+        Func<Task<CommandLineResult>> execute, CancellationToken cancellationToken)
     {
         switch (planResult.State)
         {
@@ -148,6 +159,8 @@ public sealed class TerraformDriver : ITerraformDriver
                     planResult.WorkingDirectory);
                 CommandLineResult result = await execute();
 
+                await SaveLogAsync(operation.ToLowerInvariant(), result, cancellationToken);
+
                 if (result.ExitCode != 0)
                 {
                     throw new InvalidOperationException(
@@ -159,6 +172,42 @@ public sealed class TerraformDriver : ITerraformDriver
             default:
                 throw new InvalidEnumArgumentException(nameof(planResult.State), (int)planResult.State,
                     typeof(TerraformPlanResultState));
+        }
+    }
+
+    private Task SaveLogAsync(string command, CommandLineResult result, CancellationToken cancellationToken) =>
+        _artifactStore.SaveTextAsync(RunArtifactKind.Log, $"terraform-{command}.log",
+            $"exit code: {result.ExitCode}\n\n--- stdout ---\n{result.StdOut}\n--- stderr ---\n{result.StdErr}",
+            cancellationToken);
+
+    private async Task SavePlanAsync(string workingDirectory, string planFile, CancellationToken cancellationToken)
+    {
+        if (!_artifactStore.IsEnabled)
+        {
+            return;
+        }
+
+        var planName = Path.GetFileName(planFile);
+        await _artifactStore.SaveFileAsync(RunArtifactKind.Plan, planName, planFile, cancellationToken);
+
+        try
+        {
+            CommandLineResult showResult =
+                await _commandLine.RunShowJsonAsync(workingDirectory, planFile, cancellationToken);
+
+            if (showResult.ExitCode != 0)
+            {
+                _logger.LogWarning("Terraform Show failed with exit code {ExitCode}: {Output}", showResult.ExitCode,
+                    showResult.StdErr);
+                return;
+            }
+
+            await _artifactStore.SaveTextAsync(RunArtifactKind.Plan, Path.ChangeExtension(planName, ".json"),
+                showResult.StdOut, cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(exception, "Could not render the plan {PlanFile} as JSON.", planName);
         }
     }
 }

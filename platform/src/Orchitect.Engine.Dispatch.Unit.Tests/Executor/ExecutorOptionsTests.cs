@@ -3,6 +3,9 @@ using Orchitect.Engine.Contracts.Secret;
 using Orchitect.Engine.Contracts.Secret.Azure;
 using Orchitect.Engine.Contracts.Terraform;
 using Orchitect.Engine.Dispatch.Executor;
+using Orchitect.Storage;
+using Orchitect.Storage.Azure;
+using Orchitect.Storage.FileSystem;
 
 namespace Orchitect.Engine.Dispatch.Unit.Tests.Executor;
 
@@ -41,6 +44,58 @@ public sealed class ExecutorOptionsTests
         Assert.Equal("arm-client-secret", environment["SecretProvider__Mappings__ARM_CLIENT_SECRET"]);
         Assert.DoesNotContain("AZURE_CLIENT_SECRET", environment.Keys);
         Assert.DoesNotContain(ClientSecret, environment.Values);
+    }
+
+    [Fact]
+    public void ToEnvironment_NoStorage_OnlySetsType()
+    {
+        var storageKeys = CreateOptions().ToEnvironment().Where(kvp => kvp.Key.StartsWith("Storage__")).ToList();
+
+        Assert.Equal([new KeyValuePair<string, string>("Storage__Type", "None")], storageKeys);
+        Assert.Empty(CreateOptions().ToBinds());
+    }
+
+    [Fact]
+    public void ToEnvironment_FileSystemStorage_SetsRootPathAndBindsTheHostPath()
+    {
+        var options = CreateOptions() with
+        {
+            Storage = new StorageOptions
+            {
+                Type = StorageProviderType.FileSystem,
+                FileSystem = new FileSystemStorageOptions { RootPath = "/var/orchitect/artifacts" }
+            },
+            StorageHostPath = "/srv/orchitect/artifacts"
+        };
+
+        var environment = options.ToEnvironment();
+
+        Assert.Equal("FileSystem", environment["Storage__Type"]);
+        Assert.Equal("/var/orchitect/artifacts", environment["Storage__FileSystem__RootPath"]);
+        Assert.Equal(["/srv/orchitect/artifacts:/var/orchitect/artifacts"], options.ToBinds());
+    }
+
+    [Fact]
+    public void ToEnvironment_AzureBlobStorage_SetsContainerUri()
+    {
+        var options = CreateOptions() with
+        {
+            Storage = new StorageOptions
+            {
+                Type = StorageProviderType.AzureBlob,
+                AzureBlob = new AzureBlobStorageOptions
+                {
+                    ContainerUri = new Uri("https://orchitect.blob.core.windows.net/artifacts")
+                }
+            }
+        };
+
+        var environment = options.ToEnvironment();
+
+        Assert.Equal("AzureBlob", environment["Storage__Type"]);
+        Assert.Equal("https://orchitect.blob.core.windows.net/artifacts",
+            environment["Storage__AzureBlob__ContainerUri"]);
+        Assert.DoesNotContain(AzureBlobStorageOptions.AccessTokenEnvironmentKey, environment.Keys);
     }
 
     [Fact]

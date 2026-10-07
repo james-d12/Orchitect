@@ -257,5 +257,9 @@ public sealed class TerraformValidatorTests : IDisposable
         public Task<CommandLineResult> RunApplyAsync(string executeDirectory, string planFile,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<CommandLineResult> RunShowJsonAsync(string executeDirectory, string planFile,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }
