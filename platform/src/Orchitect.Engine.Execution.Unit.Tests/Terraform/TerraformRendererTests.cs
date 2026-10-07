@@ -127,6 +127,63 @@ public sealed class TerraformRendererTests
     }
 
     [Fact]
+    public void RenderModules_PreviousKeys_RendersAChainOfMovedBlocksIntoTheModule()
+    {
+        var plans = new Dictionary<RunInput, TerraformValidationResult.ValidResult>
+        {
+            [TerraformTestData.PlanInput() with { Key = "data", PreviousKeys = ["storage", "old store"] }] =
+                TerraformTestData.ValidResult()
+        };
+
+        var main = JsonNode.Parse(new TerraformRenderer().RenderModules(plans).MainTfJson)!;
+
+        Assert.Equal(
+            [("module.storage_account_storage", "module.storage_account_data"),
+             ("module.storage_account_old_store", "module.storage_account_storage")],
+            main["moved"]!.AsArray().Select(m =>
+                (m!["from"]!.GetValue<string>(), m["to"]!.GetValue<string>())));
+    }
+
+    [Fact]
+    public void RenderModules_NoPreviousKeys_RendersNoMovedBlocks()
+    {
+        var main = JsonNode.Parse(new TerraformRenderer().RenderModules(TerraformTestData.ValidatedPlans()).MainTfJson)!;
+
+        Assert.Null(main["moved"]);
+    }
+
+    [Fact]
+    public void RenderModules_PreviousKeyRendersToAModuleInTheRun_Throws()
+    {
+        var plans = new Dictionary<RunInput, TerraformValidationResult.ValidResult>
+        {
+            [TerraformTestData.PlanInput()] = TerraformTestData.ValidResult(),
+            [TerraformTestData.PlanInput() with { Key = "data", PreviousKeys = ["Storage"] }] =
+                TerraformTestData.ValidResult()
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new TerraformRenderer().RenderModules(plans));
+
+        Assert.Contains("storage_account_storage", exception.Message);
+    }
+
+    [Fact]
+    public void RenderModules_TwoInputsMoveFromTheSameModule_Throws()
+    {
+        var plans = new Dictionary<RunInput, TerraformValidationResult.ValidResult>
+        {
+            [TerraformTestData.PlanInput() with { Key = "data", PreviousKeys = ["storage"] }] =
+                TerraformTestData.ValidResult(),
+            [TerraformTestData.PlanInput() with { Key = "logs", PreviousKeys = ["storage"] }] =
+                TerraformTestData.ValidResult()
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new TerraformRenderer().RenderModules(plans));
+
+        Assert.Contains("More than one resource moves", exception.Message);
+    }
+
+    [Fact]
     public void RenderProviders_RendersRequiredProvidersAndProviderBlocks()
     {
         var providers = JsonNode.Parse(new TerraformRenderer().RenderProviders(

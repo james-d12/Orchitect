@@ -111,7 +111,7 @@ public sealed class RunnerApiClientTests
         var plan = new RunPlan(new RunContext("project", Guid.NewGuid(), Guid.NewGuid()),
         [
             new RunInput("db", "Postgres", "postgres", RunInputProvider.Terraform, new RunInputSource(new Uri("https://github.com/test/modules"), "v1", null),
-                new Dictionary<string, string> { ["size"] = "small" })
+                new Dictionary<string, string> { ["size"] = "small" }, ["database"])
         ]);
         var handler = new StubHandler(_ => JsonResponse(plan));
 
@@ -123,7 +123,9 @@ public sealed class RunnerApiClientTests
             }), CancellationToken.None);
 
         Assert.Equal(plan.Context, result.Context);
-        Assert.Equal("db", Assert.Single(result.Inputs).Key);
+        var input = Assert.Single(result.Inputs);
+        Assert.Equal("db", input.Key);
+        Assert.Equal(["database"], input.PreviousKeys!);
         var request = Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.EndsWith($"/internal/runs/{RunId}{RunnerRoutes.Plan}", request.RequestUri?.ToString());

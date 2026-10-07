@@ -6,4 +6,5 @@ public sealed record RunInput(
     string TemplateType,
     RunInputProvider Provider,
     RunInputSource Source,
-    IReadOnlyDictionary<string, string> Parameters);
+    IReadOnlyDictionary<string, string> Parameters,
+    IReadOnlyList<string>? PreviousKeys = null);

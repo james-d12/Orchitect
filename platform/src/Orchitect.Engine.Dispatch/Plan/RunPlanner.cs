@@ -19,9 +19,11 @@ public interface IRunPlanner
     /// Resolves the score's resource templates and returns what the run should execute. A provision records the
     /// resources, instances and dependency graph and moves the instances to Provisioning; a destroy plans each
     /// recorded resource from the template version its instance was provisioned with and moves the recorded
-    /// instances to Removing. The records and the plan are stored in one transaction, so a repeat or
-    /// concurrent call returns the stored plan without recording again. Throws <see cref="RunPlanException"/> when
-    /// the run or the score can't be planned, including when the run was asked to cancel before it was planned.
+    /// instances to Removing. A score resource whose previous keys match a recorded resource keeps that resource,
+    /// which a provision renames, instead of recording a new one. The records and the plan are stored in one
+    /// transaction, so a repeat or concurrent call returns the stored plan without recording again. Throws
+    /// <see cref="RunPlanException"/> when the run or the score can't be planned, including when the run was asked
+    /// to cancel before it was planned.
     /// </summary>
     Task<RunPlan> PlanAsync(DeploymentRunId runId, ScoreFile scoreFile, CancellationToken cancellationToken);
 }
@@ -107,9 +109,10 @@ public sealed class RunPlanner : IRunPlanner
                               $"Application '{deployment.ApplicationId.Value}' of run '{runId.Value}' was not found.");
 
         var knownResources =
-            (await _resourceRepository.GetByEnvironmentAsync(deployment.EnvironmentId, cancellationToken)).ToList();
+            await _resourceRepository.GetByEnvironmentAsync(deployment.EnvironmentId, cancellationToken);
+        var matchedResources = MatchKnownResources(application, scoreFile, knownResources);
         var removableInstances = run.Operation == DeploymentRunOperation.Destroy
-            ? await GetRemovableInstancesAsync(application, scoreFile, knownResources, cancellationToken)
+            ? await GetRemovableInstancesAsync(matchedResources, cancellationToken)
             : [];
         var recordedVersions = removableInstances.ToDictionary(r => r.Key,
             r => r.Value.MaxBy(i => i.CreatedAt)!.TemplateVersionId);
@@ -118,7 +121,7 @@ public sealed class RunPlanner : IRunPlanner
         var planned = run.Operation switch
         {
             DeploymentRunOperation.Provision =>
-                await PlanProvisionAsync(application, deployment, scoreFile, inputs, knownResources,
+                await PlanProvisionAsync(application, deployment, scoreFile, inputs, matchedResources,
                     cancellationToken),
             DeploymentRunOperation.Destroy => await PlanDestroyAsync(inputs, removableInstances, cancellationToken),
             _ => throw new InvalidOperationException($"Unsupported run operation '{run.Operation}'.")
@@ -155,16 +158,70 @@ public sealed class RunPlanner : IRunPlanner
         return plan;
     }
 
-    private async Task<Dictionary<string, List<ResourceInstance>>> GetRemovableInstancesAsync(
-        Application application, ScoreFile scoreFile, List<Resource> knownResources,
-        CancellationToken cancellationToken)
+    private static Dictionary<string, Resource> MatchKnownResources(Application application, ScoreFile scoreFile,
+        IReadOnlyList<Resource> knownResources)
     {
-        var slugs = scoreFile.Resources!
-            .Select(r => Resource.CreateSlug(ResourceName(application, r.Key, r.Value)))
-            .ToHashSet();
+        var keys = scoreFile.Resources!.Keys.ToHashSet(StringComparer.Ordinal);
+        var claimedPreviousKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var matches = new Dictionary<string, Resource>();
+
+        foreach (var (key, scoreResource) in scoreFile.Resources)
+        {
+            var previousKeys = scoreResource.GetPreviousKeys();
+
+            foreach (var previousKey in previousKeys)
+            {
+                if (keys.Contains(previousKey))
+                {
+                    throw Invalid(
+                        $"Resource '{key}' lists previous key '{previousKey}', which is still a resource in the score file.");
+                }
+
+                if (!claimedPreviousKeys.TryAdd(previousKey, key))
+                {
+                    throw Invalid(
+                        $"Previous key '{previousKey}' is listed by both resource '{claimedPreviousKeys[previousKey]}' and resource '{key}'.");
+                }
+            }
+
+            var slug = Resource.CreateSlug(ResourceName(application, key, scoreResource));
+            var current = knownResources.FirstOrDefault(r => r.Slug == slug);
+            var renamed = scoreResource.Id is null
+                ? previousKeys
+                    .Select(previousKey => Resource.CreateSlug(ResourceName(application, previousKey, scoreResource)))
+                    .Distinct()
+                    .Where(previousSlug => previousSlug != slug)
+                    .Select(previousSlug => knownResources.FirstOrDefault(r => r.Slug == previousSlug))
+                    .OfType<Resource>()
+                    .ToList()
+                : [];
+
+            if (renamed.Count > 0 && current is not null)
+            {
+                throw Invalid(
+                    $"Resource '{key}' lists a previous key of existing resource '{renamed[0].Slug}', but resource '{slug}' also exists.");
+            }
+
+            if (renamed.Count > 1)
+            {
+                throw Invalid($"The previous keys of resource '{key}' match more than one existing resource.");
+            }
+
+            if ((current ?? renamed.FirstOrDefault()) is { } match)
+            {
+                matches[slug] = match;
+            }
+        }
+
+        return matches;
+    }
+
+    private async Task<Dictionary<string, List<ResourceInstance>>> GetRemovableInstancesAsync(
+        Dictionary<string, Resource> matchedResources, CancellationToken cancellationToken)
+    {
         var removableInstances = new Dictionary<string, List<ResourceInstance>>();
 
-        foreach (var resource in knownResources.Where(r => slugs.Contains(r.Slug)))
+        foreach (var (slug, resource) in matchedResources)
         {
             var instances = (await _resourceInstanceRepository.GetByResourceAsync(resource.Id, cancellationToken))
                 .Where(i => i.Status != ResourceInstanceStatus.Removed)
@@ -172,7 +229,7 @@ public sealed class RunPlanner : IRunPlanner
 
             if (instances.Count > 0)
             {
-                removableInstances[resource.Slug] = instances;
+                removableInstances[slug] = instances;
             }
         }
 
@@ -200,6 +257,7 @@ public sealed class RunPlanner : IRunPlanner
                       $"Resource '{slug}' already exists with a different resource template (resource '{key}').")
                 : template.GetLatestVersion()
                   ?? throw Invalid($"Resource template '{template.Type}' has no active version (resource '{key}').");
+            var previousKeys = resource.GetPreviousKeys();
 
             var input = new RunInput(
                 Key: key,
@@ -208,7 +266,8 @@ public sealed class RunPlanner : IRunPlanner
                 Provider: ToRunInputProvider(template.Provider),
                 Source: new RunInputSource(version.Source.BaseUrl, version.Source.Tag,
                     string.IsNullOrEmpty(version.Source.FolderPath) ? null : version.Source.FolderPath),
-                Parameters: parameters);
+                Parameters: parameters,
+                PreviousKeys: previousKeys.Count > 0 ? previousKeys : null);
 
             inputs.Add(new ResolvedInput(input, template, version, resource, name, slug));
         }
@@ -256,12 +315,12 @@ public sealed class RunPlanner : IRunPlanner
     }
 
     private async Task<List<PlannedResourceInstance>> PlanProvisionAsync(Application application,
-        Deployment deployment, ScoreFile scoreFile, List<ResolvedInput> inputs, List<Resource> knownResources,
-        CancellationToken cancellationToken)
+        Deployment deployment, ScoreFile scoreFile, List<ResolvedInput> inputs,
+        Dictionary<string, Resource> matchedResources, CancellationToken cancellationToken)
     {
-        EnsureOneTemplatePerResource(inputs, knownResources);
+        EnsureOneTemplatePerResource(inputs, matchedResources);
 
-        var instances = await RecordResourcesAsync(application, deployment, scoreFile, inputs, knownResources,
+        var instances = await RecordResourcesAsync(application, deployment, scoreFile, inputs, matchedResources,
             cancellationToken);
 
         foreach (var (instance, _) in instances)
@@ -292,11 +351,12 @@ public sealed class RunPlanner : IRunPlanner
         return planned;
     }
 
-    private static void EnsureOneTemplatePerResource(List<ResolvedInput> inputs, List<Resource> knownResources)
+    private static void EnsureOneTemplatePerResource(List<ResolvedInput> inputs,
+        Dictionary<string, Resource> matchedResources)
     {
         foreach (var input in inputs)
         {
-            var templateId = knownResources.FirstOrDefault(r => r.Slug == input.Slug)?.ResourceTemplateId
+            var templateId = matchedResources.GetValueOrDefault(input.Slug)?.ResourceTemplateId
                              ?? inputs.First(i => i.Slug == input.Slug).Template.Id;
 
             if (templateId != input.Template.Id)
@@ -309,7 +369,7 @@ public sealed class RunPlanner : IRunPlanner
 
     private async Task<List<(ResourceInstance Instance, string Key)>> RecordResourcesAsync(
         Application application, Deployment deployment, ScoreFile scoreFile, List<ResolvedInput> inputs,
-        List<Resource> knownResources, CancellationToken cancellationToken)
+        Dictionary<string, Resource> matchedResources, CancellationToken cancellationToken)
     {
         var existingGraph =
             await _resourceDependencyGraphRepository.GetByEnvironmentAsync(deployment.EnvironmentId,
@@ -322,7 +382,7 @@ public sealed class RunPlanner : IRunPlanner
 
         foreach (var input in inputs)
         {
-            var resource = await GetOrCreateResourceAsync(application, deployment, input, knownResources,
+            var resource = await GetOrCreateResourceAsync(application, deployment, input, matchedResources,
                 cancellationToken);
             graph.AddResource(resource.Id);
             resourcesByKey[input.Input.Key] = resource;
@@ -375,10 +435,18 @@ public sealed class RunPlanner : IRunPlanner
     }
 
     private async Task<Resource> GetOrCreateResourceAsync(Application application, Deployment deployment,
-        ResolvedInput input, List<Resource> knownResources, CancellationToken cancellationToken)
+        ResolvedInput input, Dictionary<string, Resource> matchedResources, CancellationToken cancellationToken)
     {
-        if (knownResources.FirstOrDefault(r => r.Slug == input.Slug) is { } existing)
+        if (matchedResources.GetValueOrDefault(input.Slug) is { } existing)
         {
+            if (existing.Slug != input.Slug)
+            {
+                _logger.LogInformation("Renaming resource {ResourceId} from {PreviousSlug} to {Slug} (resource {Key}).",
+                    existing.Id.Value, existing.Slug, input.Slug, input.Input.Key);
+                existing.Rename(input.Name);
+                await _resourceRepository.UpdateAsync(existing, cancellationToken);
+            }
+
             return existing;
         }
 
@@ -395,7 +463,7 @@ public sealed class RunPlanner : IRunPlanner
 
         var created = await _resourceRepository.CreateAsync(resource, cancellationToken)
                       ?? throw new InvalidOperationException($"Unable to create resource '{input.Slug}'.");
-        knownResources.Add(created);
+        matchedResources[input.Slug] = created;
         return created;
     }
 

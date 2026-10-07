@@ -111,6 +111,18 @@ internal sealed class RunTestContext
                 r => new ScoreResource { Type = r.Type, Parameters = r.Parameters })
         };
 
+    public static ScoreFile WithPreviousKeys(ScoreFile scoreFile, string key, string previousKeys)
+    {
+        scoreFile.Resources![key] = scoreFile.Resources[key] with
+        {
+            Metadata = new ScoreResourceMetadata
+            {
+                Annotations = new Dictionary<string, string> { [ScoreResource.PreviousKeysAnnotation] = previousKeys }
+            }
+        };
+        return scoreFile;
+    }
+
     private static ResourceTemplate NewTemplate(string type, ResourceTemplateVersionState state,
         ResourceTemplateProvider provider = ResourceTemplateProvider.Terraform) =>
         ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest

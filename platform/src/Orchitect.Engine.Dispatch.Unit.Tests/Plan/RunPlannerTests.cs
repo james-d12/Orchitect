@@ -324,6 +324,171 @@ public sealed class RunPlannerTests
     }
 
     [Fact]
+    public async Task PlanAsync_KeyRenamedWithoutPreviousKey_RecordsANewResource()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)),
+            RunOutcome.Succeeded);
+
+        await _context.PlanAsync(DeploymentRunOperation.Provision, Score(("data", StorageType, null)));
+
+        Assert.Equal(["orders-data", "orders-storage"], _context.Resources.Items.Select(r => r.Slug).Order());
+        Assert.Equal(2, _context.Instances.Items.Count);
+    }
+
+    [Fact]
+    public async Task PlanAsync_KeyRenamedWithPreviousKey_RenamesTheRecordedResource()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision,
+            Score(("storage", StorageType, new() { ["sku"] = "LRS" })), RunOutcome.Succeeded);
+        var resource = Assert.Single(_context.Resources.Items);
+        var instance = Assert.Single(_context.Instances.Items);
+
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Provision,
+            WithPreviousKeys(Score(("data", StorageType, new() { ["sku"] = "GRS" })), "data", "storage"));
+
+        Assert.Equal([resource], _context.Resources.Items);
+        Assert.Equal("orders-data", resource.Slug);
+        Assert.Equal("orders-data", resource.Name);
+        Assert.Equal([instance], _context.Instances.Items);
+        Assert.Equal(ResourceInstanceStatus.Provisioning, instance.Status);
+        Assert.Equal("GRS", instance.InputParameters["sku"].GetString());
+        Assert.True(Assert.Single(_context.Graphs.Items).ContainsResource(resource.Id));
+        var input = Assert.Single(plan.Inputs);
+        Assert.Equal("data", input.Key);
+        Assert.Equal(["storage"], input.PreviousKeys!);
+        Assert.Equal([new PlannedResourceInstance(instance.Id, "data")], _context.Plans.Items[^1].Instances);
+    }
+
+    [Fact]
+    public async Task PlanAsync_PreviousKeyKeptAfterRename_ReusesTheRenamedResource()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)),
+            RunOutcome.Succeeded);
+        var renamed = WithPreviousKeys(Score(("data", StorageType, null)), "data", "old, storage");
+        await _context.RunAsync(DeploymentRunOperation.Provision, renamed, RunOutcome.Succeeded);
+
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Provision, renamed);
+
+        Assert.Equal("orders-data", Assert.Single(_context.Resources.Items).Slug);
+        Assert.Single(_context.Instances.Items);
+        Assert.Equal(["old", "storage"], Assert.Single(plan.Inputs).PreviousKeys!);
+    }
+
+    [Fact]
+    public async Task PlanAsync_KeyRenamedWithStableId_KeepsTheResourceAndPlansThePreviousKey()
+    {
+        var original = Score(("storage", StorageType, null));
+        original.Resources!["storage"] = original.Resources["storage"] with { Id = "shared-storage" };
+        await _context.RunAsync(DeploymentRunOperation.Provision, original, RunOutcome.Succeeded);
+        var resource = Assert.Single(_context.Resources.Items);
+
+        var renamed = WithPreviousKeys(Score(("data", StorageType, null)), "data", "storage");
+        renamed.Resources!["data"] = renamed.Resources["data"] with { Id = "shared-storage" };
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Provision, renamed);
+
+        Assert.Equal([resource], _context.Resources.Items);
+        Assert.Equal("shared-storage", resource.Slug);
+        Assert.Single(_context.Instances.Items);
+        Assert.Equal(["storage"], Assert.Single(plan.Inputs).PreviousKeys!);
+    }
+
+    [Fact]
+    public async Task PlanAsync_NoPreviousKeys_PlansNoPreviousKeys()
+    {
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Provision,
+            Score(("storage", StorageType, null)));
+
+        Assert.Null(Assert.Single(plan.Inputs).PreviousKeys);
+    }
+
+    [Fact]
+    public async Task PlanAsync_KeyRecasedWithPreviousKey_ReusesTheRecordedResource()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision, Score(("Storage", StorageType, null)),
+            RunOutcome.Succeeded);
+        var resource = Assert.Single(_context.Resources.Items);
+
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Provision,
+            WithPreviousKeys(Score(("storage", StorageType, null)), "storage", "Storage"));
+
+        Assert.Equal([resource], _context.Resources.Items);
+        Assert.Equal(["Storage"], Assert.Single(plan.Inputs).PreviousKeys!);
+    }
+
+    [Fact]
+    public async Task PlanAsync_PreviousKeyStillInScore_ThrowsWithoutRecording()
+    {
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Provision,
+                WithPreviousKeys(Score(("storage", StorageType, null), ("vault", KeyVaultType, null)), "storage",
+                    "vault")));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains("still a resource in the score file", exception.Message);
+        Assert.Empty(_context.Resources.Items);
+        Assert.Empty(_context.Plans.Items);
+    }
+
+    [Fact]
+    public async Task PlanAsync_PreviousKeyListedTwice_Throws()
+    {
+        var scoreFile = WithPreviousKeys(
+            WithPreviousKeys(Score(("data", StorageType, null), ("vault", KeyVaultType, null)), "data", "old"),
+            "vault", "old");
+
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Provision, scoreFile));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains("'old' is listed by both resource 'data' and resource 'vault'", exception.Message);
+    }
+
+    [Fact]
+    public async Task PlanAsync_PreviousAndCurrentResourcesBothRecorded_ThrowsWithoutRenaming()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision,
+            Score(("storage", StorageType, null), ("data", StorageType, null)), RunOutcome.Succeeded);
+
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Provision,
+                WithPreviousKeys(Score(("data", StorageType, null)), "data", "storage")));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains("also exists", exception.Message);
+        Assert.Equal(["orders-data", "orders-storage"], _context.Resources.Items.Select(r => r.Slug).Order());
+    }
+
+    [Fact]
+    public async Task PlanAsync_PreviousKeyRecordedWithAnotherTemplate_ThrowsWithoutRenaming()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)),
+            RunOutcome.Succeeded);
+
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Provision,
+                WithPreviousKeys(Score(("vault", KeyVaultType, null)), "vault", "storage")));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains("different resource template", exception.Message);
+        Assert.Equal("orders-storage", Assert.Single(_context.Resources.Items).Slug);
+    }
+
+    [Fact]
+    public async Task PlanAsync_DestroyAfterKeyRenamed_RemovesTheRecordedInstance()
+    {
+        await _context.RunAsync(DeploymentRunOperation.Provision, Score(("storage", StorageType, null)),
+            RunOutcome.Succeeded);
+
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Destroy,
+            WithPreviousKeys(Score(("data", StorageType, null)), "data", "storage"));
+
+        var instance = Assert.Single(_context.Instances.Items);
+        Assert.Equal(ResourceInstanceStatus.Removing, instance.Status);
+        Assert.Equal([new PlannedResourceInstance(instance.Id, "data")], _context.Plans.Items[^1].Instances);
+        Assert.Equal(["storage"], Assert.Single(plan.Inputs).PreviousKeys!);
+    }
+
+    [Fact]
     public async Task PlanAsync_Destroy_MovesRecordedInstancesToRemoving()
     {
         var score = Score(("storage", StorageType, null), ("vault", KeyVaultType, null));

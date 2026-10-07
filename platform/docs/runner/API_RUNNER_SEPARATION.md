@@ -230,7 +230,7 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
   - Move those instances to `Removing`.
 - **Either:**
   - Return the `RunContext` (project name, application/environment IDs) and one `RunInput` per resource.
-  - Each `RunInput` holds the key, template name and type, provider, version source URL/tag/path, and parameters.
+  - Each `RunInput` holds the key, template name and type, provider, version source URL/tag/path, parameters, and any previous keys the resource was renamed from (#153).
 
 **DTO sketch:**
 
@@ -238,7 +238,7 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
 RunDescriptor   { RunId, Operation, RepositoryUrl, CommitId, ApplicationId, EnvironmentId }
 ScoreSubmission { ScoreFile }                       // parsed score, contract shape
 RunPlan         { Context: { ProjectName, ApplicationId, EnvironmentId }, Inputs: RunInput[] }
-RunInput        { Key, TemplateName, TemplateType, Provider, Source: { BaseUrl, Tag, Path? }, Parameters }
+RunInput        { Key, TemplateName, TemplateType, Provider, Source: { BaseUrl, Tag, Path? }, Parameters, PreviousKeys? }
 RunCompletion   { Outcome: Succeeded | Failed, ErrorSummary? }
 ```
 

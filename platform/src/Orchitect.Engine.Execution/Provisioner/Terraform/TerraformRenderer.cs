@@ -14,6 +14,8 @@ public interface ITerraformRenderer
     /// Renders the module blocks as main.tf.json and their input values as terraform.tfvars.json.
     /// Input values only appear in the tfvars file, so Terraform never evaluates them as expressions, except that
     /// ${resources.key.output} references become module output expressions, which Terraform resolves in dependency order.
+    /// An input's previous keys, most recent first, become a chain of moved blocks into its module, so Terraform keeps
+    /// the renamed module's state.
     /// </summary>
     TerraformRenderedModules RenderModules(
         Dictionary<RunInput, TerraformValidationResult.ValidResult> terraformValidationResults);
@@ -101,6 +103,13 @@ public sealed partial class TerraformRenderer : ITerraformRenderer
 
         mainTf["module"] = modules;
 
+        var moved = RenderMoves(terraformValidationResults.Keys, moduleNames);
+
+        if (moved.Count > 0)
+        {
+            mainTf["moved"] = moved;
+        }
+
         return new TerraformRenderedModules(Serialize(mainTf), Serialize(tfVars));
     }
 
@@ -182,6 +191,40 @@ public sealed partial class TerraformRenderer : ITerraformRenderer
         }
 
         return builder.ToString();
+    }
+
+    private static JsonArray RenderMoves(IEnumerable<RunInput> inputs, Dictionary<string, string> moduleNames)
+    {
+        var targets = moduleNames.Values.ToHashSet(StringComparer.Ordinal);
+        var sources = new HashSet<string>(StringComparer.Ordinal);
+        var moved = new JsonArray();
+
+        foreach (var input in inputs)
+        {
+            var to = moduleNames[input.Key];
+
+            foreach (var previousKey in input.PreviousKeys ?? [])
+            {
+                var from = ToIdentifier($"{input.TemplateName}_{previousKey}");
+
+                if (targets.Contains(from))
+                {
+                    throw new InvalidOperationException(
+                        $"Previous key '{previousKey}' of '{moduleNames[input.Key]}' renders to the Terraform module name '{from}', which is still in this run.");
+                }
+
+                if (!sources.Add(from))
+                {
+                    throw new InvalidOperationException(
+                        $"More than one resource moves from the Terraform module name '{from}'.");
+                }
+
+                moved.Add(new JsonObject { ["from"] = $"module.{from}", ["to"] = $"module.{to}" });
+                to = from;
+            }
+        }
+
+        return moved;
     }
 
     private static string RenderReferences(string rawValue, IReadOnlyList<ScoreReference> references,

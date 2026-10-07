@@ -5,7 +5,7 @@ workstream: resource
 milestone: "Resource Domain"
 issues: [151, 152, 153, 154, 155, 156]
 superseded_by: null
-last_reviewed: 2026-09-29
+last_reviewed: 2026-10-07
 ---
 
 # Domain Models
@@ -110,6 +110,27 @@ public sealed record ResourceScope
     - Detect rename vs. delete + create.
     - Without alias support → treat as delete + create.
     - With alias support → link to existing resource by `ResourceExternalId`.
+- **Implemented (#153)**: the resource lists the keys it used to have in the `orchitect.io/previous-keys`
+  annotation, comma-separated and most recent first:
+
+    ```yaml
+    resources:
+      data:                     # was "storage", and before that "store"
+        type: azure-storage-account
+        metadata:
+          annotations:
+            orchitect.io/previous-keys: storage, store
+    ```
+
+    - The run planner links the score resource to the recorded `Resource` whose slug matches a previous key,
+      instead of recording a new one, and a provision renames that `Resource` (and its slug) to the new key. A
+      resource with an `id` keeps its slug, so only the Terraform addresses change.
+    - Every `RunInput` carries its previous keys, and the Terraform renderer chains them into `moved` blocks into the
+      renamed module, so Terraform moves the state instead of destroying and recreating the resources. A `moved` block
+      whose source is not in state does nothing, so the annotation can stay in the score after the rename.
+    - The planner rejects a previous key that is still a key in the score, one listed by two resources, and a rename
+      onto a resource that already exists. The recorded resource must use the same template, as for any redeploy.
+    - Without the annotation, a renamed key is still a delete plus a create. Helm resources are not moved yet.
 
 ---
 

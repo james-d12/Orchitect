@@ -10,7 +10,7 @@ public sealed record Resource
     public ResourceId Id { get; private init; }
     public OrganisationId OrganisationId { get; private init; }
     public string Name { get; private set; } = string.Empty;
-    public string Slug { get; private init; } = string.Empty;
+    public string Slug { get; private set; } = string.Empty;
     public string Description { get; private set; } = string.Empty;
     public ResourceTemplateId ResourceTemplateId { get; private init; }
     public ApplicationId? ApplicationId { get; private init; }
@@ -41,6 +41,14 @@ public sealed record Resource
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+    }
+
+    public void Rename(string name)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        Name = name;
+        Slug = CreateSlug(name);
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public static string CreateSlug(string name) => name.ToLowerInvariant().Replace(' ', '-');
