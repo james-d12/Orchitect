@@ -60,6 +60,7 @@ try
 
     builder.Services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<OrchitectDbContext>();
 
+    builder.Services.TryAddScoped<DiscoveryRunner>();
     builder.Services.AddHostedService<DiscoveryHostedService>();
 
     builder.Services.ConfigureHttpJsonOptions(options =>

@@ -20,7 +20,7 @@ public abstract class DiscoveryService : IDiscoveryService
 
     public abstract DiscoveryPlatform Platform { get; }
 
-    public async Task DiscoverAsync(
+    public async Task<DiscoveryCounts> DiscoverAsync(
         DiscoveryConfiguration configuration,
         Credential credential,
         CancellationToken cancellationToken)
@@ -36,7 +36,7 @@ public abstract class DiscoveryService : IDiscoveryService
             var stopWatch = new Stopwatch();
             stopWatch.Start();
 
-            await StartAsync(configuration, credential, cancellationToken);
+            var counts = await StartAsync(configuration, credential, cancellationToken);
 
             stopWatch.Stop();
             var milliseconds = stopWatch.Elapsed.TotalMilliseconds;
@@ -46,6 +46,8 @@ public abstract class DiscoveryService : IDiscoveryService
                 Platform,
                 configuration.OrganisationId,
                 milliseconds);
+
+            return counts;
         }
         catch (Exception exception)
         {
@@ -59,7 +61,7 @@ public abstract class DiscoveryService : IDiscoveryService
         }
     }
 
-    protected abstract Task StartAsync(
+    protected abstract Task<DiscoveryCounts> StartAsync(
         DiscoveryConfiguration configuration,
         Credential credential,
         CancellationToken cancellationToken);

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Orchitect.Api.Jobs;
 using Orchitect.Api.Shared;
 using Orchitect.Api.Shared.Authorization;
 using Orchitect.Domain.Core.Credential;
@@ -15,16 +16,18 @@ namespace Orchitect.Api.Endpoints.Inventory.Discovery;
 
 public sealed class TriggerDiscoveryEndpoint : IEndpoint
 {
+    public sealed record TriggerDiscoveryResponse(Guid RunId);
+
     public static void Map(IEndpointRouteBuilder builder) => builder
         .MapPost("/{id}/trigger", HandleAsync)
         .RequireOrganisationMember()
         .WithName("TriggerDiscovery")
         .WithSummary("Manually trigger discovery for a specific configuration")
-        .Produces(StatusCodes.Status202Accepted)
+        .Produces<TriggerDiscoveryResponse>(StatusCodes.Status202Accepted)
         .Produces<ErrorResponse>(StatusCodes.Status404NotFound)
         .Produces<ErrorResponse>(StatusCodes.Status400BadRequest);
 
-    private static async Task<Results<Accepted, NotFound<ErrorResponse>, BadRequest<ErrorResponse>>> HandleAsync(
+    private static async Task<Results<Accepted<TriggerDiscoveryResponse>, NotFound<ErrorResponse>, BadRequest<ErrorResponse>>> HandleAsync(
         [FromRoute]
         Guid id,
         [FromQuery]
@@ -34,7 +37,9 @@ public sealed class TriggerDiscoveryEndpoint : IEndpoint
         [FromServices]
         ICredentialRepository credentialRepository,
         [FromServices]
-        IServiceProvider serviceProvider,
+        DiscoveryRunner runner,
+        [FromServices]
+        IServiceScopeFactory scopeFactory,
         CancellationToken cancellationToken)
     {
         var orgId = new OrganisationId(organisationId);
@@ -44,46 +49,20 @@ public sealed class TriggerDiscoveryEndpoint : IEndpoint
         if (config == null || config.OrganisationId != orgId)
             return TypedResults.NotFound(CreateError("CONFIG_NOT_FOUND", "Discovery configuration not found"));
 
-        // Get credential
         var credential = await credentialRepository.GetByIdAsync(config.CredentialId, cancellationToken);
         if (credential == null)
             return TypedResults.BadRequest(CreateError("CREDENTIAL_NOT_FOUND", "Associated credential not found"));
 
-        // Trigger discovery in background with a new scope
+        var run = await runner.StartAsync(config, cancellationToken);
+
         _ = Task.Run(async () =>
         {
-            // Create a new scope for the background task to avoid disposed context
-            using var scope = serviceProvider.CreateScope();
-            var scopedServices = scope.ServiceProvider;
-
-            try
-            {
-                // Get discovery services from the new scope
-                var discoveryServices = scopedServices.GetRequiredService<IEnumerable<IDiscoveryService>>();
-
-                // Find matching discovery service
-                var service = discoveryServices.FirstOrDefault(s => s.Platform == config.Platform);
-
-                if (service == null)
-                {
-                    Console.WriteLine($"No discovery service available for platform {config.Platform}");
-                    return;
-                }
-
-                await service.DiscoverAsync(
-                    config,
-                    credential,
-                    CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                // Log error (inject ILogger if needed)
-                Console.WriteLine($"Discovery failed: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-            }
+            using var scope = scopeFactory.CreateScope();
+            var scopedRunner = scope.ServiceProvider.GetRequiredService<DiscoveryRunner>();
+            await scopedRunner.ExecuteAsync(config, run, CancellationToken.None);
         }, CancellationToken.None);
 
-        return TypedResults.Accepted($"/api/discovery/{id}");
+        return TypedResults.Accepted($"/discovery/{id}/status", new TriggerDiscoveryResponse(run.Id.Value));
     }
 
     private static ErrorResponse CreateError(string code, string message) =>

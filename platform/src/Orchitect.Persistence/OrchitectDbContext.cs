@@ -23,6 +23,7 @@ public sealed class OrchitectDbContext : IdentityDbContext
     public DbSet<CloudSecret> CloudSecrets { get; init; } = null!;
     public DbSet<CloudResource> CloudResources { get; init; } = null!;
     public DbSet<DiscoveryConfiguration> DiscoveryConfigurations { get; init; } = null!;
+    public DbSet<DiscoveryRun> DiscoveryRuns { get; init; } = null!;
     public DbSet<User> Owners { get; init; } = null!;
     public DbSet<Pipeline> Pipelines { get; init; } = null!;
     public DbSet<Repository> Repositories { get; init; } = null!;

@@ -45,7 +45,7 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
 
     public override DiscoveryPlatform Platform => DiscoveryPlatform.AzureDevOps;
 
-    protected override async Task StartAsync(
+    protected override async Task<DiscoveryCounts> StartAsync(
         DiscoveryConfiguration configuration,
         Credential credential,
         CancellationToken cancellationToken)
@@ -120,5 +120,14 @@ public sealed class AzureDevOpsDiscoveryService : DiscoveryService
             pipelines.Count,
             pullRequests.Count,
             workItems.Count);
+
+        return new DiscoveryCounts
+        {
+            Teams = teams.Count,
+            Repositories = repositories.Count,
+            Pipelines = pipelines.Count,
+            PullRequests = pullRequests.Count,
+            Issues = workItems.Count
+        };
     }
 }
