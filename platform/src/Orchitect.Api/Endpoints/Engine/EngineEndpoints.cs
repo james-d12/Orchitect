@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using Orchitect.Api.Endpoints.Engine.Application;
 using Orchitect.Api.Endpoints.Engine.Deployment;
 using Orchitect.Api.Endpoints.Engine.Environment;
+using Orchitect.Api.Endpoints.Engine.Resource;
 using Orchitect.Api.Endpoints.Engine.ResourceTemplate;
 using Orchitect.Api.Shared;
 
@@ -17,6 +18,7 @@ public static class EngineEndpoints
         endpoints.MapEnvironmentEndpoints();
         endpoints.MapDeploymentEndpoints();
         endpoints.MapResourceTemplateEndpoints();
+        endpoints.MapResourceEndpoints();
     }
 
     private static void MapApplicationEndpoints(this IEndpointRouteBuilder endpoints)
@@ -69,6 +71,17 @@ public static class EngineEndpoints
             .MapEndpoint<GetAllResourceTemplatesEndpoint>()
             .MapEndpoint<UpdateResourceTemplateEndpoint>()
             .MapEndpoint<DeleteResourceTemplateEndpoint>();
+    }
+
+    private static void MapResourceEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var endpoints1 = endpoints.MapGroup("/resources")
+            .WithTags("Resource");
+
+        endpoints1.MapPrivateGroup()
+            .MapEndpoint<GetAllResourcesEndpoint>()
+            .MapEndpoint<GetResourceEndpoint>()
+            .MapEndpoint<GetResourceDependenciesEndpoint>();
     }
 
     private static RouteGroupBuilder MapPrivateGroup(this IEndpointRouteBuilder endpoints, string? prefix = null)
