@@ -1,11 +1,13 @@
 using System.Net;
 using System.Text.Json;
 using AutoFixture;
+using Microsoft.Extensions.DependencyInjection;
 using Orchitect.Api.Endpoints.Core.Credential;
 using Orchitect.Api.Endpoints.Inventory.Discovery;
 using Orchitect.Api.Integration.Tests.Helpers;
 using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
+using Orchitect.Domain.Inventory.Discovery.Services;
 
 namespace Orchitect.Api.Integration.Tests;
 
@@ -33,6 +35,19 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
         var credential = await response.ReadFromJsonAsync<CredentialResponse>();
         ArgumentNullException.ThrowIfNull(credential);
         return credential;
+    }
+
+    private async Task<Guid> CreateDisabledDiscoveryConfigurationAsync(HttpClient client, Guid organisationId)
+    {
+        var credential = await CreateCredentialAsync(client, organisationId, CredentialPlatform.GitHub);
+        var request = BuildDiscoveryRequest(organisationId, credential.Id, DiscoveryPlatform.GitHub) with
+        {
+            IsEnabled = false
+        };
+        var response = await client.PostAsJsonAsync(DiscoveryUrl, request);
+        var created = await response.ReadFromJsonAsync<CreateDiscoveryConfigurationEndpoint.CreateDiscoveryConfigurationResponse>();
+        ArgumentNullException.ThrowIfNull(created);
+        return created.Id.Value;
     }
 
     [Fact]
@@ -326,5 +341,214 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenGettingDiscoveryConfiguration_ShouldReturn200OkWithLatestRun()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var configId = await CreateDisabledDiscoveryConfigurationAsync(client, organisation.Id);
+        var counts = new DiscoveryCounts { Repositories = 3, Pipelines = 2 };
+        var run = await factory.SeedDiscoveryRunAsync(new DiscoveryConfigurationId(configId), DateTime.UtcNow,
+            r => r.Succeed(counts));
+
+        // Act
+        var response = await client.GetAsync($"{DiscoveryUrl}/{configId}");
+        var body = await response.ReadFromJsonAsync<GetDiscoveryConfigurationEndpoint.GetDiscoveryConfigurationResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(configId, body.Id);
+        Assert.Equal(organisation.Id, body.OrganisationId);
+        Assert.Equal(DiscoveryPlatform.GitHub, body.Platform);
+        Assert.False(body.IsEnabled);
+        Assert.NotNull(body.LatestRun);
+        Assert.Equal(run.Id.Value, body.LatestRun.Id);
+        Assert.Equal(DiscoveryRunStatus.Succeeded, body.LatestRun.Status);
+        Assert.Equal(counts, body.LatestRun.Counts);
+        Assert.Equal(5, body.LatestRun.Counts.Total);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenGettingDiscoveryConfiguration_WithNoRuns_ShouldReturnNoLatestRun()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var configId = await CreateDisabledDiscoveryConfigurationAsync(client, organisation.Id);
+
+        // Act
+        var response = await client.GetAsync($"{DiscoveryUrl}/{configId}");
+        var body = await response.ReadFromJsonAsync<GetDiscoveryConfigurationEndpoint.GetDiscoveryConfigurationResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Null(body.LatestRun);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenGettingNonExistentDiscoveryConfiguration_ShouldReturn404NotFound()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+
+        // Act
+        var response = await client.GetAsync($"{DiscoveryUrl}/{Guid.NewGuid()}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenNotAMember_ShouldReturn404NotFoundForConfigurationAndRuns()
+    {
+        // Arrange
+        var member = await factory.CreateClient().AddAuthorisationHeader();
+        var outsider = await factory.CreateClient().AddAuthorisationHeaderForNewUser();
+        var organisation = await member.CreateOrganisationAsync();
+        var configId = await CreateDisabledDiscoveryConfigurationAsync(member, organisation.Id);
+        await factory.SeedDiscoveryRunAsync(new DiscoveryConfigurationId(configId), DateTime.UtcNow);
+
+        // Act
+        var get = await outsider.GetAsync($"{DiscoveryUrl}/{configId}");
+        var status = await outsider.GetAsync($"{DiscoveryUrl}/{configId}/status");
+        var runs = await outsider.GetAsync($"{DiscoveryUrl}/{configId}/runs");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, status.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, runs.StatusCode);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenGettingStatus_WithNoRuns_ShouldReturn404NotFound()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var configId = await CreateDisabledDiscoveryConfigurationAsync(client, organisation.Id);
+
+        // Act
+        var response = await client.GetAsync($"{DiscoveryUrl}/{configId}/status");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenGettingStatus_ShouldReturnLatestRun()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var configId = new DiscoveryConfigurationId(await CreateDisabledDiscoveryConfigurationAsync(client, organisation.Id));
+        var now = DateTime.UtcNow;
+        await factory.SeedDiscoveryRunAsync(configId, now.AddMinutes(-30), r => r.Succeed(new DiscoveryCounts()));
+        var latest = await factory.SeedDiscoveryRunAsync(configId, now.AddMinutes(-1), r => r.Fail("Bad credentials"));
+
+        // Act
+        var response = await client.GetAsync($"{DiscoveryUrl}/{configId.Value}/status");
+        var body = await response.ReadFromJsonAsync<DiscoveryRunResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(latest.Id.Value, body.Id);
+        Assert.Equal(configId.Value, body.DiscoveryConfigurationId);
+        Assert.Equal(DiscoveryRunStatus.Failed, body.Status);
+        Assert.Equal("Bad credentials", body.ErrorMessage);
+        Assert.NotNull(body.CompletedAt);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenListingRuns_ShouldReturnNewestFirstUpToLimit()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var configId = new DiscoveryConfigurationId(await CreateDisabledDiscoveryConfigurationAsync(client, organisation.Id));
+        var now = DateTime.UtcNow;
+        var oldest = await factory.SeedDiscoveryRunAsync(configId, now.AddMinutes(-3));
+        var middle = await factory.SeedDiscoveryRunAsync(configId, now.AddMinutes(-2));
+        var newest = await factory.SeedDiscoveryRunAsync(configId, now.AddMinutes(-1));
+
+        // Act
+        var all = await client.GetAsync($"{DiscoveryUrl}/{configId.Value}/runs");
+        var allBody = await all.ReadFromJsonAsync<List<DiscoveryRunResponse>>();
+        var limited = await client.GetAsync($"{DiscoveryUrl}/{configId.Value}/runs?limit=2");
+        var limitedBody = await limited.ReadFromJsonAsync<List<DiscoveryRunResponse>>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, all.StatusCode);
+        Assert.NotNull(allBody);
+        Assert.Equal([newest.Id.Value, middle.Id.Value, oldest.Id.Value], allBody.Select(r => r.Id));
+        Assert.Equal(HttpStatusCode.OK, limited.StatusCode);
+        Assert.NotNull(limitedBody);
+        Assert.Equal([newest.Id.Value, middle.Id.Value], limitedBody.Select(r => r.Id));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(101)]
+    public async Task DiscoveryApi_WhenListingRuns_WithInvalidLimit_ShouldReturn400BadRequest(int limit)
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var configId = await CreateDisabledDiscoveryConfigurationAsync(client, organisation.Id);
+
+        // Act
+        var response = await client.GetAsync($"{DiscoveryUrl}/{configId}/runs?limit={limit}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenTriggeringDiscovery_ShouldRecordRun()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var configId = await CreateDisabledDiscoveryConfigurationAsync(client, organisation.Id);
+
+        // Act
+        var response = await client.PostAsync($"{DiscoveryUrl}/{configId}/trigger?organisationId={organisation.Id}", null);
+        var body = await response.ReadFromJsonAsync<TriggerDiscoveryEndpoint.TriggerDiscoveryResponse>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal($"/discovery/{configId}/status", response.Headers.Location?.OriginalString);
+
+        using var scope = factory.Services.CreateScope();
+        var run = await scope.ServiceProvider.GetRequiredService<IDiscoveryRunRepository>()
+            .GetByIdAsync(new DiscoveryRunId(body.RunId));
+        Assert.NotNull(run);
+        Assert.Equal(configId, run.DiscoveryConfigurationId.Value);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenDeletingDiscoveryConfiguration_ShouldDeleteItsRuns()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var configId = await CreateDisabledDiscoveryConfigurationAsync(client, organisation.Id);
+        var run = await factory.SeedDiscoveryRunAsync(new DiscoveryConfigurationId(configId), DateTime.UtcNow);
+
+        // Act
+        var response = await client.DeleteAsync($"{DiscoveryUrl}/{configId}?organisationId={organisation.Id}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var deleted = await scope.ServiceProvider.GetRequiredService<IDiscoveryRunRepository>().GetByIdAsync(run.Id);
+        Assert.Null(deleted);
     }
 }
