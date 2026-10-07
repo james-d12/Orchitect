@@ -173,7 +173,7 @@ public sealed class OrganisationMembershipIntegrationTests(WebApplicationFactory
         var (member, outsider, organisationId) = await CreateOrganisationWithOutsiderAsync();
         var credential = await CreateCredentialAsync(member, organisationId);
         var createRequest = new CreateDiscoveryConfigurationEndpoint.CreateDiscoveryConfigurationRequest(
-            organisationId.ToString(), credential.Id, DiscoveryPlatform.GitHub, true, null);
+            organisationId.ToString(), credential.Id, "GitHub", DiscoveryPlatform.GitHub, true, null);
         var created = await member.PostAsJsonAsync("/discovery", createRequest);
         var configuration =
             await created.ReadFromJsonAsync<CreateDiscoveryConfigurationEndpoint.CreateDiscoveryConfigurationResponse>();
@@ -183,7 +183,7 @@ public sealed class OrganisationMembershipIntegrationTests(WebApplicationFactory
         var create = await outsider.PostAsJsonAsync("/discovery", createRequest);
         var update = await outsider.PutAsJsonAsync($"/discovery/{configurationId}",
             new UpdateDiscoveryConfigurationEndpoint.UpdateDiscoveryConfigurationRequest(
-                organisationId.ToString(), false, null));
+                organisationId.ToString(), "GitHub", false, null));
         var trigger = await outsider.PostAsync($"/discovery/{configurationId}/trigger?organisationId={organisationId}",
             null);
         var delete = await outsider.DeleteAsync($"/discovery/{configurationId}?organisationId={organisationId}");
