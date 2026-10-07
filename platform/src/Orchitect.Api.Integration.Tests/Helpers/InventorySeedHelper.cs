@@ -19,12 +19,8 @@ public static class InventorySeedHelper
 {
     private static readonly Fixture Fixture = new();
 
-    public static async Task<User> SeedUserAsync(
-        this WebApplicationFactoryWithPostgres factory,
-        OrganisationId organisationId,
-        UserPlatform? platform = null)
-    {
-        var user = new User
+    public static User BuildUser(OrganisationId organisationId, UserPlatform? platform = null) =>
+        new()
         {
             Id = new UserId(Fixture.Create<string>()),
             OrganisationId = organisationId,
@@ -35,6 +31,13 @@ public static class InventorySeedHelper
             DiscoveredAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+
+    public static async Task<User> SeedUserAsync(
+        this WebApplicationFactoryWithPostgres factory,
+        OrganisationId organisationId,
+        UserPlatform? platform = null)
+    {
+        var user = BuildUser(organisationId, platform);
 
         using var scope = factory.Services.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
@@ -124,10 +127,17 @@ public static class InventorySeedHelper
     {
         owner ??= await factory.SeedUserAsync(organisationId);
 
-        var pipeline = new Pipeline
+        var pipeline = BuildPipeline(owner, platform);
+        await factory.UpsertPipelinesAsync(pipeline);
+
+        return pipeline;
+    }
+
+    public static Pipeline BuildPipeline(User owner, PipelinePlatform? platform = null) =>
+        new()
         {
             Id = new PipelineId(Fixture.Create<string>()),
-            OrganisationId = organisationId,
+            OrganisationId = owner.OrganisationId,
             Name = Fixture.Create<string>(),
             Url = new Uri($"https://pipelines.example.com/{Fixture.Create<string>()}"),
             User = owner,
@@ -136,11 +146,13 @@ public static class InventorySeedHelper
             UpdatedAt = DateTime.UtcNow
         };
 
+    public static async Task UpsertPipelinesAsync(
+        this WebApplicationFactoryWithPostgres factory,
+        params Pipeline[] pipelines)
+    {
         using var scope = factory.Services.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IPipelineRepository>();
-        await repository.BulkUpsertAsync([pipeline]);
-
-        return pipeline;
+        await repository.BulkUpsertAsync(pipelines);
     }
 
     public static async Task<Repository> SeedRepositoryAsync(
