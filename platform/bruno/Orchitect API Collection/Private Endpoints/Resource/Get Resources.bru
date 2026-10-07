@@ -1,0 +1,28 @@
+meta {
+  name: Get Resources
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{API_BASE_URL}}/resources?environmentId={{ENVIRONMENT_ID}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  environmentId: {{ENVIRONMENT_ID}}
+}
+
+script:post-response {
+  var resources = res.body.resources
+  
+  if (resources && resources.length > 0) {
+    bru.setVar("RESOURCE_ID", resources[0].id)
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

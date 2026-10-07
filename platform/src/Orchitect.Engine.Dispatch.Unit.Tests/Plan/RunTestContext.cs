@@ -198,6 +198,18 @@ internal sealed class RunTestContext
         public Task<IReadOnlyList<Resource>> GetByEnvironmentAsync(EnvironmentId environmentId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Resource>>(Items.Where(r => r.EnvironmentId == environmentId).ToList());
+
+        public Task<IReadOnlyList<Resource>> GetByOrganisationIdsAsync(
+            IReadOnlyCollection<OrganisationId> organisationIds, EnvironmentId? environmentId = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Resource>>(Items
+                .Where(r => organisationIds.Contains(r.OrganisationId) &&
+                            (environmentId is null || r.EnvironmentId == environmentId))
+                .ToList());
+
+        public Task<IReadOnlyList<Resource>> GetByIdsAsync(IReadOnlyCollection<ResourceId> ids,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Resource>>(Items.Where(r => ids.Contains(r.Id)).ToList());
     }
 
     internal sealed class InMemoryResourceInstanceRepository : IResourceInstanceRepository

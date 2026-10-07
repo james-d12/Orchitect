@@ -27,6 +27,16 @@ public interface IResourceDependencyGraph
     /// </summary>
     void SetDependencies(ResourceId from, IEnumerable<ResourceId> to);
 
+    /// <summary>
+    /// Returns the resources that <paramref name="resourceId"/> depends on directly.
+    /// </summary>
+    IReadOnlyCollection<ResourceId> GetDependencies(ResourceId resourceId);
+
+    /// <summary>
+    /// Returns the resources that depend on <paramref name="resourceId"/> directly.
+    /// </summary>
+    IReadOnlyCollection<ResourceId> GetDependents(ResourceId resourceId);
+
     bool HasDependencyPath(ResourceId startId, ResourceId targetId);
     bool ContainsResource(ResourceId resourceId);
 

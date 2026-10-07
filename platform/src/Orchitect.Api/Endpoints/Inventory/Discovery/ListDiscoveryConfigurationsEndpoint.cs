@@ -16,6 +16,7 @@ public sealed class ListDiscoveryConfigurationsEndpoint : IEndpoint
 {
     public record ListDiscoveryConfigurationResponse(
         DiscoveryConfigurationId Id,
+        string Name,
         CredentialId CredentialId,
         string CredentialName,
         DiscoveryPlatform Platform,
@@ -58,6 +59,7 @@ public sealed class ListDiscoveryConfigurationsEndpoint : IEndpoint
 
         var response = configs.Select(c => new ListDiscoveryConfigurationResponse(
             c.Id,
+            c.Name,
             c.CredentialId,
             credentials.GetValueOrDefault(c.CredentialId, "Unknown"),
             c.Platform,

@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orchitect.Common.Observability;
-using Orchitect.Domain.Core.Credential;
 using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Domain.Inventory.Discovery.Services;
 
@@ -62,23 +61,18 @@ public sealed class DiscoveryHostedService : BackgroundService
 
     private async Task RunDiscoveryCycleAsync(CancellationToken cancellationToken)
     {
-        using var scope = _serviceProvider.CreateScope();
+        List<DiscoveryConfiguration> configList;
 
-        var configRepository = scope.ServiceProvider
-            .GetRequiredService<IDiscoveryConfigurationRepository>();
-        var credentialRepository = scope.ServiceProvider
-            .GetRequiredService<ICredentialRepository>();
-        var payloadResolver = scope.ServiceProvider
-            .GetRequiredService<CredentialPayloadResolver>();
-        var discoveryServices = scope.ServiceProvider
-            .GetServices<IDiscoveryService>()
-            .ToList();
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var configRepository = scope.ServiceProvider
+                .GetRequiredService<IDiscoveryConfigurationRepository>();
 
-        _logger.LogDebug("Fetching enabled discovery configurations...");
+            _logger.LogDebug("Fetching enabled discovery configurations...");
 
-        // Get all enabled discovery configurations
-        var configurations = await configRepository.GetEnabledConfigurationsAsync(cancellationToken);
-        var configList = configurations.ToList();
+            var configurations = await configRepository.GetEnabledConfigurationsAsync(cancellationToken);
+            configList = configurations.ToList();
+        }
 
         _logger.LogInformation("Found {Count} enabled discovery configurations", configList.Count);
 
@@ -99,12 +93,9 @@ public sealed class DiscoveryHostedService : BackgroundService
             {
                 try
                 {
-                    await ProcessDiscoveryConfigurationAsync(
-                        config,
-                        credentialRepository,
-                        payloadResolver,
-                        discoveryServices,
-                        cancellationToken);
+                    using var scope = _serviceProvider.CreateScope();
+                    var runner = scope.ServiceProvider.GetRequiredService<DiscoveryRunner>();
+                    await runner.RunAsync(config, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -122,71 +113,5 @@ public sealed class DiscoveryHostedService : BackgroundService
                 "Completed discovery for organisation {OrgId}",
                 organisationId);
         }
-    }
-
-    private async Task ProcessDiscoveryConfigurationAsync(
-        DiscoveryConfiguration config,
-        ICredentialRepository credentialRepository,
-        CredentialPayloadResolver payloadResolver,
-        List<IDiscoveryService> discoveryServices,
-        CancellationToken cancellationToken)
-    {
-        _logger.LogDebug(
-            "Processing discovery config {ConfigId}: {Platform} for org {OrgId}",
-            config.Id,
-            config.Platform,
-            config.OrganisationId);
-
-        // Get credential
-        var credential = await credentialRepository.GetByIdAsync(config.CredentialId, cancellationToken);
-        if (credential == null)
-        {
-            _logger.LogWarning(
-                "Credential {CredentialId} not found for config {ConfigId}, skipping",
-                config.CredentialId,
-                config.Id);
-            return;
-        }
-
-        // Validate credential belongs to same org (shouldn't happen due to FK, but defensive)
-        if (credential.OrganisationId != config.OrganisationId)
-        {
-            _logger.LogError(
-                "Credential {CredentialId} belongs to org {CredOrgId} but config {ConfigId} is for org {ConfigOrgId}",
-                credential.Id,
-                credential.OrganisationId,
-                config.Id,
-                config.OrganisationId);
-            return;
-        }
-
-        // Find matching discovery service
-        var service = discoveryServices.FirstOrDefault(s => s.Platform == config.Platform);
-
-        if (service == null)
-        {
-            _logger.LogWarning(
-                "No discovery service registered for platform {Platform}, skipping config {ConfigId}",
-                config.Platform,
-                config.Id);
-            return;
-        }
-
-        // Run discovery
-        _logger.LogInformation(
-            "Starting {Platform} discovery for organisation {OrgId} using credential '{CredentialName}'",
-            config.Platform,
-            config.OrganisationId,
-            credential.Name);
-
-        await service.DiscoverAsync(
-            config,
-            credential,
-            cancellationToken);
-
-        _logger.LogInformation(
-            "Completed {Platform} discovery for organisation {OrgId}",
-            config.Platform,
-            config.OrganisationId);
     }
 }

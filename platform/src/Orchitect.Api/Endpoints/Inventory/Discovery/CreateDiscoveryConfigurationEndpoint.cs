@@ -17,6 +17,7 @@ public sealed class CreateDiscoveryConfigurationEndpoint : IEndpoint
     public record CreateDiscoveryConfigurationRequest(
         string OrganisationId,
         Guid CredentialId,
+        string Name,
         DiscoveryPlatform Platform,
         bool IsEnabled,
         Dictionary<string, string>? PlatformConfig);
@@ -44,6 +45,13 @@ public sealed class CreateDiscoveryConfigurationEndpoint : IEndpoint
         var organisationId = new OrganisationId(Guid.Parse(createDiscoveryConfigurationRequest.OrganisationId));
         var credentialId = new CredentialId(createDiscoveryConfigurationRequest.CredentialId);
 
+        if (string.IsNullOrWhiteSpace(createDiscoveryConfigurationRequest.Name))
+            return TypedResults.BadRequest(CreateError("NAME_REQUIRED", "Name is required"));
+
+        if (createDiscoveryConfigurationRequest.Name.Trim().Length > DiscoveryConfiguration.NameMaxLength)
+            return TypedResults.BadRequest(CreateError("NAME_TOO_LONG",
+                $"Name must be at most {DiscoveryConfiguration.NameMaxLength} characters"));
+
         // Validate credential exists and belongs to this organisation
         var credential = await credentialRepository.GetByIdAsync(credentialId, cancellationToken);
         if (credential == null)
@@ -64,6 +72,7 @@ public sealed class CreateDiscoveryConfigurationEndpoint : IEndpoint
         var config = DiscoveryConfiguration.Create(
             organisationId,
             credentialId,
+            createDiscoveryConfigurationRequest.Name.Trim(),
             createDiscoveryConfigurationRequest.Platform,
             createDiscoveryConfigurationRequest.IsEnabled,
             createDiscoveryConfigurationRequest.PlatformConfig);

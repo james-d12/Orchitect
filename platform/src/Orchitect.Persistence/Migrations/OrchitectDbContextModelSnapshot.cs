@@ -864,6 +864,11 @@ namespace Orchitect.Persistence.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<Guid>("OrganisationId")
                         .HasColumnType("uuid");
 
@@ -897,6 +902,35 @@ namespace Orchitect.Persistence.Migrations
                         .HasDatabaseName("IX_DiscoveryConfigurations_OrganisationId_Platform");
 
                     b.ToTable("DiscoveryConfigurations", "inventory");
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Discovery.DiscoveryRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DiscoveryConfigurationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DiscoveryConfigurationId", "StartedAt");
+
+                    b.ToTable("DiscoveryRuns", "inventory");
                 });
 
             modelBuilder.Entity("Orchitect.Domain.Inventory.Identity.Team", b =>
@@ -1504,6 +1538,60 @@ namespace Orchitect.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_DiscoveryConfigurations_Organisations");
+                });
+
+            modelBuilder.Entity("Orchitect.Domain.Inventory.Discovery.DiscoveryRun", b =>
+                {
+                    b.HasOne("Orchitect.Domain.Inventory.Discovery.DiscoveryConfiguration", null)
+                        .WithMany()
+                        .HasForeignKey("DiscoveryConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_DiscoveryRuns_DiscoveryConfigurations");
+
+                    b.OwnsOne("Orchitect.Domain.Inventory.Discovery.DiscoveryCounts", "Counts", b1 =>
+                        {
+                            b1.Property<Guid>("DiscoveryRunId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("CloudResources")
+                                .HasColumnType("integer")
+                                .HasColumnName("CloudResourceCount");
+
+                            b1.Property<int>("CloudSecrets")
+                                .HasColumnType("integer")
+                                .HasColumnName("CloudSecretCount");
+
+                            b1.Property<int>("Issues")
+                                .HasColumnType("integer")
+                                .HasColumnName("IssueCount");
+
+                            b1.Property<int>("Pipelines")
+                                .HasColumnType("integer")
+                                .HasColumnName("PipelineCount");
+
+                            b1.Property<int>("PullRequests")
+                                .HasColumnType("integer")
+                                .HasColumnName("PullRequestCount");
+
+                            b1.Property<int>("Repositories")
+                                .HasColumnType("integer")
+                                .HasColumnName("RepositoryCount");
+
+                            b1.Property<int>("Teams")
+                                .HasColumnType("integer")
+                                .HasColumnName("TeamCount");
+
+                            b1.HasKey("DiscoveryRunId");
+
+                            b1.ToTable("DiscoveryRuns", "inventory");
+
+                            b1.WithOwner()
+                                .HasForeignKey("DiscoveryRunId");
+                        });
+
+                    b.Navigation("Counts")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Orchitect.Domain.Inventory.Identity.Team", b =>
