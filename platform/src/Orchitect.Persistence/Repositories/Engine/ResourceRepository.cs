@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Engine.Environment;
 using Orchitect.Domain.Engine.Resource;
 
@@ -54,5 +55,29 @@ public sealed class ResourceRepository : IResourceRepository
             .Where(r => r.EnvironmentId == environmentId)
             .ToListAsync(cancellationToken)
             .ContinueWith<IReadOnlyList<Resource>>(t => t.Result, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Resource>> GetByOrganisationIdsAsync(
+        IReadOnlyCollection<OrganisationId> organisationIds, EnvironmentId? environmentId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.Resources.AsNoTracking()
+            .Where(r => organisationIds.Contains(r.OrganisationId));
+
+        if (environmentId is not null)
+        {
+            query = query.Where(r => r.EnvironmentId == environmentId.Value);
+        }
+
+        return await query.OrderBy(r => r.Name).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Resource>> GetByIdsAsync(IReadOnlyCollection<ResourceId> ids,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Resources.AsNoTracking()
+            .Where(r => ids.Contains(r.Id))
+            .OrderBy(r => r.Name)
+            .ToListAsync(cancellationToken);
     }
 }

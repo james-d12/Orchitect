@@ -88,6 +88,7 @@ public static class OrchitectPersistenceExtensions
         services.AddEntityRepository<Application, ApplicationId, IApplicationRepository>();
         services.AddEntityRepository<Environment, EnvironmentId, IEnvironmentRepository>();
         services.AddEntityRepository<Deployment, DeploymentId, IDeploymentRepository>();
+        services.AddEntityRepository<Resource, ResourceId, IResourceRepository>();
 
         return services;
     }
