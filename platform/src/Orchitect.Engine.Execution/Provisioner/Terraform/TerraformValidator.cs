@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Orchitect.Engine.Contracts.Runner.Api;
+using Orchitect.Engine.Contracts.Score;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 using Orchitect.Engine.Execution.Shared.CommandLine;
 
@@ -61,6 +62,8 @@ public sealed class TerraformValidator : ITerraformValidator
         {
             results[planInput] = ValidateInputs(planInput, downloads[source], modules);
         }
+
+        ValidateReferences(results);
 
         return terraformPlanInputs.ToDictionary(planInput => planInput, planInput => results[planInput]);
     }
@@ -181,6 +184,7 @@ public sealed class TerraformValidator : ITerraformValidator
         }
 
         var invalidValues = inputs
+            .Where(input => ScoreReference.Find(input.Value).Count == 0)
             .Select(input => TerraformValueConverter.TryConvert(input.Value,
                 terraformConfig.Variables[input.Key].Type, out _, out var error)
                 ? null
@@ -196,6 +200,41 @@ public sealed class TerraformValidator : ITerraformValidator
 
         return TerraformValidationResult.Valid(terraformConfig, moduleDirectory);
     }
+
+    private static void ValidateReferences(Dictionary<RunInput, TerraformValidationResult> results)
+    {
+        var resultsByKey = results.ToDictionary(r => r.Key.Key, r => r.Value);
+
+        foreach (var (planInput, result) in results.ToList())
+        {
+            if (result is not TerraformValidationResult.ValidResult)
+            {
+                continue;
+            }
+
+            var invalidReferences = planInput.Parameters
+                .SelectMany(p => ScoreReference.Find(p.Value).Select(r => (Input: p.Key, Reference: r)))
+                .Select(p => FindReferenceError(p.Input, p.Reference, resultsByKey))
+                .OfType<string>()
+                .ToList();
+
+            if (invalidReferences.Count > 0)
+            {
+                results[planInput] = TerraformValidationResult.InputInvalid(
+                    $"These inputs reference outputs that could not be resolved: {string.Join("; ", invalidReferences)}");
+            }
+        }
+    }
+
+    private static string? FindReferenceError(string inputName, ScoreReference reference,
+        Dictionary<string, TerraformValidationResult> resultsByKey) =>
+        resultsByKey.GetValueOrDefault(reference.Key) switch
+        {
+            null => $"{inputName}: resource '{reference.Key}' is not a Terraform resource of this run",
+            TerraformValidationResult.ValidResult target when !target.Config.Outputs.ContainsKey(reference.Output) =>
+                $"{inputName}: resource '{reference.Key}' has no output '{reference.Output}'",
+            _ => null
+        };
 
     private sealed record ModuleInspection(TerraformConfig? Config, string Error);
 }

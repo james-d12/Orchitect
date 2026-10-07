@@ -21,6 +21,7 @@ internal sealed class RunTestContext
     public const string StorageType = "azure-storage-account";
     public const string KeyVaultType = "azure-key-vault";
     public const string InactiveType = "inactive-template";
+    public const string HelmType = "helm-chart";
 
     private readonly Dictionary<DeploymentRunId, DeploymentRun> _runs = [];
     private readonly IDeploymentRunRepository _runRepository = Substitute.For<IDeploymentRunRepository>();
@@ -49,7 +50,8 @@ internal sealed class RunTestContext
         {
             NewTemplate(StorageType, ResourceTemplateVersionState.Active),
             NewTemplate(KeyVaultType, ResourceTemplateVersionState.Active),
-            NewTemplate(InactiveType, ResourceTemplateVersionState.Inactive)
+            NewTemplate(InactiveType, ResourceTemplateVersionState.Inactive),
+            NewTemplate(HelmType, ResourceTemplateVersionState.Active, ResourceTemplateProvider.Helm)
         }.ToDictionary(t => t.Type);
         _templateRepository.GetByTypeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => _templates.GetValueOrDefault(call.Arg<string>()));
@@ -109,14 +111,15 @@ internal sealed class RunTestContext
                 r => new ScoreResource { Type = r.Type, Parameters = r.Parameters })
         };
 
-    private static ResourceTemplate NewTemplate(string type, ResourceTemplateVersionState state) =>
+    private static ResourceTemplate NewTemplate(string type, ResourceTemplateVersionState state,
+        ResourceTemplateProvider provider = ResourceTemplateProvider.Terraform) =>
         ResourceTemplate.CreateWithVersion(new CreateResourceTemplateWithVersionRequest
         {
             OrganisationId = new OrganisationId(),
             Name = $"{type} template",
             Type = type,
             Description = $"A {type}.",
-            Provider = ResourceTemplateProvider.Terraform,
+            Provider = provider,
             Version = "1.0.0",
             Source = new ResourceTemplateVersionSource
             {
