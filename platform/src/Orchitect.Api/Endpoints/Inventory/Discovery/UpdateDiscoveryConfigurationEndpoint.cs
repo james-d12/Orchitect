@@ -15,6 +15,7 @@ public sealed class UpdateDiscoveryConfigurationEndpoint : IEndpoint
 {
     public record UpdateDiscoveryConfigurationRequest(
         string OrganisationId,
+        string Name,
         bool IsEnabled,
         Dictionary<string, string>? PlatformConfig);
 
@@ -24,9 +25,10 @@ public sealed class UpdateDiscoveryConfigurationEndpoint : IEndpoint
         .WithName("UpdateDiscoveryConfiguration")
         .WithSummary("Update a discovery configuration")
         .Produces(StatusCodes.Status200OK)
+        .Produces<ErrorResponse>(StatusCodes.Status400BadRequest)
         .Produces<ErrorResponse>(StatusCodes.Status404NotFound);
 
-    private static async Task<Results<Ok, NotFound<ErrorResponse>>> HandleAsync(
+    private static async Task<Results<Ok, BadRequest<ErrorResponse>, NotFound<ErrorResponse>>> HandleAsync(
         [FromRoute]
         Guid id,
         [FromBody]
@@ -38,11 +40,21 @@ public sealed class UpdateDiscoveryConfigurationEndpoint : IEndpoint
         var organisationId = new OrganisationId(Guid.Parse(updateDiscoveryConfigurationRequest.OrganisationId));
         var configId = new DiscoveryConfigurationId(id);
 
+        if (string.IsNullOrWhiteSpace(updateDiscoveryConfigurationRequest.Name))
+            return TypedResults.BadRequest(CreateError("NAME_REQUIRED", "Name is required"));
+
+        if (updateDiscoveryConfigurationRequest.Name.Trim().Length > DiscoveryConfiguration.NameMaxLength)
+            return TypedResults.BadRequest(CreateError("NAME_TOO_LONG",
+                $"Name must be at most {DiscoveryConfiguration.NameMaxLength} characters"));
+
         var existing = await repository.GetByIdAsync(configId, cancellationToken);
         if (existing == null || existing.OrganisationId != organisationId)
             return TypedResults.NotFound(CreateError("CONFIG_NOT_FOUND", "Discovery configuration not found"));
 
-        var updated = existing.Update(updateDiscoveryConfigurationRequest.IsEnabled, updateDiscoveryConfigurationRequest.PlatformConfig);
+        var updated = existing.Update(
+            updateDiscoveryConfigurationRequest.Name.Trim(),
+            updateDiscoveryConfigurationRequest.IsEnabled,
+            updateDiscoveryConfigurationRequest.PlatformConfig);
         await repository.UpdateAsync(updated, cancellationToken);
 
         return TypedResults.Ok();
