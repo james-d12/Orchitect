@@ -25,8 +25,8 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
         new(_fixture.Create<string>(), organisationId, _fixture.Create<CredentialType>(), platform, SamplePayload);
 
     private CreateDiscoveryConfigurationEndpoint.CreateDiscoveryConfigurationRequest BuildDiscoveryRequest(
-        Guid organisationId, Guid credentialId, DiscoveryPlatform platform) =>
-        new(organisationId.ToString(), credentialId, platform, true, null);
+        Guid organisationId, Guid credentialId, DiscoveryPlatform platform, string? name = null) =>
+        new(organisationId.ToString(), credentialId, name ?? _fixture.Create<string>(), platform, true, null);
 
     private async Task<CredentialResponse> CreateCredentialAsync(
         HttpClient client, Guid organisationId, CredentialPlatform platform)
@@ -100,6 +100,41 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task DiscoveryApi_WhenCreatingDiscoveryConfiguration_WithBlankName_ShouldReturn400BadRequest(string name)
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var credential = await CreateCredentialAsync(client, organisation.Id, CredentialPlatform.GitHub);
+        var request = BuildDiscoveryRequest(organisation.Id, credential.Id, DiscoveryPlatform.GitHub, name);
+
+        // Act
+        var response = await client.PostAsJsonAsync(DiscoveryUrl, request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenCreatingDiscoveryConfiguration_WithNameTooLong_ShouldReturn400BadRequest()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var credential = await CreateCredentialAsync(client, organisation.Id, CredentialPlatform.GitHub);
+        var request = BuildDiscoveryRequest(organisation.Id, credential.Id, DiscoveryPlatform.GitHub,
+            new string('a', DiscoveryConfiguration.NameMaxLength + 1));
+
+        // Act
+        var response = await client.PostAsJsonAsync(DiscoveryUrl, request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task DiscoveryApi_WhenListingDiscoveryConfigurations_ShouldReturn200Ok()
     {
@@ -121,6 +156,7 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
         Assert.NotNull(body);
 
         var config = body.Single(c => c.Id.Value == created.Id.Value);
+        Assert.Equal(createRequest.Name, config.Name);
         Assert.Equal(credential.Id, config.CredentialId.Value);
         Assert.Equal(credential.Name, config.CredentialName);
         Assert.Equal(DiscoveryPlatform.GitHub, config.Platform);
@@ -170,13 +206,39 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
         var created = await createResponse.ReadFromJsonAsync<CreateDiscoveryConfigurationEndpoint.CreateDiscoveryConfigurationResponse>();
         Assert.NotNull(created);
 
-        var updateRequest = new UpdateDiscoveryConfigurationEndpoint.UpdateDiscoveryConfigurationRequest(organisation.Id.ToString(), false, null);
+        var updateRequest = new UpdateDiscoveryConfigurationEndpoint.UpdateDiscoveryConfigurationRequest(organisation.Id.ToString(), "Renamed", false, null);
+
+        // Act
+        var response = await client.PutAsJsonAsync($"{DiscoveryUrl}/{created.Id.Value}", updateRequest);
+        var listResponse = await client.GetAsync($"{DiscoveryUrl}?organisationId={organisation.Id}");
+        var configs = await listResponse.ReadFromJsonAsync<IEnumerable<ListDiscoveryConfigurationsEndpoint.ListDiscoveryConfigurationResponse>>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(configs);
+        var config = configs.Single(c => c.Id.Value == created.Id.Value);
+        Assert.Equal("Renamed", config.Name);
+        Assert.False(config.IsEnabled);
+    }
+
+    [Fact]
+    public async Task DiscoveryApi_WhenUpdatingDiscoveryConfiguration_WithBlankName_ShouldReturn400BadRequest()
+    {
+        // Arrange
+        var client = await factory.CreateClient().AddAuthorisationHeader();
+        var organisation = await client.CreateOrganisationAsync();
+        var credential = await CreateCredentialAsync(client, organisation.Id, CredentialPlatform.GitHub);
+        var createResponse = await client.PostAsJsonAsync(DiscoveryUrl, BuildDiscoveryRequest(organisation.Id, credential.Id, DiscoveryPlatform.GitHub));
+        var created = await createResponse.ReadFromJsonAsync<CreateDiscoveryConfigurationEndpoint.CreateDiscoveryConfigurationResponse>();
+        Assert.NotNull(created);
+
+        var updateRequest = new UpdateDiscoveryConfigurationEndpoint.UpdateDiscoveryConfigurationRequest(organisation.Id.ToString(), " ", false, null);
 
         // Act
         var response = await client.PutAsJsonAsync($"{DiscoveryUrl}/{created.Id.Value}", updateRequest);
 
         // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -185,7 +247,7 @@ public sealed class DiscoveryIntegrationTests(WebApplicationFactoryWithPostgres 
         // Arrange
         var client = await factory.CreateClient().AddAuthorisationHeader();
         var organisation = await client.CreateOrganisationAsync();
-        var updateRequest = new UpdateDiscoveryConfigurationEndpoint.UpdateDiscoveryConfigurationRequest(organisation.Id.ToString(), false, null);
+        var updateRequest = new UpdateDiscoveryConfigurationEndpoint.UpdateDiscoveryConfigurationRequest(organisation.Id.ToString(), "Renamed", false, null);
 
         // Act
         var response = await client.PutAsJsonAsync($"{DiscoveryUrl}/{Guid.NewGuid()}", updateRequest);

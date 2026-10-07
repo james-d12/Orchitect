@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Orchitect.Persistence;
@@ -12,9 +13,11 @@ using Orchitect.Persistence;
 namespace Orchitect.Persistence.Migrations
 {
     [DbContext(typeof(OrchitectDbContext))]
-    partial class OrchitectDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007202855_discovery_configuration_name")]
+    partial class discovery_configuration_name
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -904,35 +907,6 @@ namespace Orchitect.Persistence.Migrations
                     b.ToTable("DiscoveryConfigurations", "inventory");
                 });
 
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Discovery.DiscoveryRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("DiscoveryConfigurationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DiscoveryConfigurationId", "StartedAt");
-
-                    b.ToTable("DiscoveryRuns", "inventory");
-                });
-
             modelBuilder.Entity("Orchitect.Domain.Inventory.Identity.Team", b =>
                 {
                     b.Property<string>("Id")
@@ -1538,60 +1512,6 @@ namespace Orchitect.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_DiscoveryConfigurations_Organisations");
-                });
-
-            modelBuilder.Entity("Orchitect.Domain.Inventory.Discovery.DiscoveryRun", b =>
-                {
-                    b.HasOne("Orchitect.Domain.Inventory.Discovery.DiscoveryConfiguration", null)
-                        .WithMany()
-                        .HasForeignKey("DiscoveryConfigurationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_DiscoveryRuns_DiscoveryConfigurations");
-
-                    b.OwnsOne("Orchitect.Domain.Inventory.Discovery.DiscoveryCounts", "Counts", b1 =>
-                        {
-                            b1.Property<Guid>("DiscoveryRunId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<int>("CloudResources")
-                                .HasColumnType("integer")
-                                .HasColumnName("CloudResourceCount");
-
-                            b1.Property<int>("CloudSecrets")
-                                .HasColumnType("integer")
-                                .HasColumnName("CloudSecretCount");
-
-                            b1.Property<int>("Issues")
-                                .HasColumnType("integer")
-                                .HasColumnName("IssueCount");
-
-                            b1.Property<int>("Pipelines")
-                                .HasColumnType("integer")
-                                .HasColumnName("PipelineCount");
-
-                            b1.Property<int>("PullRequests")
-                                .HasColumnType("integer")
-                                .HasColumnName("PullRequestCount");
-
-                            b1.Property<int>("Repositories")
-                                .HasColumnType("integer")
-                                .HasColumnName("RepositoryCount");
-
-                            b1.Property<int>("Teams")
-                                .HasColumnType("integer")
-                                .HasColumnName("TeamCount");
-
-                            b1.HasKey("DiscoveryRunId");
-
-                            b1.ToTable("DiscoveryRuns", "inventory");
-
-                            b1.WithOwner()
-                                .HasForeignKey("DiscoveryRunId");
-                        });
-
-                    b.Navigation("Counts")
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Orchitect.Domain.Inventory.Identity.Team", b =>

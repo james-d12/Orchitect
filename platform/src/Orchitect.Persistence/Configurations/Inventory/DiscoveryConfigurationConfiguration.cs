@@ -43,6 +43,10 @@ internal sealed class DiscoveryConfigurationConfiguration : IEntityTypeConfigura
             .HasConstraintName("FK_DiscoveryConfigurations_Credentials")
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Property(x => x.Name)
+            .HasMaxLength(DiscoveryConfiguration.NameMaxLength)
+            .IsRequired();
+
         builder.Property(x => x.Platform)
             .HasConversion<string>()
             .IsRequired();
