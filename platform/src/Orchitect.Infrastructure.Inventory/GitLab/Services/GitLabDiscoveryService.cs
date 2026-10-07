@@ -39,7 +39,7 @@ public sealed class GitLabDiscoveryService : DiscoveryService
 
     public override DiscoveryPlatform Platform => DiscoveryPlatform.GitLab;
 
-    protected override async Task StartAsync(
+    protected override async Task<DiscoveryCounts> StartAsync(
         DiscoveryConfiguration configuration,
         Credential credential,
         CancellationToken cancellationToken)
@@ -79,5 +79,12 @@ public sealed class GitLabDiscoveryService : DiscoveryService
             repositories.Count,
             pipelines.Count,
             pullRequests.Count);
+
+        return new DiscoveryCounts
+        {
+            Repositories = repositories.Count,
+            Pipelines = pipelines.Count,
+            PullRequests = pullRequests.Count
+        };
     }
 }

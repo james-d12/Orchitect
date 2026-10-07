@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Orchitect.Persistence;
@@ -12,9 +13,11 @@ using Orchitect.Persistence;
 namespace Orchitect.Persistence.Migrations
 {
     [DbContext(typeof(OrchitectDbContext))]
-    partial class OrchitectDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007203116_discovery_runs")]
+    partial class discovery_runs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -863,11 +866,6 @@ namespace Orchitect.Persistence.Migrations
 
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid>("OrganisationId")
                         .HasColumnType("uuid");

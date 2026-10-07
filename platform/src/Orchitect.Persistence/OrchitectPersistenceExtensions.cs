@@ -15,6 +15,7 @@ using Orchitect.Domain.Engine.ResourceInstance;
 using Orchitect.Domain.Engine.ResourceTemplate;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Services;
+using Orchitect.Domain.Inventory.Discovery;
 using Orchitect.Domain.Inventory.Discovery.Services;
 using Orchitect.Domain.Inventory.Identity.Services;
 using Orchitect.Domain.Inventory.Issue;
@@ -57,6 +58,7 @@ public static class OrchitectPersistenceExtensions
         services.TryAddScoped<ICredentialRepository, CredentialRepository>();
 
         services.TryAddScoped<IDiscoveryConfigurationRepository, DiscoveryConfigurationRepository>();
+        services.TryAddScoped<IDiscoveryRunRepository, DiscoveryRunRepository>();
         services.TryAddScoped<IRepositoryRepository, RepositoryRepository>();
         services.TryAddScoped<IPipelineRepository, PipelineRepository>();
         services.TryAddScoped<IPullRequestRepository, PullRequestRepository>();
@@ -78,6 +80,7 @@ public static class OrchitectPersistenceExtensions
 
         services.AddEntityRepository<Organisation, OrganisationId, IOrganisationRepository>();
         services.AddEntityRepository<Credential, CredentialId, ICredentialRepository>();
+        services.AddEntityRepository<DiscoveryConfiguration, DiscoveryConfigurationId, IDiscoveryConfigurationRepository>();
         services.AddEntityRepository<Repository, RepositoryId, IRepositoryRepository>();
         services.AddEntityRepository<Pipeline, PipelineId, IPipelineRepository>();
         services.AddEntityRepository<PullRequest, PullRequestId, IPullRequestRepository>();
@@ -88,6 +91,7 @@ public static class OrchitectPersistenceExtensions
         services.AddEntityRepository<Application, ApplicationId, IApplicationRepository>();
         services.AddEntityRepository<Environment, EnvironmentId, IEnvironmentRepository>();
         services.AddEntityRepository<Deployment, DeploymentId, IDeploymentRepository>();
+        services.AddEntityRepository<Resource, ResourceId, IResourceRepository>();
 
         return services;
     }

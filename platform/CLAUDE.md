@@ -88,7 +88,7 @@ Each capability is a namespace folder (`Core`, `Engine`, `Inventory`) inside the
 
 | Project | Role |
 |---|---|
-| `Orchitect.Api` | The single ASP.NET API. Minimal-API endpoints in `Endpoints/{Core,Engine,Inventory}/`, plus `Jobs/DiscoveryHostedService` for periodic Inventory discovery |
+| `Orchitect.Api` | The single ASP.NET API. Minimal-API endpoints in `Endpoints/{Core,Engine,Inventory}/`, plus `Jobs/DiscoveryHostedService` for periodic Inventory discovery. Every discovery, scheduled or triggered, goes through `Jobs/DiscoveryRunner`, which records a `DiscoveryRun` (status, counts, error) readable at `GET /discovery/{id}/status` and `/runs` |
 | `Orchitect.Domain` | Entities, strongly-typed IDs and repository interfaces, in `Core/`, `Engine/` and `Inventory/` |
 | `Orchitect.Persistence` | `OrchitectDbContext`, EF configurations, repositories and migrations for all contexts |
 | `Orchitect.Engine.Contracts` | What the API and the runner must agree on: runner arguments and environment keys, `RunnerOperation`, `TerraformBackendOptions`, `SecretProviderOptions`, the secrets file, the Score models, and the runner API routes, DTOs and contract version (`Runner/Api/`). No Orchitect references |

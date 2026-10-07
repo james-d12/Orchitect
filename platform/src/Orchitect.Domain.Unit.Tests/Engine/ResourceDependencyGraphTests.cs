@@ -230,6 +230,28 @@ public sealed class ResourceDependencyGraphTests
     }
 
     [Fact]
+    public void GetDependenciesAndDependents_ReturnOnlyDirectNeighbours()
+    {
+        var (app, api, db) = (Add(), Add(), Add());
+        _graph.AddDependency(app, api);
+        _graph.AddDependency(api, db);
+
+        Assert.Equal([db], _graph.GetDependencies(api));
+        Assert.Equal([app], _graph.GetDependents(api));
+        Assert.Empty(_graph.GetDependencies(db));
+        Assert.Empty(_graph.GetDependents(app));
+    }
+
+    [Fact]
+    public void GetDependenciesAndDependents_UnknownResource_ReturnEmpty()
+    {
+        var unknown = new ResourceId();
+
+        Assert.Empty(_graph.GetDependencies(unknown));
+        Assert.Empty(_graph.GetDependents(unknown));
+    }
+
+    [Fact]
     public void ResolveOrder_PutsDependenciesBeforeDependents()
     {
         var (aks, acr, keyVault, subnet, vnet) = (Add(), Add(), Add(), Add(), Add());

@@ -114,6 +114,16 @@ public sealed class ResourceDependencyGraph : IResourceDependencyGraph
         }
     }
 
+    public IReadOnlyCollection<ResourceId> GetDependencies(ResourceId resourceId)
+    {
+        return _nodes.TryGetValue(resourceId, out ResourceDependencyNode? node) ? node.Out.ToList() : [];
+    }
+
+    public IReadOnlyCollection<ResourceId> GetDependents(ResourceId resourceId)
+    {
+        return _nodes.TryGetValue(resourceId, out ResourceDependencyNode? node) ? node.In.ToList() : [];
+    }
+
     public bool HasDependencyPath(ResourceId startId, ResourceId targetId)
     {
         if (!_nodes.ContainsKey(startId) || !_nodes.ContainsKey(targetId))

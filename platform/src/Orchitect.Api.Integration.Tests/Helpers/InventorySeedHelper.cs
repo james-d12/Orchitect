@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Orchitect.Domain.Core.Organisation;
 using Orchitect.Domain.Inventory.Cloud;
 using Orchitect.Domain.Inventory.Cloud.Services;
+using Orchitect.Domain.Inventory.Discovery;
+using Orchitect.Domain.Inventory.Discovery.Services;
 using Orchitect.Domain.Inventory.Identity;
 using Orchitect.Domain.Inventory.Identity.Services;
 using Orchitect.Domain.Inventory.Issue;
@@ -242,5 +244,25 @@ public static class InventorySeedHelper
         await repository.BulkUpsertAsync([issue]);
 
         return issue;
+    }
+
+    public static async Task<DiscoveryRun> SeedDiscoveryRunAsync(
+        this WebApplicationFactoryWithPostgres factory,
+        DiscoveryConfigurationId configurationId,
+        DateTime startedAt,
+        Func<DiscoveryRun, DiscoveryRun>? finish = null)
+    {
+        var run = DiscoveryRun.Start(configurationId) with { StartedAt = startedAt };
+
+        if (finish is not null)
+        {
+            run = finish(run);
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDiscoveryRunRepository>();
+        await repository.CreateAsync(run);
+
+        return run;
     }
 }

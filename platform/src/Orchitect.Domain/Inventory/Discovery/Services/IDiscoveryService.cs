@@ -6,7 +6,10 @@ public interface IDiscoveryService
 {
     DiscoveryPlatform Platform { get; }
 
-    Task DiscoverAsync(
+    /// <summary>
+    /// Discovers and saves the platform's items, returning how many of each kind were found.
+    /// </summary>
+    Task<DiscoveryCounts> DiscoverAsync(
         DiscoveryConfiguration configuration,
         Credential credential,
         CancellationToken cancellationToken);
