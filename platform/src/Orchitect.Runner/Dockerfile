@@ -83,6 +83,7 @@ COPY src/Orchitect.Engine.Contracts/Orchitect.Engine.Contracts.csproj src/Orchit
 COPY src/Orchitect.Engine.Execution/Orchitect.Engine.Execution.csproj src/Orchitect.Engine.Execution/
 COPY src/Orchitect.Runner/Orchitect.Runner.csproj src/Orchitect.Runner/
 COPY src/Orchitect.ServiceDefaults/Orchitect.ServiceDefaults.csproj src/Orchitect.ServiceDefaults/
+COPY src/Orchitect.Storage/Orchitect.Storage.csproj src/Orchitect.Storage/
 
 RUN dotnet restore src/Orchitect.Runner/Orchitect.Runner.csproj
 
