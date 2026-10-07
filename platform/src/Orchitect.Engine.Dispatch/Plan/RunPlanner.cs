@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Orchitect.Common.Observability;
 using Orchitect.Domain.Core;
@@ -27,7 +26,7 @@ public interface IRunPlanner
     Task<RunPlan> PlanAsync(DeploymentRunId runId, ScoreFile scoreFile, CancellationToken cancellationToken);
 }
 
-public sealed partial class RunPlanner : IRunPlanner
+public sealed class RunPlanner : IRunPlanner
 {
     private readonly ILogger<RunPlanner> _logger;
     private readonly IUnitOfWork _unitOfWork;
@@ -214,7 +213,46 @@ public sealed partial class RunPlanner : IRunPlanner
             inputs.Add(new ResolvedInput(input, template, version, resource, name, slug));
         }
 
+        ValidateReferences(inputs);
+
         return inputs;
+    }
+
+    private static void ValidateReferences(List<ResolvedInput> inputs)
+    {
+        var providers = inputs.ToDictionary(i => i.Input.Key, i => i.Input.Provider);
+
+        foreach (var input in inputs.Select(i => i.Input))
+        {
+            foreach (var (name, value) in input.Parameters)
+            {
+                if (ScoreReference.HasMalformed(value))
+                {
+                    throw Invalid(
+                        $"Parameter '{name}' of resource '{input.Key}' has a malformed reference; expected ${{resources.<key>.<output>}}.");
+                }
+
+                foreach (var reference in ScoreReference.Find(value))
+                {
+                    if (reference.Key == input.Key)
+                    {
+                        throw Invalid($"Parameter '{name}' of resource '{input.Key}' references itself.");
+                    }
+
+                    if (!providers.TryGetValue(reference.Key, out var provider))
+                    {
+                        throw Invalid(
+                            $"Parameter '{name}' of resource '{input.Key}' references resource '{reference.Key}', which is not in the score file.");
+                    }
+
+                    if (input.Provider != RunInputProvider.Terraform || provider != RunInputProvider.Terraform)
+                    {
+                        throw Invalid(
+                            $"Parameter '{name}' of resource '{input.Key}' references resource '{reference.Key}', but outputs can only be referenced between Terraform resources.");
+                    }
+                }
+            }
+        }
     }
 
     private async Task<List<PlannedResourceInstance>> PlanProvisionAsync(Application application,
@@ -313,7 +351,15 @@ public sealed partial class RunPlanner : IRunPlanner
                 .Select(key => resourcesByKey[key].Id)
                 .Where(id => id != keys.Key);
 
-            graph.SetDependencies(keys.Key, dependencies);
+            try
+            {
+                graph.SetDependencies(keys.Key, dependencies);
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw Invalid(
+                    $"Resource '{keys.First()}' cannot depend on the resources it references: {exception.Message}");
+            }
         }
 
         if (existingGraph is null)
@@ -440,12 +486,9 @@ public sealed partial class RunPlanner : IRunPlanner
 
     private static IEnumerable<string> FindReferencedResourceKeys(ScoreResource scoreResource) =>
         (scoreResource.Parameters ?? [])
-        .SelectMany(p => ResourceReferenceRegex().Matches(p.Value))
-        .Select(m => m.Groups["key"].Value)
+        .SelectMany(p => ScoreReference.Find(p.Value))
+        .Select(r => r.Key)
         .Distinct();
-
-    [GeneratedRegex(@"\$\{resources\.(?<key>[A-Za-z0-9_-]+)\.")]
-    private static partial Regex ResourceReferenceRegex();
 
     private sealed record ResolvedInput(
         RunInput Input,

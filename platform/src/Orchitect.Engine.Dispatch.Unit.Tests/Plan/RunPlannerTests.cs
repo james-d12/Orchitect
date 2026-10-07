@@ -223,6 +223,61 @@ public sealed class RunPlannerTests
         Assert.Equal(0, Assert.Single(_context.Graphs.Items).DependencyCount(storage.Id));
     }
 
+    [Theory]
+    [InlineData("${resources.cache.id}", "not in the score file")]
+    [InlineData("${resources.storage.id}", "references itself")]
+    [InlineData("${resources.vault}", "malformed")]
+    [InlineData("${resources.vault.id", "malformed")]
+    public async Task PlanAsync_InvalidReference_ThrowsWithoutRecording(string value, string error)
+    {
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Provision, Score(
+                ("vault", KeyVaultType, null),
+                ("storage", StorageType, new() { ["key_vault_id"] = value }))));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains(error, exception.Message);
+        Assert.Contains("key_vault_id", exception.Message);
+        Assert.Empty(_context.Resources.Items);
+        Assert.Empty(_context.Plans.Items);
+    }
+
+    [Fact]
+    public async Task PlanAsync_ReferenceBetweenProviders_Throws()
+    {
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Provision, Score(
+                ("chart", HelmType, null),
+                ("storage", StorageType, new() { ["name"] = "${resources.chart.name}" }))));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains("only be referenced between Terraform resources", exception.Message);
+    }
+
+    [Fact]
+    public async Task PlanAsync_ReferencesFormACycle_Throws()
+    {
+        var exception = await Assert.ThrowsAsync<RunPlanException>(() =>
+            _context.PlanAsync(DeploymentRunOperation.Provision, Score(
+                ("vault", KeyVaultType, new() { ["storage_id"] = "${resources.storage.id}" }),
+                ("storage", StorageType, new() { ["key_vault_id"] = "${resources.vault.id}" }))));
+
+        Assert.Equal(RunPlanFailure.Invalid, exception.Failure);
+        Assert.Contains("cycle", exception.Message);
+        Assert.Empty(_context.Plans.Items);
+    }
+
+    [Fact]
+    public async Task PlanAsync_ReferenceInsideText_PlansParameterUnchanged()
+    {
+        var (_, plan) = await _context.PlanAsync(DeploymentRunOperation.Provision, Score(
+            ("vault", KeyVaultType, null),
+            ("storage", StorageType, new() { ["name"] = "orders-${resources.vault.name}-data" })));
+
+        Assert.Equal("orders-${resources.vault.name}-data",
+            plan.Inputs.Single(i => i.Key == "storage").Parameters["name"]);
+    }
+
     [Fact]
     public async Task PlanAsync_ScoreResourceHasId_UsesIdAsResourceName()
     {

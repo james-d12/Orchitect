@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Orchitect.Engine.Contracts.Runner.Api;
+using Orchitect.Engine.Contracts.Score;
 using Orchitect.Engine.Execution.Provisioner.Terraform.Models;
 
 namespace Orchitect.Engine.Execution.Provisioner.Terraform;
@@ -11,7 +12,8 @@ public interface ITerraformRenderer
 {
     /// <summary>
     /// Renders the module blocks as main.tf.json and their input values as terraform.tfvars.json.
-    /// Input values only appear in the tfvars file, so Terraform never evaluates them as expressions.
+    /// Input values only appear in the tfvars file, so Terraform never evaluates them as expressions, except that
+    /// ${resources.key.output} references become module output expressions, which Terraform resolves in dependency order.
     /// </summary>
     TerraformRenderedModules RenderModules(
         Dictionary<RunInput, TerraformValidationResult.ValidResult> terraformValidationResults);
@@ -43,10 +45,11 @@ public sealed partial class TerraformRenderer : ITerraformRenderer
         var variables = new JsonObject();
         var modules = new JsonObject();
         var tfVars = new JsonObject();
+        var moduleNames = terraformValidationResults.Keys.ToDictionary(i => i.Key, ModuleName);
 
         foreach (var (planInput, validationResult) in terraformValidationResults)
         {
-            var moduleName = ToIdentifier($"{planInput.TemplateName}_{planInput.Key}");
+            var moduleName = moduleNames[planInput.Key];
 
             if (modules.ContainsKey(moduleName))
             {
@@ -58,6 +61,14 @@ public sealed partial class TerraformRenderer : ITerraformRenderer
 
             foreach (var (inputName, rawValue) in planInput.Parameters)
             {
+                var references = ScoreReference.Find(rawValue);
+
+                if (references.Count > 0)
+                {
+                    module[inputName] = RenderReferences(rawValue, references, moduleNames, inputName, moduleName);
+                    continue;
+                }
+
                 var variableName = $"{moduleName}__{inputName}";
                 var variableType = validationResult.Config.Variables.GetValueOrDefault(inputName)?.Type;
 
@@ -172,6 +183,34 @@ public sealed partial class TerraformRenderer : ITerraformRenderer
 
         return builder.ToString();
     }
+
+    private static string RenderReferences(string rawValue, IReadOnlyList<ScoreReference> references,
+        Dictionary<string, string> moduleNames, string inputName, string moduleName)
+    {
+        var builder = new StringBuilder();
+        var position = 0;
+
+        foreach (var reference in references)
+        {
+            if (!moduleNames.TryGetValue(reference.Key, out var target))
+            {
+                throw new InvalidOperationException(
+                    $"Input '{inputName}' of '{moduleName}' references resource '{reference.Key}', which is not in this run.");
+            }
+
+            builder.Append(EscapeTemplate(rawValue[position..reference.Index]))
+                .Append("${module.").Append(target).Append('.').Append(reference.Output).Append('}');
+            position = reference.Index + reference.Length;
+        }
+
+        return builder.Append(EscapeTemplate(rawValue[position..])).ToString();
+    }
+
+    private static string EscapeTemplate(string value) => value
+        .Replace("${", "$${", StringComparison.Ordinal)
+        .Replace("%{", "%%{", StringComparison.Ordinal);
+
+    private static string ModuleName(RunInput input) => ToIdentifier($"{input.TemplateName}_{input.Key}");
 
     private static string Serialize(JsonNode node) => node.ToJsonString(SerializerOptions);
 }

@@ -91,6 +91,42 @@ public sealed class TerraformRendererTests
     }
 
     [Fact]
+    public void RenderModules_ParameterIsReference_RendersModuleOutputExpression()
+    {
+        var plans = ReferencePlans("${resources.vault.id}");
+
+        var rendered = new TerraformRenderer().RenderModules(plans);
+
+        var main = JsonNode.Parse(rendered.MainTfJson)!;
+        Assert.Equal("${module.key_vault_vault.id}",
+            main["module"]!["storage_account_storage"]!["key_vault_id"]!.GetValue<string>());
+        Assert.Null(main["variable"]?["storage_account_storage__key_vault_id"]);
+        Assert.Null(JsonNode.Parse(rendered.TfVarsJson)!["storage_account_storage__key_vault_id"]);
+    }
+
+    [Fact]
+    public void RenderModules_ReferenceInsideText_EscapesTheLiteralText()
+    {
+        var plans = ReferencePlans("${resources.vault.name}/${file(\"/etc/passwd\")}%{ if true }");
+
+        var main = JsonNode.Parse(new TerraformRenderer().RenderModules(plans).MainTfJson)!;
+
+        Assert.Equal("${module.key_vault_vault.name}/$${file(\"/etc/passwd\")}%%{ if true }",
+            main["module"]!["storage_account_storage"]!["key_vault_id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void RenderModules_ReferenceToResourceOutsideTheRun_Throws()
+    {
+        var plans = Plans(new Dictionary<string, string> { ["key_vault_id"] = "${resources.vault.id}" },
+            ("key_vault_id", "string"));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new TerraformRenderer().RenderModules(plans));
+
+        Assert.Contains("vault", exception.Message);
+    }
+
+    [Fact]
     public void RenderProviders_RendersRequiredProvidersAndProviderBlocks()
     {
         var providers = JsonNode.Parse(new TerraformRenderer().RenderProviders(
@@ -126,6 +162,14 @@ public sealed class TerraformRendererTests
     {
         Assert.Throws<InvalidOperationException>(() =>
             new TerraformRenderer().RenderBackendConfig(new Dictionary<string, string> { [key] = "value" }));
+    }
+
+    private static Dictionary<RunInput, TerraformValidationResult.ValidResult> ReferencePlans(string value)
+    {
+        var plans = Plans(new Dictionary<string, string> { ["key_vault_id"] = value }, ("key_vault_id", "string"));
+        plans[TerraformTestData.Input(key: "vault", templateName: "Key Vault")] =
+            TerraformValidationResult.Valid(new TerraformConfig(), "/modules/vault");
+        return plans;
     }
 
     private static Dictionary<RunInput, TerraformValidationResult.ValidResult> Plans(

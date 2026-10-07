@@ -93,6 +93,42 @@ public sealed class TerraformValidatorTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidateAsync_ReferenceToExistingOutput_IsValid()
+    {
+        var (validator, vault) = CreateReferenceValidator();
+        var storage = Input(new Dictionary<string, string> { ["replicas"] = "${resources.vault.count}" }, "storage");
+
+        var results = await validator.ValidateAsync([vault, storage]);
+
+        Assert.All(results.Values, result => Assert.IsType<TerraformValidationResult.ValidResult>(result));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_ReferenceToMissingOutput_IsInputInvalid()
+    {
+        var (validator, vault) = CreateReferenceValidator();
+        var storage = Input(new Dictionary<string, string> { ["replicas"] = "${resources.vault.missing}" }, "storage");
+
+        var results = await validator.ValidateAsync([vault, storage]);
+
+        Assert.IsType<TerraformValidationResult.ValidResult>(results[vault]);
+        Assert.Equal(TerraformValidationResult.ValidationResultState.InputInvalid, results[storage].State);
+        Assert.Contains("replicas: resource 'vault' has no output 'missing'", results[storage].Message);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_ReferenceToResourceOutsideTheRun_IsInputInvalid()
+    {
+        var (validator, _) = CreateReferenceValidator();
+        var storage = Input(new Dictionary<string, string> { ["replicas"] = "${resources.vault.count}" }, "storage");
+
+        var results = await validator.ValidateAsync([storage]);
+
+        Assert.Equal(TerraformValidationResult.ValidationResultState.InputInvalid, results[storage].State);
+        Assert.Contains("resource 'vault' is not a Terraform resource of this run", results[storage].Message);
+    }
+
+    [Fact]
     public async Task ValidateAsync_InspectReportsDiagnostics_IsModuleInvalidWithDiagnostic()
     {
         const string diagnosticsJson =
@@ -138,6 +174,17 @@ public sealed class TerraformValidatorTests : IDisposable
         var results = await validator.ValidateAsync([input]);
 
         Assert.Equal(TerraformValidationResult.ValidationResultState.ModuleInvalid, results[input].State);
+    }
+
+    private (TerraformValidator Validator, RunInput Vault) CreateReferenceValidator()
+    {
+        var commandLine = new InspectingTerraformCommandLine(directory => new CommandLineResult(
+            directory.EndsWith("vault")
+                ? """{"variables":{},"outputs":{"count":{"name":"count"}}}"""
+                : """{"variables":{"replicas":{"name":"replicas","type":"number","required":true}}}""",
+            string.Empty, 0));
+        var validator = CreateValidator(new TerraformModuleDownloaderTests.FakeGitCommandLine("vault"), commandLine);
+        return (validator, Input(new Dictionary<string, string>(), "vault", folderPath: "vault"));
     }
 
     private TerraformValidator CreateValidator(IGitCommandLine git, ITerraformCommandLine commandLine) =>
