@@ -61,6 +61,39 @@ public sealed class OrganisationRepository : IOrganisationRepository
             .ToListAsync(cancellationToken);
     }
 
+    public Task<Organisation?> GetWithUsersAndTeamsAsync(OrganisationId id, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Organisations.AsNoTracking()
+            .Include(o => o.Users)
+            .Include(o => o.Teams)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+    }
+
+    public Task LockAsync(OrganisationId id, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM \"Organisations\" WHERE \"Id\" = {id.Value} FOR UPDATE", cancellationToken);
+    }
+
+    public async Task UpdateUsersAsync(Organisation organisation, CancellationToken cancellationToken = default)
+    {
+        var users = _dbContext.Set<OrganisationUser>();
+        var existingUsers = await users
+            .Where(u => u.OrganisationId == organisation.Id)
+            .ToListAsync(cancellationToken);
+        var userIds = organisation.Users.Select(u => u.Id).ToHashSet();
+        var existingUserIds = existingUsers.Select(u => u.Id).ToHashSet();
+
+        users.RemoveRange(existingUsers.Where(u => !userIds.Contains(u.Id)));
+        await users.AddRangeAsync(organisation.Users.Where(u => !existingUserIds.Contains(u.Id)), cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _dbContext.Organisations
+            .Where(o => o.Id == organisation.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.UpdatedAt, organisation.UpdatedAt), cancellationToken);
+    }
+
     public async Task<IReadOnlyList<OrganisationId>> GetIdsForMemberAsync(string identityUserId,
         CancellationToken cancellationToken = default)
     {

@@ -1,0 +1,23 @@
+meta {
+  name: Register Member User
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{API_BASE_URL}}/users/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "username": "TestMember",
+    "email": "TestMember@gmail.com",
+    "password": "TestPassword1234!"
+  }
+}
+
+docs {
+  Registers a second user to add to an organisation with Add Organisation Member.
+}

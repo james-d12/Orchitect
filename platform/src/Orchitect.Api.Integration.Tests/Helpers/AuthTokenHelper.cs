@@ -22,9 +22,14 @@ public static class AuthTokenHelper
         return client;
     }
 
-    public static async Task<HttpClient> AddAuthorisationHeaderForNewUser(this HttpClient client)
+    public static Task<HttpClient> AddAuthorisationHeaderForNewUser(this HttpClient client)
     {
-        var token = await RegisterAndLoginAsync(client, $"{Guid.NewGuid():N}@example.com");
+        return client.AddAuthorisationHeaderForNewUser($"{Guid.NewGuid():N}@example.com");
+    }
+
+    public static async Task<HttpClient> AddAuthorisationHeaderForNewUser(this HttpClient client, string email)
+    {
+        var token = await RegisterAndLoginAsync(client, email);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
