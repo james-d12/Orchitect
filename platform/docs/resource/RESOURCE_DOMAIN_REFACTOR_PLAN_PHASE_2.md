@@ -3,9 +3,9 @@ title: "Resource domain – Phase 2"
 status: active
 workstream: resource
 milestone: "Resource Domain"
-issues: [141, 142, 143, 144, 145, 146, 155, 187]
+issues: [141, 142, 143, 144, 146, 155, 187]
 superseded_by: null
-last_reviewed: 2026-09-29
+last_reviewed: 2026-10-08
 ---
 
 # Phase 2: Resource Domain — Requirements, Resolution, Deployments & Deltas
@@ -14,7 +14,7 @@ last_reviewed: 2026-09-29
 
 Phase 1 delivered a solid core: `Resource` as declared desired state, `ResourceInstance` with guarded lifecycle transitions, and `ResourceDependencyGraph` keyed on `ResourceId`. Phase 2 evolves this into a real platform orchestrator by adding the layer above the resource model — intent capture, resolution, change planning, and execution tracking.
 
-**The goal:** an application expresses what it needs → the platform resolves it to a concrete resource → a delta is computed → a deployment executes it in graph order → a snapshot records the result.
+**The goal:** an application expresses what it needs → the platform resolves it to a concrete resource → a delta is computed → a deployment executes it in graph order → the resource instances record the result.
 
 ---
 
@@ -30,7 +30,6 @@ Phase 1 delivered a solid core: `Resource` as declared desired state, `ResourceI
 - **Resolution** (ResourceBinding, IResourceResolver)
 - **Change Planning** (DeploymentDelta)
 - **Deployment Execution** (Deployment — enriched)
-- **State History** (EnvironmentStateSnapshot)
 
 ---
 
@@ -50,7 +49,7 @@ Both `order-service` and `payment-service` need `azure.service-bus`. Without the
 
 ### 3. Delta computation needs a declared desired state
 
-`DeploymentDelta` is computed by diffing the current `EnvironmentStateSnapshot` (what exists now) against the new desired set (what the requirements say should exist). Without requirements as a first-class concept, there is nothing to diff against — you'd compare raw `Resource` lists with no knowledge of *why* each resource exists or whether a resource that disappeared was intentionally removed or is a bug.
+`DeploymentDelta` is computed by diffing the application's current resource instances (what exists now) against the new desired set (what the requirements say should exist). Without requirements as a first-class concept, there is nothing to diff against — you'd compare raw `Resource` lists with no knowledge of *why* each resource exists or whether a resource that disappeared was intentionally removed or is a bug.
 
 **In one sentence:** `ResourceRequirement` is the app's voice. `ResourceBinding` is the platform's answer. `IResourceResolver` is the decision logic. Together they answer: given what this app says it needs, which concrete resource satisfies it, and is that the same resource another app is already using?
 
@@ -65,7 +64,7 @@ Both `order-service` and `payment-service` need `azure.service-bus`. Without the
 - EF config at `src/Orchitect.Persistence/Configurations/Engine/DeploymentConfiguration.cs`
 - Used in `Orchitect.Playground/Program.cs`
 
-Phase 2 enriches this aggregate — add `DeploymentDeltaId?`, `string RequestedBy`, `DateTime? StartedAt`, `DateTime? CompletedAt`, `string? ErrorSummary`, and a guarded `Transition` method. Expand `DeploymentStatus` to: `Pending, Planning, Running, Succeeded, Failed, Cancelled` (replacing `Deployed` / `RolledBack`).
+Phase 2 enriches this aggregate — add `string RequestedBy`, `DateTime? StartedAt`, `DateTime? CompletedAt`, `string? ErrorSummary`, and a guarded `Transition` method. Expand `DeploymentStatus` to: `Pending, Planning, Running, Succeeded, Failed, Cancelled` (replacing `Deployed` / `RolledBack`).
 
 ### Existing `Requirement` stub (replace entirely)
 
@@ -120,7 +119,6 @@ A first-class record of change execution. Existing `Deployment` gains:
 
 | Added Field | Purpose |
 |---|---|
-| `DeploymentDeltaId?` | planned change (nullable until `Planning`) |
 | `RequestedBy` | user email or `"system"` |
 | `StartedAt?` | timing |
 | `CompletedAt?` | timing |
@@ -149,44 +147,29 @@ Cancelled → []
 
 ### 4. DeploymentDelta
 
-Represents what will change before execution.
+Represents what a run will change, worked out before execution. It belongs to a `DeploymentRun`, not to the `Deployment`: a deployment can have several runs (retries, destroy), and each run is planned on its own by `IRunPlanner`.
 
-Fields:
+The delta is one change per resource instance the run touches:
 
-| Field | Purpose |
+| Change | Meaning |
 |---|---|
-| `Id` | identity |
-| `OrganisationId` | tenant scope |
-| `EnvironmentId` | target |
-| `AddedResourceIds` | new resources |
-| `UpdatedResourceIds` | changed resources |
-| `RemovedResourceIds` | resources to tear down |
+| `Added` | No current instance: the resource or its instance is new |
+| `Updated` | The current instance's template version or input parameters differ from the resolved input |
+| `Unchanged` | The current instance matches the resolved input |
+| `Removed` | The application consumed the resource before, and the score file no longer has it |
+
+**Baseline (current state):** the resources in the environment whose `Consumers` include the application (later its `ResourceBinding`s, #143), each with its latest instance that isn't `Removed`. The baseline is scoped to the application, not the environment. Other applications' resources are never part of the delta.
 
 Example delta:
 ```
-+ Add Kafka topic
-~ Upgrade payment-api image
-- Remove old cache
++ ecommerce-cosmos-products   (Added)
+~ ecommerce-redis-catalog     (Updated: max_memory 1gb → 2gb)
+- ecommerce-legacy-cache      (Removed)
 ```
 
-### 5. EnvironmentStateSnapshot
+### 5. EnvironmentStateSnapshot (dropped)
 
-Stores current known environment state after a successful deployment. Used as the baseline for computing the next delta.
-
-```
-Snapshot A (current) vs Desired B = DeploymentDelta
-```
-
-Fields:
-
-| Field | Purpose |
-|---|---|
-| `Id` | identity |
-| `OrganisationId` | tenant scope |
-| `EnvironmentId` | which environment |
-| `DeploymentId` | which deployment produced this snapshot |
-| `ResourceIds` | all active resources at capture time |
-| `CapturedAt` | timestamp |
+Dropped in #145: "Not needed, as we store resource instances." `ResourceInstance` status already records what exists in an environment, so the delta's baseline comes from the instances (see §4).
 
 ---
 
@@ -211,14 +194,9 @@ Engine/
     CommitId.cs
     CreateDeploymentRequest.cs
     IDeploymentRepository.cs
-  DeploymentDelta/
-    DeploymentDeltaId.cs
-    DeploymentDelta.cs
-    IDeploymentDeltaRepository.cs
-  EnvironmentState/
-    EnvironmentStateSnapshotId.cs
-    EnvironmentStateSnapshot.cs
-    IEnvironmentStateSnapshotRepository.cs
+    DeploymentDelta.cs          (new — computed delta)
+    ResourceChange.cs           (new)
+    PlannedResourceInstance.cs  (existing — gains ResourceId and Change)
 ```
 
 ---
@@ -377,9 +355,10 @@ public enum DeploymentStatus
 }
 ```
 
+> `DeltaId` and `SetDelta()` are dropped: the delta lives on the run plan (Step 4). The rest of this step is being rewritten to fit the current `Deploying`/`Destroying` lifecycle (#141).
+
 **Updated `Deployment.cs` (key additions):**
 ```csharp
-public DeploymentDeltaId? DeltaId { get; private set; }
 public string RequestedBy { get; private init; } = string.Empty;
 public DateTime? StartedAt { get; private set; }
 public DateTime? CompletedAt { get; private set; }
@@ -406,8 +385,6 @@ public void Transition(DeploymentStatus newStatus, string? errorSummary = null)
         CompletedAt = DateTime.UtcNow;
     UpdatedAt = DateTime.UtcNow;
 }
-
-public void SetDelta(DeploymentDeltaId deltaId) => DeltaId = deltaId;
 ```
 
 **Update `CreateDeploymentRequest`** to include `string RequestedBy`.
@@ -418,106 +395,77 @@ public void SetDelta(DeploymentDeltaId deltaId) => DeltaId = deltaId;
 
 ### Step 4 — DeploymentDelta
 
-New folder `Engine/DeploymentDelta/`.
+The delta is computed by `RunPlanner` for each run and stored on that run's `DeploymentRunPlan`, in the same transaction as the plan. A repeat or concurrent `PlanAsync` returns the stored plan, and the stored delta with it. There is no separate aggregate, repository or table.
 
-**`DeploymentDeltaId.cs`** — standard strongly-typed GUID struct.
-
-**`DeploymentDelta.cs`:**
+**`ResourceChange.cs`:**
 ```csharp
-public sealed class DeploymentDelta
+public enum ResourceChange
 {
-    public DeploymentDeltaId Id { get; private init; }
-    public OrganisationId OrganisationId { get; private init; }
-    public EnvironmentId EnvironmentId { get; private init; }
-    public DateTime CreatedAt { get; private init; }
-
-    private readonly List<ResourceId> _addedResourceIds = [];
-    private readonly List<ResourceId> _updatedResourceIds = [];
-    private readonly List<ResourceId> _removedResourceIds = [];
-
-    public IReadOnlyList<ResourceId> AddedResourceIds => _addedResourceIds.AsReadOnly();
-    public IReadOnlyList<ResourceId> UpdatedResourceIds => _updatedResourceIds.AsReadOnly();
-    public IReadOnlyList<ResourceId> RemovedResourceIds => _removedResourceIds.AsReadOnly();
-
-    private DeploymentDelta() { }
-
-    public static DeploymentDelta Create(OrganisationId organisationId, EnvironmentId environmentId)
-        => new()
-        {
-            Id = new DeploymentDeltaId(),
-            OrganisationId = organisationId,
-            EnvironmentId = environmentId,
-            CreatedAt = DateTime.UtcNow
-        };
-
-    public void AddResource(ResourceId id)    => _addedResourceIds.Add(id);
-    public void UpdateResource(ResourceId id) => _updatedResourceIds.Add(id);
-    public void RemoveResource(ResourceId id) => _removedResourceIds.Add(id);
+    Added,
+    Updated,
+    Unchanged,
+    Removed
 }
 ```
 
-**`IDeploymentDeltaRepository.cs`:**
+**`PlannedResourceInstance.cs`** gains the resource and the change. `Key` is the score key; a removed resource has no key, because it is no longer in the score file:
 ```csharp
-public interface IDeploymentDeltaRepository : IRepository<DeploymentDelta, DeploymentDeltaId>
+public sealed record PlannedResourceInstance(
+    ResourceInstanceId InstanceId,
+    ResourceId ResourceId,
+    string? Key,
+    ResourceChange Change);
+```
+
+**`DeploymentDelta.cs`** — a pure computation, so it can be unit tested without the planner:
+```csharp
+public sealed record CurrentResourceInstance(
+    ResourceInstanceId InstanceId,
+    ResourceId ResourceId,
+    ResourceTemplateVersionId TemplateVersionId,
+    IReadOnlyDictionary<string, JsonElement> InputParameters);
+
+public sealed record DesiredResource(
+    string Key,
+    ResourceId ResourceId,
+    ResourceTemplateVersionId TemplateVersionId,
+    IReadOnlyDictionary<string, JsonElement> InputParameters);
+
+public static class DeploymentDelta
 {
-    Task<DeploymentDelta?> UpdateAsync(DeploymentDelta delta, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Compares an application's current instances with the resources its score file resolves to. Each resource
+    /// appears once: Added, Updated or Unchanged when it is desired, Removed when only the current state has it.
+    /// </summary>
+    public static IReadOnlyList<(ResourceId ResourceId, string? Key, ResourceChange Change)> Compute(
+        IReadOnlyCollection<CurrentResourceInstance> current,
+        IReadOnlyCollection<DesiredResource> desired);
 }
 ```
 
-**Persistence:** `DeploymentDeltaConfiguration.cs` — store the three `ResourceId` lists as `jsonb` arrays of `Guid`. Add `DbSet<DeploymentDelta> DeploymentDeltas` to `OrchitectDbContext`.
+**Rules:**
+- **Baseline:** the environment's resources whose `Consumers` include the application, each with its latest instance that isn't `Removed`. It is scoped to the application, so other applications' resources never appear.
+- **Compute first.** `GetOrCreateInstanceAsync` calls `Reconfigure` on the current instance, so the delta must be computed before `RecordResourcesAsync` changes anything.
+- **Updated:** the template version differs, or the input parameters differ (compared by key and JSON value).
+- **First deploy:** no baseline, so every resource is `Added`.
+- **Retry:** an instance that is `Failed` or still `Provisioning` counts as `Updated` when its inputs changed, and as `Unchanged` otherwise. Its status is not part of the comparison; `BeginProvisioning` already handles it.
+- **Removed:** the planner records the removed instances in the plan, but #144 does not change them. The removed instances' transitions (`PendingRemoval` → `Removing` → `Removed`), the graph, the consumers and the shared-resource rule are #187. Until then, `RunCompleter` skips them, because they are not `Provisioning` or `Removing`.
+- **Destroy runs:** every planned instance is `Removed`.
+
+**Persistence:** extend `DeploymentRunPlanConfiguration`'s stored instance (`StoredInstance`) with `ResourceId` and `Change`. Plans stored before this change deserialize with `Change = Added` for provision runs and `Removed` for destroy runs, so no data migration is needed.
+
+**Exposure:** return the delta with the latest run on `GET /deployments/{id}`, as lists of added, updated and removed resource ids and slugs.
+
+**Tests:**
+- Unit tests for `DeploymentDelta.Compute` covering: first deploy, unchanged, version change, parameter change, removed, and a resource shared with another application that isn't touched.
+- `RunPlannerTests` checking that the delta is computed before `Reconfigure` and that a replayed plan returns the stored delta.
+- An integration test: deploy, then redeploy with one resource changed and one dropped, and assert the persisted delta.
 
 ---
 
-### Step 5 — EnvironmentStateSnapshot
+### Step 5 — EnvironmentStateSnapshot (dropped)
 
-New folder `Engine/EnvironmentState/`.
-
-**`EnvironmentStateSnapshotId.cs`** — standard strongly-typed GUID struct.
-
-**`EnvironmentStateSnapshot.cs`:**
-```csharp
-public sealed class EnvironmentStateSnapshot
-{
-    public EnvironmentStateSnapshotId Id { get; private init; }
-    public OrganisationId OrganisationId { get; private init; }
-    public EnvironmentId EnvironmentId { get; private init; }
-    public DeploymentId DeploymentId { get; private init; }
-    public DateTime CapturedAt { get; private init; }
-
-    private readonly List<ResourceId> _resourceIds = [];
-    public IReadOnlyList<ResourceId> ResourceIds => _resourceIds.AsReadOnly();
-
-    private EnvironmentStateSnapshot() { }
-
-    public static EnvironmentStateSnapshot Capture(
-        OrganisationId organisationId,
-        EnvironmentId environmentId,
-        DeploymentId deploymentId,
-        IEnumerable<ResourceId> activeResourceIds)
-    {
-        var snapshot = new EnvironmentStateSnapshot
-        {
-            Id = new EnvironmentStateSnapshotId(),
-            OrganisationId = organisationId,
-            EnvironmentId = environmentId,
-            DeploymentId = deploymentId,
-            CapturedAt = DateTime.UtcNow
-        };
-        snapshot._resourceIds.AddRange(activeResourceIds);
-        return snapshot;
-    }
-}
-```
-
-**`IEnvironmentStateSnapshotRepository.cs`:**
-```csharp
-public interface IEnvironmentStateSnapshotRepository : IRepository<EnvironmentStateSnapshot, EnvironmentStateSnapshotId>
-{
-    Task<EnvironmentStateSnapshot?> GetLatestByEnvironmentAsync(EnvironmentId environmentId, CancellationToken cancellationToken = default);
-}
-```
-
-**Persistence:** `EnvironmentStateSnapshotConfiguration.cs` — store `ResourceIds` as `jsonb`. Add `DbSet<EnvironmentStateSnapshot> EnvironmentStateSnapshots` to `OrchitectDbContext`.
+Dropped in #145. The delta's baseline comes from `ResourceInstance` (Step 4).
 
 ---
 
@@ -527,11 +475,10 @@ Extend `Orchitect.Playground/Program.cs` to demonstrate the full Phase 2 flow af
 
 1. Create `ResourceRequirement` for each resource (type, class, constraints, parameters)
 2. Create `ResourceBinding` for each (requirement → resource direct mapping)
-3. Create `DeploymentDelta` (mark all resources as added)
+3. Compute the `DeploymentDelta` against the Phase 1 instances
 4. Create enriched `Deployment` with `RequestedBy = "system"`
-5. Transition: `Pending → Planning`, call `SetDelta`, then `Planning → Running → Succeeded`
-6. Capture `EnvironmentStateSnapshot`
-7. Print a summary of the full provision flow
+5. Run the deployment lifecycle (the exact transitions depend on #141)
+6. Print a summary of the full provision flow
 
 ---
 
@@ -550,13 +497,14 @@ Resolver binds:
   kafka    → eventbus-prod
   vault    → kv-prod
   ↓
-DeploymentDelta computed:
-  + Upgrade image v5→v6
-  + Add topic payment-refunds
+DeploymentDelta computed against payment-api's current instances:
+  + Added    topic payment-refunds
+  ~ Updated  payment-db-prod (sku changed)
+  = Unchanged kv-prod
   ↓
 Deployment executes in graph order
   ↓
-EnvironmentStateSnapshot stored
+Resource instances record the result
 ```
 
 ---
@@ -576,21 +524,18 @@ EnvironmentStateSnapshot stored
 | `Engine/ResourceResolution/ResourceBinding.cs` | **Create** |
 | `Engine/ResourceResolution/IResourceResolver.cs` | **Create** |
 | `Engine/ResourceResolution/IResourceBindingRepository.cs` | **Create** |
-| `Engine/Deployment/Deployment.cs` | **Modify** — add `DeltaId?`, `RequestedBy`, `StartedAt`, `CompletedAt`, `ErrorSummary`, `Transition()`, `SetDelta()` |
+| `Engine/Deployment/Deployment.cs` | **Modify** — add `RequestedBy`, `StartedAt`, `CompletedAt`, `ErrorSummary`, `Transition()` (being reworked in #141) |
 | `Engine/Deployment/DeploymentStatus.cs` | **Modify** — replace with `Pending/Planning/Running/Succeeded/Failed/Cancelled` |
 | `Engine/Deployment/CreateDeploymentRequest.cs` | **Modify** — add `RequestedBy` parameter |
-| `Engine/DeploymentDelta/DeploymentDeltaId.cs` | **Create** |
-| `Engine/DeploymentDelta/DeploymentDelta.cs` | **Create** |
-| `Engine/DeploymentDelta/IDeploymentDeltaRepository.cs` | **Create** |
-| `Engine/EnvironmentState/EnvironmentStateSnapshotId.cs` | **Create** |
-| `Engine/EnvironmentState/EnvironmentStateSnapshot.cs` | **Create** |
-| `Engine/EnvironmentState/IEnvironmentStateSnapshotRepository.cs` | **Create** |
+| `Engine/Deployment/DeploymentDelta.cs` | **Create** — `Compute` plus `CurrentResourceInstance`, `DesiredResource` |
+| `Engine/Deployment/ResourceChange.cs` | **Create** |
+| `Engine/Deployment/PlannedResourceInstance.cs` | **Modify** — add `ResourceId`, `Change`; `Key` nullable |
+| `Engine.Dispatch/Plan/RunPlanner.cs` | **Modify** — compute the delta before recording, store it on the plan |
 | `Persistence/Configurations/Engine/ResourceRequirementConfiguration.cs` | **Create** |
 | `Persistence/Configurations/Engine/ResourceBindingConfiguration.cs` | **Create** |
 | `Persistence/Configurations/Engine/DeploymentConfiguration.cs` | **Modify** — add new nullable columns |
-| `Persistence/Configurations/Engine/DeploymentDeltaConfiguration.cs` | **Create** |
-| `Persistence/Configurations/Engine/EnvironmentStateSnapshotConfiguration.cs` | **Create** |
-| `Persistence/OrchitectDbContext.cs` | **Modify** — add 4 new `DbSet`s |
+| `Persistence/Configurations/Engine/DeploymentRunPlanConfiguration.cs` | **Modify** — store `ResourceId` and `Change` per planned instance |
+| `Persistence/OrchitectDbContext.cs` | **Modify** — add 2 new `DbSet`s (requirements, bindings) |
 | `Orchitect.Playground/Program.cs` | **Modify** — extend with Phase 2 demo flow |
 
 ---
@@ -599,10 +544,10 @@ EnvironmentStateSnapshot stored
 
 - **`Constraints` uses `Dictionary<string, string>`** — constraints are label-style tags (region=uk, compliance=pci) that don't need complex values. `Parameters` uses `Dictionary<string, JsonElement>` for full Terraform variable parity.
 - **`RequestedBy` is `string`** — avoids coupling `Deployment` to a specific identity type. Accepts a user email or `"system"`.
-- **`DeploymentDelta` is `sealed class` not `record`** — mutable list fields (`Add*` mutators) are safer on a class. Matches the `ResourceDependencyGraph` precedent.
-- **`EnvironmentStateSnapshot.ResourceIds` stored as `jsonb`** — avoids a join table for a read-only historical record. Querying individual IDs within snapshots is not a primary use case.
+- **`DeploymentDelta` is a pure computation, not an aggregate** — `Compute(current, desired)` returns one change per resource, so the change kinds can't overlap and it is unit tested without a database. The result is stored on the run plan.
+- **The delta belongs to a run, not a deployment** — each run (first attempt, retry, destroy) is planned separately and can see different current state.
+- **No `EnvironmentStateSnapshot`** — `ResourceInstance` already records what exists, so the baseline is read from the instances (#145).
 - **`IResourceResolver` is a domain interface only** — the actual resolution strategy (slug match, policy evaluator, etc.) lives in Infrastructure. Phase 2 only defines the contract.
-- **`Deployment.DeltaId` is nullable** — a deployment is created at `Pending` before the delta is computed. `SetDelta()` is called once the `DeploymentDelta` is persisted and the deployment transitions to `Planning`.
 
 ---
 
@@ -620,7 +565,7 @@ EnvironmentStateSnapshot stored
 ## Risks to Avoid
 
 1. **Don't merge requirements into Resource** — `Resource` is what the platform owns; `ResourceRequirement` is what an app asks for. Keep them separate.
-2. **Don't let Deployment own resources directly** — `Deployment` references `DeploymentDeltaId` + `EnvironmentId`. Resources are in the delta.
+2. **Don't let Deployment own resources directly** — each run's plan lists the instances it touches and how (the delta).
 3. **Don't hardcode resolver logic in controllers/services** — `IResourceResolver` is a domain strategy; its implementation belongs in Infrastructure.
 
 ---
@@ -632,7 +577,6 @@ EnvironmentStateSnapshot stored
 - `IResourceResolver` (interface only)
 - `Deployment` enriched
 - `DeploymentDelta`
-- `EnvironmentStateSnapshot`
 
 ## Nice Later (out of scope)
 
@@ -1165,40 +1109,35 @@ Console.WriteLine($"    new resource: {cosmosProductsResource.Slug} ({cosmosProd
 
 ### Step 10 — Compute DeploymentDelta
 
-The delta is computed by comparing the current `EnvironmentStateSnapshot` (the 9 resources provisioned in Phase 1) against the resolved binding set. The only new resource the bindings require that the snapshot doesn't contain is `ecommerce-cosmos-products`.
+The delta compares product-catalog's current instances with what its bindings resolve to. The baseline is scoped to product-catalog: the resources whose `Consumers` include it, with their latest instance that isn't `Removed`. After Phase 1, that is only AKS (`aksInstance`). The Redis resource was declared in Phase 1 but never provisioned, so it has no instance and counts as added. Other applications' resources (Service Bus, Key Vault, CosmosDB orders) are not part of this delta.
 
 ```csharp
-// Phase 1 snapshot: 9 known active resources.
-var phase1ResourceIds = new[]
+// Baseline: product-catalog's consumed resources with a live instance.
+var current = new[]
 {
-    vnetResource.Id, aksSubnetResource.Id, dataSubnetResource.Id,
-    keyVaultResource.Id, acrResource.Id, aksResource.Id,
-    cosmosOrdersResource.Id, serviceBusResource.Id, redisCacheResource.Id
+    new CurrentResourceInstance(aksInstance.Id, aksResource.Id,
+        aksInstance.TemplateVersionId, aksInstance.InputParameters)
 };
 
-// New desired set: all bound resources. Diff against snapshot.
-var desiredResourceIds = new HashSet<ResourceId>
+// Desired: what product-catalog's bindings resolve to, with the inputs the planner would use.
+var desired = new[]
 {
-    cosmosOrdersResource.Id, serviceBusResource.Id, aksResource.Id,  // order-service
-    keyVaultResource.Id,                                              // payment + notif
-    redisCacheResource.Id,                                           // catalog redis (existing)
-    cosmosProductsResource.Id                                        // catalog cosmos (NEW)
+    new DesiredResource("aks", aksResource.Id,
+        aksInstance.TemplateVersionId, aksInstance.InputParameters),            // same inputs → Unchanged
+    new DesiredResource("cache", redisCacheResource.Id,
+        redisCacheTemplate.GetLatestVersion()!.Id, new Dictionary<string, JsonElement>()), // no instance → Added
+    new DesiredResource("db", cosmosProductsResource.Id,
+        cosmosOrdersTemplate.GetLatestVersion()!.Id, new Dictionary<string, JsonElement>()) // new resource → Added
 };
 
-var delta = DeploymentDelta.Create(organisation.Id, production.Id);
+var delta = DeploymentDelta.Compute(current, desired);
 
-foreach (var id in desiredResourceIds)
-{
-    if (!phase1ResourceIds.Contains(id))
-        delta.AddResource(id);   // net-new resource — needs provisioning
-}
-// No updates or removals in this scenario — all existing resources are unchanged.
-
-Console.WriteLine("\n=== Deployment Delta ===");
-Console.WriteLine($"  + Add: {cosmosProductsResource.Slug} (product-catalog CosmosDB)");
-Console.WriteLine($"  ~ Update: (none)");
-Console.WriteLine($"  - Remove: (none)");
-Console.WriteLine($"  Total: {delta.AddedResourceIds.Count} added, {delta.UpdatedResourceIds.Count} updated, {delta.RemovedResourceIds.Count} removed");
+Console.WriteLine("\n=== Deployment Delta (product-catalog) ===");
+foreach (var (resourceId, key, change) in delta)
+    Console.WriteLine($"  {change,-9} {key ?? "(dropped)"} {resourceId.Value}");
+// Added     cache ...
+// Added     db    ...
+// Unchanged aks   ...
 ```
 
 ---
@@ -1223,9 +1162,7 @@ Console.WriteLine($"  Requested by: {catalogDeploy.RequestedBy}");
 catalogDeploy.Transition(DeploymentStatus.Planning);
 Console.WriteLine($"  → {catalogDeploy.Status}");   // Planning
 
-// Delta computed and persisted — attach it to the deployment.
-catalogDeploy.SetDelta(delta.Id);
-Console.WriteLine($"  DeltaId attached: {catalogDeploy.DeltaId}");
+// The run's plan stores the delta computed in Step 10.
 
 // IaC apply begins. StartedAt is set automatically on transition to Running.
 catalogDeploy.Transition(DeploymentStatus.Running);
@@ -1248,7 +1185,6 @@ var notifDeploy = Deployment.Create(new CreateDeploymentRequest(
     RequestedBy:   "system"));
 
 notifDeploy.Transition(DeploymentStatus.Planning);
-notifDeploy.SetDelta(DeploymentDelta.Create(organisation.Id, production.Id).Id);  // empty delta — no new resources
 notifDeploy.Transition(DeploymentStatus.Running);
 
 // Terraform apply fails: Service Bus topic quota exceeded.
@@ -1285,9 +1221,9 @@ catch (InvalidOperationException ex)
 
 ---
 
-### Step 12 — Capture EnvironmentStateSnapshot
+### Step 12 — Record the Result on the Instances
 
-After successful deployment, record the full set of active resources as the new baseline. The next delta computation will diff against this snapshot.
+After a successful deployment, the instances become the next run's baseline. There is no separate snapshot (#145). The new cosmos-products instance goes to `Active`, and the Redis instance follows the same steps.
 
 ```csharp
 // Provision the new cosmos-products instance (matches the Phase 1 pattern).
@@ -1312,29 +1248,7 @@ cosmosProductsInstance.Transition(ResourceInstanceStatus.Active, new ResourceIns
     Workspace = "ecommerce-prod"
 });
 
-// Snapshot captures all 10 active resources — this becomes the new baseline.
-var activeResourceIds = new[]
-{
-    vnetResource.Id, aksSubnetResource.Id, dataSubnetResource.Id,
-    keyVaultResource.Id, acrResource.Id, aksResource.Id,
-    cosmosOrdersResource.Id, serviceBusResource.Id, redisCacheResource.Id,
-    cosmosProductsResource.Id   // newly added in this deployment
-};
-
-var snapshot = EnvironmentStateSnapshot.Capture(
-    organisationId:   organisation.Id,
-    environmentId:    production.Id,
-    deploymentId:     catalogDeploy.Id,
-    activeResourceIds: activeResourceIds);
-
-Console.WriteLine($"\n=== Environment State Snapshot ===");
-Console.WriteLine($"  SnapshotId:  {snapshot.Id.Value}");
-Console.WriteLine($"  Environment: production");
-Console.WriteLine($"  DeploymentId: {snapshot.DeploymentId.Value}");
-Console.WriteLine($"  CapturedAt:   {snapshot.CapturedAt:u}");
-Console.WriteLine($"  Resources ({snapshot.ResourceIds.Count}):");
-foreach (var id in snapshot.ResourceIds)
-    Console.WriteLine($"    {id.Value}");
+Console.WriteLine($"\n=== cosmos-products instance: {cosmosProductsInstance.Status} ===");
 ```
 
 ---
@@ -1379,8 +1293,8 @@ foreach (var (binding, type, slug) in allBindings)
     Console.WriteLine($"  {binding.Id.Value} │ {type,-28} → {slug}");
 
 Console.WriteLine("\n── Delta ─────────────────────────────────────────────────");
-Console.WriteLine($"  + ecommerce-cosmos-products (product-catalog CosmosDB, 8000 RU/s)");
-Console.WriteLine($"  (no updates, no removals)");
+foreach (var (resourceId, key, change) in delta)
+    Console.WriteLine($"  {change,-9} {key ?? "(dropped)"} {resourceId.Value}");
 
 Console.WriteLine("\n── Deployment Timeline ───────────────────────────────────");
 Console.WriteLine($"  {catalogDeploy.Id.Value}");
@@ -1389,14 +1303,11 @@ Console.WriteLine($"  Started:   {catalogDeploy.StartedAt:u}");
 Console.WriteLine($"  Completed: {catalogDeploy.CompletedAt:u}");
 Console.WriteLine($"  Status:    {catalogDeploy.Status}");
 
-Console.WriteLine("\n── Snapshot ──────────────────────────────────────────────");
-Console.WriteLine($"  {snapshot.ResourceIds.Count} active resources at {snapshot.CapturedAt:u}");
-Console.WriteLine($"  Next delta will diff against this snapshot.");
 ```
 
 ---
 
-## Example Real Flow
+## Example Real Flow (playground)
 
 ```
 product-catalog deploy
@@ -1405,18 +1316,20 @@ score.yaml
 ResourceRequirements created (type, class, constraints)
   ↓
 Resolver binds:
-  azure.cosmosdb.orders (no id:) → NEW ecommerce-cosmos-products  [delta: + Add]
-  azure.redis-cache     (no id:) → ecommerce-redis-catalog         [existing, no delta]
-  azure.aks             (id: ecommerce-aks-prod) → ecommerce-aks-prod [existing, no delta]
+  azure.cosmosdb.orders (no id:) → NEW ecommerce-cosmos-products
+  azure.redis-cache     (no id:) → ecommerce-redis-catalog (declared, never provisioned)
+  azure.aks             (id: ecommerce-aks-prod) → ecommerce-aks-prod
   ↓
-DeploymentDelta computed:
-  + Add ecommerce-cosmos-products
+DeploymentDelta computed against product-catalog's instances:
+  + Added     ecommerce-cosmos-products
+  + Added     ecommerce-redis-catalog
+  = Unchanged ecommerce-aks-prod
   ↓
 Deployment executes in graph order (cosmos after data subnet)
   ↓
-EnvironmentStateSnapshot stored (10 resources)
+Instances move to Active
   ↓
-Next deploy diffs against this snapshot
+Next deploy diffs against product-catalog's instances
 ```
 
 ---
@@ -1432,5 +1345,5 @@ dotnet run --project src/Orchitect.Playground  # playground runs end-to-end
 
 After domain build passes, run the migration script:
 ```bash
-./scripts/efm.sh Phase2_ResourceRequirements_Bindings_Deltas_Snapshots
+./scripts/efm.sh Phase2_ResourceRequirements_Bindings_Deltas
 ```
