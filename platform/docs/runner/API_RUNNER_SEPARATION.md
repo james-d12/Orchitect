@@ -3,9 +3,9 @@ title: "API / runner separation (target design)"
 status: active
 workstream: runner
 milestone: "Runner Isolation"
-issues: [102, 103, 105, 106, 107, 110, 202, 203, 204, 213, 214, 215]
+issues: [102, 103, 105, 106, 107, 110, 153, 202, 203, 204, 213, 214, 215]
 superseded_by: null
-last_reviewed: 2026-10-03
+last_reviewed: 2026-10-08
 ---
 
 # Orchitect Runner Architecture
@@ -98,6 +98,7 @@ The runner API needs a stable run ID, because one deployment can have several ru
 | `RunnerId` | Container / job ID |
 | `TokenHash`, `TokenExpiresAt` | The run's credential (§6). Cleared on revocation. |
 | `LogLocation` | Reserved for per-run logs (A8) |
+| `AllowRemovals` | Target (#153): the provision may remove the application's resources that are no longer in the score. Set when the run is queued. |
 
 The container receives only `--run-id`. `--application-id`, `--deployment-id` and `--operation` go away: the runner gets them from the run descriptor.
 
@@ -224,6 +225,7 @@ All shared types live in `Orchitect.Engine.Contracts/Runner/Api/` (#203). The ru
   - Get or create the `Resource` and `ResourceInstance`.
   - Update consumers and the dependency graph.
   - Move the instances to `Provisioning`.
+  - Target (#153): find the application's recorded resources that are no longer in the score. Fail with `RemovalsNotConfirmed` unless the run allows removals; otherwise move their instances to `Removing` too. See `resource/resource-workflows.md` §3.
 - **Destroy:**
   - Find the recorded resources for the score's resources and their removable instances.
   - Plan each recorded resource from the template version its instance was provisioned with (`ResourceInstance.TemplateVersionId`), even if that version is no longer active (#213). A resource with nothing recorded uses the latest active version.
