@@ -5,7 +5,7 @@ workstream: resource
 milestone: "Resource Domain"
 issues: [151, 152, 153, 154, 155, 156]
 superseded_by: null
-last_reviewed: 2026-09-29
+last_reviewed: 2026-10-08
 ---
 
 # Domain Models
@@ -91,6 +91,26 @@ public sealed record ResourceScope
     - Mark `Resource` as `PendingDeletion`.
     - Delete safely in DAG order (dependents first).
     - Mark as `Deleted`.
+- **Today**: Terraform keeps one root module per application and environment, so a provision whose score no longer
+  has a resource destroys its `module.<template>_<key>` without warning. The run planner only looks at the
+  resources in the score, so the removed resource's `Resource` and instance stay `Active` after the infrastructure
+  is gone.
+- **Target design (#153)**:
+    - **Detect.** On a provision, the run planner finds the application's recorded resources that still have a live
+      instance (anything but `Removed`) and whose slug no longer matches a resource in the score. These are the
+      run's removals.
+    - **Block by default.** If there are removals and the run wasn't queued with `AllowRemovals`, the plan fails with
+      `RunPlanFailure.RemovalsNotConfirmed` and lists each resource it would destroy (slug and template type).
+      Nothing is recorded and the runner never reaches `terraform apply`.
+    - **Confirm per run.** `AllowRemovals` is set on the request that queues the provision (`POST /deployments`) and
+      stored on `DeploymentRun`. It applies to that run only, not to the deployment or later runs.
+    - **Clean up.** With `AllowRemovals`, the planner moves the removed instances to `Removing` in the same
+      transaction that moves the score's instances to `Provisioning`, and the run's completion moves them to
+      `Removed`. The application is dropped from each removed resource's consumers, and the resource is dropped
+      from the dependency graph. The run records what it removed, so a confirmed removal stays visible.
+    - **Shared resources.** A removed resource that other applications still consume is blocked even with
+      `AllowRemovals`, because its module lives in this application's Terraform state and would still be destroyed
+      (see #214).
 
 ---
 
@@ -110,6 +130,11 @@ public sealed record ResourceScope
     - Detect rename vs. delete + create.
     - Without alias support → treat as delete + create.
     - With alias support → link to existing resource by `ResourceExternalId`.
+- **Decision (#153)**: a rename is a removal of the old key plus an addition of the new one, handled as in §3. The
+  removal is blocked until the run is queued with `AllowRemovals`, so a rename never destroys the old resource
+  without someone confirming it. The score has no rename or alias metadata: a "one removed, one added of the same
+  type" match is ambiguous, and keeping state across a rename (Terraform `moved` blocks) isn't worth a
+  rename-specific field in `score.yaml`.
 
 ---
 
