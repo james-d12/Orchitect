@@ -25,7 +25,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Orchitect.Engine.Execution\Orchitect.Engine.Execution.csproj" />
+      <ProjectReference Include="..\..\src\Orchitect.Engine.Execution\Orchitect.Engine.Execution.csproj" />
     </ItemGroup>
 
 </Project>

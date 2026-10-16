@@ -52,10 +52,10 @@ The API applies pending migrations on startup (`ApplyMigrations()` in `Orchitect
 dotnet test
 
 # Run a single test project
-dotnet test src/Orchitect.Engine.Execution.Unit.Tests
+dotnet test tests/Orchitect.Engine.Execution.Unit.Tests
 ```
 
-Test projects:
+Test projects live in `tests/`, alongside the production projects in `src/`:
 - `Orchitect.AppHost.E2E.Tests`: boots the real Aspire AppHost and checks every resource becomes healthy (needs Docker, Node.js and pnpm)
 - `Orchitect.Api.Integration.Tests`: endpoints and repositories against Postgres in Testcontainers (needs Docker)
 - `Orchitect.Domain.Unit.Tests`: domain entity behaviour (e.g. deployment status transitions)

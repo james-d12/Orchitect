@@ -21,7 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Orchitect.AppHost\Orchitect.AppHost.csproj" />
+        <ProjectReference Include="..\..\src\Orchitect.AppHost\Orchitect.AppHost.csproj" />
     </ItemGroup>
 
 </Project>

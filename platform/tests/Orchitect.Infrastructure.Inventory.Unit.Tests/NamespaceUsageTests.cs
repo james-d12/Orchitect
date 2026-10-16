@@ -15,8 +15,8 @@ public sealed class NamespaceUsageTests
     {
         var baseDir = AppDomain.CurrentDomain.BaseDirectory;
         var solutionDir =
-            Directory.GetParent(baseDir)?.Parent?.Parent?.Parent?.Parent?.FullName ?? string.Empty;
-        return Path.Combine(solutionDir, "Orchitect.Infrastructure.Inventory");
+            Directory.GetParent(baseDir)?.Parent?.Parent?.Parent?.Parent?.Parent?.FullName ?? string.Empty;
+        return Path.Combine(solutionDir, "src", "Orchitect.Infrastructure.Inventory");
     }
 
     [Theory]
