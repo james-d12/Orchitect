@@ -14,33 +14,33 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Api", "src\Orchit
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Infrastructure.Inventory", "src\Orchitect.Infrastructure.Inventory\Orchitect.Infrastructure.Inventory.csproj", "{5A3652DB-54C8-4290-84D2-8062C245D0BA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Infrastructure.Inventory.Unit.Tests", "src\Orchitect.Infrastructure.Inventory.Unit.Tests\Orchitect.Infrastructure.Inventory.Unit.Tests.csproj", "{08425FD5-B210-4332-9E50-A6E52E92E37A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Infrastructure.Inventory.Unit.Tests", "tests\Orchitect.Infrastructure.Inventory.Unit.Tests\Orchitect.Infrastructure.Inventory.Unit.Tests.csproj", "{08425FD5-B210-4332-9E50-A6E52E92E37A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Aspire", "Aspire", "{39DC69B3-EE8D-4C43-B6FA-B69DEF7B77F2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Api.Integration.Tests", "src\Orchitect.Api.Integration.Tests\Orchitect.Api.Integration.Tests.csproj", "{67F547C0-B70F-437B-98BA-2A51C39D6642}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Api.Integration.Tests", "tests\Orchitect.Api.Integration.Tests\Orchitect.Api.Integration.Tests.csproj", "{67F547C0-B70F-437B-98BA-2A51C39D6642}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Common", "src\Orchitect.Common\Orchitect.Common.csproj", "{C38F8776-2062-4845-BDD1-DF92627304B6}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{CC0A1FCB-7A7A-427C-B617-0B883DB93332}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Common.Unit.Tests", "src\Orchitect.Common.Unit.Tests\Orchitect.Common.Unit.Tests.csproj", "{74EE9A69-EA6A-44C0-8471-AF5B509A5E46}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Common.Unit.Tests", "tests\Orchitect.Common.Unit.Tests\Orchitect.Common.Unit.Tests.csproj", "{74EE9A69-EA6A-44C0-8471-AF5B509A5E46}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Domain.Unit.Tests", "src\Orchitect.Domain.Unit.Tests\Orchitect.Domain.Unit.Tests.csproj", "{C59149B2-D803-46FF-8F2B-A78A3C351E11}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Domain.Unit.Tests", "tests\Orchitect.Domain.Unit.Tests\Orchitect.Domain.Unit.Tests.csproj", "{C59149B2-D803-46FF-8F2B-A78A3C351E11}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Runner", "src\Orchitect.Runner\Orchitect.Runner.csproj", "{F4145D1B-D812-4DC1-9D43-EE6F35E0FD2D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Execution", "src\Orchitect.Engine.Execution\Orchitect.Engine.Execution.csproj", "{7C585B88-7799-4CF3-926E-92587F3B7DB7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Execution.Unit.Tests", "src\Orchitect.Engine.Execution.Unit.Tests\Orchitect.Engine.Execution.Unit.Tests.csproj", "{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Execution.Unit.Tests", "tests\Orchitect.Engine.Execution.Unit.Tests\Orchitect.Engine.Execution.Unit.Tests.csproj", "{5BCE88F4-AD32-4D15-BAFB-CE8A9E62C5AB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Contracts", "src\Orchitect.Engine.Contracts\Orchitect.Engine.Contracts.csproj", "{A1E5C0B2-3F41-4C8E-9D2A-6B7C8D9E0F11}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Dispatch", "src\Orchitect.Engine.Dispatch\Orchitect.Engine.Dispatch.csproj", "{B2F6D1C3-4052-4D9F-8E3B-7C8D9E0F1A22}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Dispatch.Unit.Tests", "src\Orchitect.Engine.Dispatch.Unit.Tests\Orchitect.Engine.Dispatch.Unit.Tests.csproj", "{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.Engine.Dispatch.Unit.Tests", "tests\Orchitect.Engine.Dispatch.Unit.Tests\Orchitect.Engine.Dispatch.Unit.Tests.csproj", "{C3A7E2D4-5163-4EA0-9F4C-8D9E0F1A2B33}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.AppHost.E2E.Tests", "src\Orchitect.AppHost.E2E.Tests\Orchitect.AppHost.E2E.Tests.csproj", "{D4B8F3E5-6274-4FB1-A05D-9E0F1A2B3C44}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchitect.AppHost.E2E.Tests", "tests\Orchitect.AppHost.E2E.Tests\Orchitect.AppHost.E2E.Tests.csproj", "{D4B8F3E5-6274-4FB1-A05D-9E0F1A2B3C44}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

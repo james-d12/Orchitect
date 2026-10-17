@@ -13,7 +13,7 @@ allowed-tools:
 
 # /integration-test — Scaffold Integration Tests
 
-Generates integration test classes for new Orchitect API endpoints, following the established patterns in `platform/src/Orchitect.Api.Integration.Tests/`.
+Generates integration test classes for new Orchitect API endpoints, following the established patterns in `platform/tests/Orchitect.Api.Integration.Tests/`.
 
 Arguments passed: `$ARGUMENTS`
 
@@ -50,7 +50,7 @@ There are two distinct patterns depending on the context:
 
 ## Step 3 — Check for existing seed helper (Inventory only)
 
-Read `platform/src/Orchitect.Api.Integration.Tests/Helpers/InventorySeedHelper.cs`.
+Read `platform/tests/Orchitect.Api.Integration.Tests/Helpers/InventorySeedHelper.cs`.
 
 If `Seed{Entity}Async` does not already exist:
 1. Read the domain entity class to discover its properties and ID type.
@@ -114,7 +114,7 @@ For each **query filter** the endpoint accepts (name, platform, url, status, etc
 
 ## Step 5 — Write the test file
 
-Create `platform/src/Orchitect.Api.Integration.Tests/{Entity}IntegrationTests.cs` using this structure:
+Create `platform/tests/Orchitect.Api.Integration.Tests/{Entity}IntegrationTests.cs` using this structure:
 
 ```csharp
 using System.Net;
@@ -173,7 +173,7 @@ public sealed class {Entity}IntegrationTests(WebApplicationFactoryWithPostgres f
 Run the tests to confirm they pass:
 
 ```bash
-cd platform && dotnet test src/Orchitect.Api.Integration.Tests --filter "{Entity}IntegrationTests"
+cd platform && dotnet test tests/Orchitect.Api.Integration.Tests --filter "{Entity}IntegrationTests"
 ```
 
 Fix any compilation errors before reporting done. If tests fail due to missing seed data, missing using directives, or wrong response type names — investigate and fix.

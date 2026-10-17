@@ -38,7 +38,7 @@ Branch `feature/organisation_membership_check`, PR #195. The first version (`868
 - `Orchitect.Api.Integration.Tests/OrganisationMembershipIntegrationTests.cs` uses `AuthTokenHelper.AddAuthorisationHeaderForNewUser()` to get an outsider client. `AddAuthorisationHeader()` still returns the shared, cached user that owns everything the other tests create.
 - `OrganisationMemberIntegrationTests.cs` covers listing, adding and removing members, the last member, and a non-member getting 404.
 - `OrganisationScopeCoverageTests` enumerates `EndpointDataSource`.
-- Full suite: `DOTNET_USE_POLLING_FILE_WATCHER=true dotnet test src/Orchitect.Api.Integration.Tests`. Without the variable, `DeploymentIntegrationTests` can fail with "configured user limit (128) on the number of inotify instances". That is environmental: each `WithWebHostBuilder` host opens file watchers.
+- Full suite: `DOTNET_USE_POLLING_FILE_WATCHER=true dotnet test tests/Orchitect.Api.Integration.Tests`. Without the variable, `DeploymentIntegrationTests` can fail with "configured user limit (128) on the number of inotify instances". That is environmental: each `WithWebHostBuilder` host opens file watchers.
 
 ## Decisions
 - 403 for an explicit `organisationId` the caller can't use, 404 for an entity id in another organisation. This follows the issue's "403/404" criterion and keeps entity existence private.
